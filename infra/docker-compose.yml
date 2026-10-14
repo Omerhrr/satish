@@ -1,0 +1,42 @@
+# XP local infrastructure — Postgres + Redis for developer environments.
+#
+#   docker compose -f infra/docker-compose.yml up -d
+#
+# Bitcoin/Lightning regtest nodes (bitcoind, electrs, LDK/CLN) are added in
+# phase 3 after the wallet/Lightning implementation decisions — see
+# docs/decisions.md. Nothing here holds secret material.
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: xp-postgres
+    environment:
+      POSTGRES_USER: xp
+      POSTGRES_PASSWORD: xp_dev_only
+      POSTGRES_DB: xp
+    ports:
+      - "5432:5432"
+    volumes:
+      - xp_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U xp -d xp"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: xp-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - xp_redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  xp_pgdata:
+  xp_redisdata:
