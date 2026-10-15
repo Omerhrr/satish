@@ -295,3 +295,42 @@ quality bars a repeatable regression harness with 5 cases covering
 citations, conflicts, unavailable disclosure, estimate typing, and the
 honest-empty report. Live search awaits a search API key (tracked open
 item); live fetch works wherever the sandbox has egress.
+
+## D15 — Commerce intelligence: structural-only scoring, canned ad-library honesty, typed landed-cost template (2026-10-15, phase 8)
+
+**Context:** phase 8 asks for product discovery, supported ad-library
+integrations, trend scoring with transparent signals, supplier/listing
+comparison, vehicle auction research, a landed-cost estimate template, and
+source freshness/confidence indicators — under acceptance bars that forbid
+inventing demand, ad-performance, or availability claims, and require
+visible, configurable scoring factors.
+
+**Decision:** a dedicated `services/commerce-adapter` package over the same
+provenance records phase 7 persists (no new tables — verdicts live in
+`task_events`, artifacts in `artifacts`). Scoring exposes EXACTLY five
+structural factors (`distinct_sources`, `supplier_count`, `price_spread`,
+`freshness`, `attribute_completeness`) with operator-configured weights
+(`XP_COMMERCE_SCORING_FACTORS`); the weight configuration is echoed verbatim
+in every verdict, any config defect falls back to documented defaults WITH a
+disclosure, and factors with insufficient data are excluded with reasons
+instead of silently zeroed. There is deliberately NO demand, ad-performance,
+or availability factor — the platform cannot measure those from snapshot
+pages. The ad-library integration is canned-only and says so on every
+result; page-printed performance metrics stay in provenance but never enter
+a summary or a score. The landed-cost template types every line
+(asking price = estimate, official published rate = observed, user input =
+assumption), states that no verified transaction cost exists in the
+pipeline, and — when the model binds a source — takes the line VALUE from
+the persisted fact, so citing [S2] with a different number is impossible.
+Source freshness (fresh/recent/stale/outdated) and confidence (status +
+retrieval mode + corroboration, capped at 0.9) ride along on every source
+everywhere it is shown.
+
+**Consequences:** the product registry gains six commerce tools under the
+existing `research:read` scope (one scope wall, one budget gate, one audit
+path); commerce fixture pages join the SAME canned providers, so search and
+fetch reach them through the phase-7 permission wall unchanged; the
+committed commerce evaluation set (`tests/data/commerce_eval_set.json` +
+`make commerce-eval`, 7 cases) is the repeatable regression harness. A live
+ad-library integration would require a permitted API partnership and is
+tracked as an open item, honestly out of reach for now.

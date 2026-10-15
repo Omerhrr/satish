@@ -147,6 +147,8 @@
           [{{ i + 1 }}] <span class="badge" :class="s.status">{{ s.status }}</span>
           {{ s.title || "(untitled)" }} — <span class="mono small">{{ s.url }}</span>
           · {{ s.fact_count }} facts · {{ s.retrieval_mode }}
+          · <span class="dim">freshness {{ s.freshness }}</span>
+          · <span class="dim">confidence {{ s.confidence }}</span>
         </li>
         <li v-if="result.sources.length === 0" class="dim">No sources were collected.</li>
       </ul>
@@ -157,6 +159,33 @@
       </div>
       <div v-if="result.gaps.length" class="notice small">
         <strong>Coverage gaps:</strong> {{ result.gaps.join(", ") }}
+      </div>
+
+      <div v-if="result.scored" class="notice small">
+        <strong>Commerce score: {{ result.scored.product }} — {{ result.scored.score }} / 100</strong>
+        <div class="dim small" style="margin: 4px 0">
+          Structural signals only — this score does not measure demand, ad
+          performance, or availability. Factors and weights are operator-configured:
+        </div>
+        <table class="small" style="width: 100%; border-collapse: collapse; margin-top: 4px">
+          <thead>
+            <tr style="text-align: left">
+              <th style="padding: 2px 6px 2px 0">factor</th>
+              <th style="padding: 2px 6px">weight</th>
+              <th style="padding: 2px 6px">signal</th>
+              <th style="padding: 2px 6px">normalized</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="f in result.scored.factors" :key="f.name" :class="{ dim: !f.included }">
+              <td style="padding: 2px 6px 2px 0">{{ f.name }}<span v-if="!f.included"> (excluded)</span></td>
+              <td style="padding: 2px 6px">{{ f.weight }}</td>
+              <td style="padding: 2px 6px">{{ f.signal }}</td>
+              <td style="padding: 2px 6px">{{ f.normalized ?? "—" }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <div v-for="(d, i) in result.scored.disclosures" :key="i" class="dim small">• {{ d }}</div>
       </div>
 
       <h3 class="small" style="margin: 14px 0 4px">Limitations</h3>

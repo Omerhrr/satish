@@ -58,8 +58,8 @@ async def cmd_start(message: Message) -> None:
     await message.answer(
         "Welcome to <b>XP</b> — your Bitcoin-native AI workforce.\n\n"
         "Self-custody first: your keys, your bitcoin. "
-        "I help you run research, business intelligence, and document jobs "
-        "paid in sats via XP credits.\n\n"
+        "I help you run research, commerce intelligence, vehicle comparisons, "
+        "and document jobs paid in sats via XP credits.\n\n"
         f"{SECURITY_NOTE}\n\n"
         "Tap below to open the Mini App, or try /help.",
         reply_markup=mini_app_keyboard(settings),
@@ -137,9 +137,10 @@ async def cmd_fund(message: Message) -> None:
 @router.message(Command("research"))
 async def cmd_research(message: Message) -> None:
     await message.answer(
-        "Describe your objective and constraints in the Mini App task form. "
-        "The agent proposes a plan with an XP estimate; you approve the budget "
-        "before anything runs.",
+        "Describe your objective and constraints in the Mini App task form — "
+        "product sourcing, supplier comparison, vehicle auction research, or "
+        "general research. The agent proposes a plan with an XP estimate; you "
+        "approve the budget before anything runs.",
         reply_markup=mini_app_keyboard(get_settings()),
     )
 

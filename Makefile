@@ -3,7 +3,7 @@ VENV := .venv
 PY := $(VENV)/bin/python
 API_URL := sqlite+aiosqlite:////$(CURDIR)/data/xp-dev.db
 
-.PHONY: help install migrate run-api run-worker run-bot run-web test lint dsh-verify research-eval wallet-regtest lightning-drill compose-up compose-down
+.PHONY: help install migrate run-api run-worker run-bot run-web test lint dsh-verify research-eval commerce-eval wallet-regtest lightning-drill compose-up compose-down
 
 help:
 	@echo "install      - install python (uv) + node (bun) dependencies"
@@ -12,6 +12,7 @@ help:
 	@echo "run-worker   - arq worker (needs XP_REDIS_URL)"
 	@echo "dsh-verify   - live-verify the pinned DSH revision (needs XP_DEEPSEEK_API_KEY)"
 	@echo "research-eval - run the committed research evaluation set (phase 7)"
+	@echo "commerce-eval - run the committed commerce evaluation set (phase 8)"
 	@echo "wallet-regtest - end-to-end BDK+bitcoind regtest proof (spawns its own node)"
 	@echo "lightning-drill - two-node lnd regtest drill (invoice/payment/recovery; needs healthy zmq)"
 	@echo "run-bot      - Telegram bot (needs XP_TELEGRAM_BOT_TOKEN)"
@@ -21,7 +22,7 @@ help:
 
 install:
 	uv pip install --python $(PY) -e packages/py-core -e services/api -e services/worker \
-	        -e services/agent-adapter -e services/wallet-adapter -e services/lightning-adapter -e services/research-adapter -e apps/bot
+	        -e services/agent-adapter -e services/wallet-adapter -e services/lightning-adapter -e services/research-adapter -e services/commerce-adapter -e apps/bot
 	bun install
 
 migrate:
@@ -50,6 +51,9 @@ dsh-verify:
 
 research-eval:
 	$(PY) scripts/research_eval.py
+
+commerce-eval:
+	$(PY) scripts/commerce_eval.py
 
 wallet-regtest:
 	$(PY) scripts/regtest_proof.py

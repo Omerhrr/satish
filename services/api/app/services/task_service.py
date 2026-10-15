@@ -180,6 +180,8 @@ async def build_task_result(
     research sources by task, the latest research.compared verdict, the
     evaluation notes, and the ledger entries that reference the task.
     """
+    from commerce_adapter import confidence_label, freshness_label
+    from research_adapter import SourceRecord
     from xp_core.models.entities import (
         Artifact,
         ResearchSource,
@@ -189,6 +191,8 @@ async def build_task_result(
     from xp_core.schemas.api import (
         ResultArtifactOut,
         ResultSourceOut,
+        ScoredFactorOut,
+        ScoredOut,
         TaskResultOut,
         XpReceiptOut,
     )
@@ -221,18 +225,31 @@ async def build_task_result(
             .order_by(ResearchSource.created_at)
         )
     ).scalars().all()
-    sources = [
-        ResultSourceOut(
+    sources = []
+    for s in source_rows:
+        record = SourceRecord(
+            source_id=s.id,
             url=s.url,
             title=s.title,
             status=s.status,
-            retrieval_mode=s.retrieval_mode,
-            fact_count=s.fact_count,
             retrieved_at=s.retrieved_at,
+            retrieval_mode=s.retrieval_mode,
             note=s.note,
         )
-        for s in source_rows
-    ]
+        conf_label, _rationale, _score = confidence_label(record)
+        sources.append(
+            ResultSourceOut(
+                url=s.url,
+                title=s.title,
+                status=s.status,
+                retrieval_mode=s.retrieval_mode,
+                fact_count=s.fact_count,
+                retrieved_at=s.retrieved_at,
+                note=s.note,
+                freshness=freshness_label(s.retrieved_at),
+                confidence=conf_label,
+            )
+        )
 
     compared = (
         await session.execute(
@@ -252,6 +269,42 @@ async def build_task_result(
         conflicts = list(payload.get("conflicts", []))
         gaps = list(payload.get("gaps", []))
         disclosures = list(payload.get("disclosures", []))
+
+    # phase-8: latest commerce.scored verdict (factor table + config echo)
+    scored_event = (
+        await session.execute(
+            select(TaskEvent)
+            .where(TaskEvent.task_id == task.id, TaskEvent.event_type == "commerce.scored")
+            .order_by(TaskEvent.seq.desc())
+            .limit(1)
+        )
+    ).scalars().first()
+    scored: ScoredOut | None = None
+    if scored_event is not None:
+        payload = scored_event.payload or {}
+        scored = ScoredOut(
+            product=str(payload.get("product", "")),
+            score=float(payload.get("score", 0.0)),
+            factors=[
+                ScoredFactorOut(
+                    name=str(f.get("name", "")),
+                    weight=float(f.get("weight", 0.0)),
+                    signal=str(f.get("signal", "")),
+                    normalized=(
+                        float(f["normalized"]) if f.get("normalized") is not None else None
+                    ),
+                    included=bool(f.get("included", False)),
+                    reason=str(f.get("reason", "")),
+                )
+                for f in payload.get("factors", [])
+                if isinstance(f, dict)
+            ],
+            excluded=[str(e) for e in payload.get("excluded", [])],
+            config_echo={
+                str(k): float(v) for k, v in (payload.get("config_echo") or {}).items()
+            },
+            disclosures=[str(d) for d in payload.get("disclosures", [])],
+        )
 
     evaluation = (
         await session.execute(
@@ -319,6 +372,7 @@ async def build_task_result(
         gaps=gaps,
         limitations=limitations,
         xp_receipt=receipt,
+        scored=scored,
     )
 
 

@@ -25,6 +25,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from app.services.task_events import append_event
+from commerce_adapter import commerce_facts
 from dsh_adapter.tools import ToolRegistry, ToolSpec
 from research_adapter import (
     Fact,
@@ -71,6 +72,30 @@ def load_corpus(settings: Settings) -> list[dict[str, Any]]:
         log.warning("research_corpus_missing", path=str(path))
         return RESEARCH_CORPUS_FALLBACK
     return json.loads(path.read_text())["corpus"]
+
+
+def load_commerce_corpus(settings: Settings) -> list[dict[str, Any]]:
+    """Commerce fixture corpus (phase 8): suppliers, market/auction/dealer
+    listings, an official tariff, and an ad-library fixture. Entries carry
+    ``source_type``; merged into the same canned providers so web.search and
+    web.fetch_page reach them through ONE permission wall. A missing or
+    malformed file degrades to an empty corpus with a warning — commerce
+    tools then honestly report zero fixtures, never fabricated ones."""
+    import json
+    from pathlib import Path
+
+    path = Path(settings.commerce_eval_set_path)
+    if not path.is_absolute():
+        path = Path(__file__).resolve().parents[4] / path
+    if not path.is_file():
+        log.warning("commerce_corpus_missing", path=str(path))
+        return []
+    try:
+        corpus = json.loads(path.read_text())["corpus"]
+    except (json.JSONDecodeError, KeyError) as exc:
+        log.warning("commerce_corpus_malformed", path=str(path), error=str(exc))
+        return []
+    return [e for e in corpus if isinstance(e, dict) and e.get("url")]
 
 
 async def _upsert_source(
@@ -290,6 +315,9 @@ def build_product_registry(
     """The runtime registry: same allowlist semantics, real handlers."""
     registry = ToolRegistry()
     corpus = load_corpus(settings)
+    commerce_corpus = load_commerce_corpus(settings)
+    corpus = corpus + commerce_corpus
+    corpus_by_url = {str(e["url"]): e for e in corpus}
     search_provider = make_search_provider(settings.research_search_mode, corpus)
     fetch_provider = make_fetch_provider(settings.research_fetch_mode, corpus)
 
@@ -320,11 +348,28 @@ def build_product_registry(
     async def web_fetch_page(url: str) -> dict[str, Any]:
         outcome = await fetch_provider.fetch(url)
         if outcome.status == "ok" and outcome.page is not None:
-            facts = facts_from_extraction(
-                [(f.key, f.value) for f in outcome.page.facts],
-                is_listing_snapshot=outcome.is_listing_snapshot,
-                retrieved_at=datetime.now(UTC),
-            )
+            now = datetime.now(UTC)
+            # Commerce corpus entries carry source_type -> commerce fact
+            # typing (asking prices = estimates, official rates = observed);
+            # research pages keep the research classifier. The persisted note
+            # records the source type so downstream commerce tools can tell
+            # suppliers from listings deterministically.
+            entry = corpus_by_url.get(url)
+            source_type = str(entry.get("source_type", "")) if entry else ""
+            if source_type:
+                facts = commerce_facts(
+                    [(f.key, f.value) for f in outcome.page.facts],
+                    source_type=source_type,
+                    retrieved_at=now,
+                )
+                note = f"source_type={source_type}"
+            else:
+                facts = facts_from_extraction(
+                    [(f.key, f.value) for f in outcome.page.facts],
+                    is_listing_snapshot=outcome.is_listing_snapshot,
+                    retrieved_at=now,
+                )
+                note = None
             row, _ = await _upsert_source(
                 session,
                 task,
@@ -334,7 +379,8 @@ def build_product_registry(
                 retrieval_mode=outcome.mode,
                 facts=[f.as_dict() for f in facts],
                 content_sha256=outcome.page.content_sha256,
-                retrieved_at=datetime.now(UTC),
+                note=note,
+                retrieved_at=now,
             )
             await session.commit()
             fact_keys = [f.key for f in facts]
@@ -656,6 +702,13 @@ def build_product_registry(
             handler=schedule_job,
         )
     )
+
+    # -- commerce intelligence (phase 8) -------------------------------------
+    from app.services.commerce_tools import register_commerce_tools
+
+    register_commerce_tools(
+        registry, session=session, task=task, settings=settings, corpus=commerce_corpus
+    )
     return registry
 
 
@@ -668,4 +721,9 @@ def artifact_slug(title: str) -> str:
     return (slug.strip("-") or "artifact")[:60]
 
 
-__all__ = ["artifact_slug", "build_product_registry", "load_corpus"]
+__all__ = [
+    "artifact_slug",
+    "build_product_registry",
+    "load_commerce_corpus",
+    "load_corpus",
+]

@@ -124,6 +124,19 @@ class Settings(BaseSettings):
     # evaluation set (phase-7 acceptance #5). Relative to repo root.
     research_eval_set_path: str = "tests/data/research_eval_set.json"
 
+    # -- commerce intelligence (phase 8) ---------------------------------------
+    # Scoring factor weights as a JSON object; factor names are fixed (see
+    # commerce_adapter.scoring.DEFAULT_FACTORS) and weights are operator-
+    # configurable. Any defect falls back to the documented defaults WITH a
+    # disclosure in the score output — never silently.
+    commerce_scoring_factors: str = (
+        '{"distinct_sources": 2.0, "supplier_count": 1.5, "price_spread": 1.5, '
+        '"freshness": 1.0, "attribute_completeness": 1.0}'
+    )
+    # Commerce fixture corpus + repeatable commerce evaluation set
+    # (phase-8 acceptance bars). Relative to repo root.
+    commerce_eval_set_path: str = "tests/data/commerce_eval_set.json"
+
     # -- worker ----------------------------------------------------------------
     pdf_storage_dir: str = "./data/artifacts"
     reconcile_interval_seconds: int = 3600  # billing_flow #8

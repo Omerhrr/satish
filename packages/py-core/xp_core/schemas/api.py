@@ -222,6 +222,9 @@ class ResultSourceOut(BaseModel):
     fact_count: int
     retrieved_at: datetime | None
     note: str | None
+    # phase-8: source freshness + confidence indicators (deliverable #7)
+    freshness: str = "unknown"  # fresh | recent | stale | outdated | unknown
+    confidence: str = "low"  # high | medium | low
 
 
 class XpReceiptOut(BaseModel):
@@ -232,6 +235,24 @@ class XpReceiptOut(BaseModel):
     settled_at: datetime | None
     balance_after: int | None
     status: str  # settled | pending_settlement | no_charge
+
+
+class ScoredFactorOut(BaseModel):
+    name: str
+    weight: float
+    signal: str
+    normalized: float | None = None
+    included: bool
+    reason: str = ""
+
+
+class ScoredOut(BaseModel):
+    product: str
+    score: float
+    factors: list[ScoredFactorOut]
+    excluded: list[str] = []
+    config_echo: dict[str, float] = {}
+    disclosures: list[str] = []
 
 
 class TaskResultOut(BaseModel):
@@ -246,6 +267,8 @@ class TaskResultOut(BaseModel):
     gaps: list[str]
     limitations: list[str]
     xp_receipt: XpReceiptOut
+    # phase-8: latest commerce.scored verdict, if the task scored a candidate
+    scored: ScoredOut | None = None
 
 
 class ApprovalDecisionIn(BaseModel):

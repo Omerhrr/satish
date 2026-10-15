@@ -135,6 +135,9 @@ export interface ResultSourceOut {
   fact_count: number;
   retrieved_at: string | null;
   note: string | null;
+  // phase-8: source freshness + confidence indicators
+  freshness: "fresh" | "recent" | "stale" | "outdated" | "unknown";
+  confidence: "high" | "medium" | "low";
 }
 
 export interface XpReceiptOut {
@@ -145,6 +148,25 @@ export interface XpReceiptOut {
   settled_at: string | null;
   balance_after: number | null;
   status: "settled" | "pending_settlement" | "no_charge";
+}
+
+// phase-8: transparent commerce scoring verdict (factors + weights echoed)
+export interface ScoredFactorOut {
+  name: string;
+  weight: number;
+  signal: string;
+  normalized: number | null;
+  included: boolean;
+  reason: string;
+}
+
+export interface ScoredOut {
+  product: string;
+  score: number;
+  factors: ScoredFactorOut[];
+  excluded: string[];
+  config_echo: Record<string, number>;
+  disclosures: string[];
 }
 
 export interface TaskResultOut {
@@ -159,6 +181,7 @@ export interface TaskResultOut {
   gaps: string[];
   limitations: string[];
   xp_receipt: XpReceiptOut;
+  scored: ScoredOut | null;
 }
 
 // -- request payloads -------------------------------------------------------------

@@ -1,0 +1,235 @@
+{
+ "_meta": {
+  "name": "xp commerce evaluation set",
+  "phase": 8,
+  "purpose": "Repeatable regression harness for commerce intelligence: transparent configurable scoring, supplier/listing comparison, vehicle auction checks, canned ad-library integration, landed-cost template, freshness/confidence. All pages are offline fixtures (.test TLD); no network is touched.",
+  "quality_bars": [
+   "only accessible and permitted fixture sources are represented as searched",
+   "the report layer distinguishes asking prices (estimates), official published rates (observed), and verified costs (none exist here, disclosed)",
+   "no demand, ad-performance, or availability measure is invented: scoring has no such factor and ad summaries exclude performance keys",
+   "scoring factors and their weights are visible and configurable (config echoed in every verdict)"
+  ]
+ },
+ "corpus": [
+  {
+   "url": "https://supplier.example.test/energy/inverter-5kw-quote",
+   "title": "5kW Hybrid Inverter - Supplier A quotation",
+   "source_type": "supplier",
+   "keywords": ["inverter", "5kw", "hybrid", "supplier", "quote", "sungrid", "solar"],
+   "snippet": "Supplier quotation snapshot from SunGrid Ltd.",
+   "text": "Supplier quotation - SunGrid Ltd\nProduct: 5kW hybrid inverter\nUnit price: 1450\nCurrency: USD\nMOQ: 10\nLead time days: 21\nShipping total: 380\nWarranty months: 24\nSupplier: SunGrid Ltd"
+  },
+  {
+   "url": "https://supplier.example.test/energy/inverter-5kw-quote-b",
+   "title": "5kW Hybrid Inverter - Supplier B quotation",
+   "source_type": "supplier",
+   "keywords": ["inverter", "5kw", "hybrid", "supplier", "quote", "volttrade", "solar"],
+   "snippet": "Supplier quotation snapshot from VoltTrade Ltd.",
+   "text": "Supplier quotation - VoltTrade Ltd\nProduct: 5kW hybrid inverter\nUnit price: 1520\nCurrency: USD\nMOQ: 5\nLead time days: 14\nShipping total: 300\nWarranty months: 12\nSupplier: VoltTrade Ltd"
+  },
+  {
+   "url": "https://tariff.example.test/ng/import-duty-solar",
+   "title": "Import duty schedule - solar equipment (published rate)",
+   "source_type": "official",
+   "keywords": ["tariff", "duty", "import", "official", "nigeria", "solar", "rate"],
+   "snippet": "Official published import-duty rate for solar equipment.",
+   "text": "Official import duty schedule\nCategory: Solar inverter\nDuty rate pct: 5\nLevy pct: 0\nUpdated: 2026-08-01\nAuthority: Customs and Tariff Division"
+  },
+  {
+   "url": "https://ads.example.test/library/energy-q3",
+   "title": "Ad library fixture - solar energy ads Q3",
+   "source_type": "ad_library",
+   "keywords": ["ad", "library", "inverter", "solar", "sungrid", "advertiser", "lagos"],
+   "snippet": "Ad-library fixture entry: advertiser, dates, regions, creative text.",
+   "text": "Ad library entry\nAdvertiser: SunGrid Ltd\nAd id: AD-88123\nPlatform: example-social\nFirst seen: 2026-07-12\nLast seen: 2026-09-30\nRegions: NG, GH\nCreative: 5kW hybrid inverter, dealer pricing available\nCTR: 12.4"
+  },
+  {
+   "url": "https://auctions.example.test/lot/hilux-2019-lot42",
+   "title": "Auction lot 42 - 2019 Toyota Hilux",
+   "source_type": "auction",
+   "is_listing": true,
+   "keywords": ["hilux", "toyota", "auction", "vehicle", "truck", "lot", "2019"],
+   "snippet": "Auction lot snapshot for a 2019 Toyota Hilux.",
+   "text": "Auction lot 42\nMake: Toyota\nModel: Hilux\nYear: 2019\nMileage km: 118000\nAuction house: Port Harcourt Auto Auctions\nLot id: LOT-42\nReserve price: 21000\nBuyer premium pct: 7.5\nCondition grade: B\nCurrency: USD"
+  },
+  {
+   "url": "https://dealer.example.test/trucks/hilux-2019",
+   "title": "2019 Toyota Hilux - dealer listing",
+   "source_type": "dealer",
+   "is_listing": true,
+   "keywords": ["hilux", "toyota", "dealer", "vehicle", "truck", "2019"],
+   "snippet": "Dealer listing snapshot for a 2019 Toyota Hilux.",
+   "text": "Dealer listing\nMake: Toyota\nModel: Hilux\nYear: 2019\nMileage km: 132500\nAsking price: 22800\nCurrency: USD\nSeller: Kano Truck Dealers"
+  },
+  {
+   "url": "https://market.example.test/accra/inverters",
+   "title": "5kW hybrid inverter - Accra market listing",
+   "source_type": "market",
+   "is_listing": true,
+   "keywords": ["inverter", "5kw", "hybrid", "market", "accra", "ghana"],
+   "snippet": "Market listing snapshot in GHS.",
+   "text": "Market listing - Accra\nProduct: 5kW hybrid inverter\nAsking price: 9800\nCurrency: GHS\nSeller: Accra Solar Mart\nStock status: in stock"
+  },
+  {
+   "url": "https://market.example.test/lagos/inverters-5kw",
+   "title": "5kW hybrid inverter - Lagos market listing",
+   "source_type": "market",
+   "is_listing": true,
+   "keywords": ["inverter", "5kw", "hybrid", "market", "lagos", "nigeria"],
+   "snippet": "Market listing snapshot in USD.",
+   "text": "Market listing - Lagos\nProduct: 5kW hybrid inverter\nAsking price: 1495\nCurrency: USD\nSeller: Ikeja Power Store"
+  }
+ ],
+ "cases": [
+  {
+   "name": "scoring_transparency_and_config",
+   "steps": {
+    "search_query": "5kw hybrid inverter supplier quote",
+    "fetch_urls": [
+     "https://supplier.example.test/energy/inverter-5kw-quote",
+     "https://supplier.example.test/energy/inverter-5kw-quote-b",
+     "https://market.example.test/lagos/inverters-5kw"
+    ],
+    "operation": {
+     "tool": "commerce.score",
+     "args": {
+      "product": "5kW hybrid inverter",
+      "required_keys": ["unit_price", "moq", "lead_time_days"]
+     }
+    }
+   },
+   "expect": {
+    "min_sources": 3,
+    "factors_visible": ["distinct_sources", "supplier_count", "price_spread", "freshness", "attribute_completeness"],
+    "factors_excluded": [],
+    "config_echo": {
+     "distinct_sources": 2.0,
+     "supplier_count": 1.5,
+     "price_spread": 1.5,
+     "freshness": 1.0,
+     "attribute_completeness": 1.0
+    }
+   }
+  },
+  {
+   "name": "mixed_currency_spread_excluded",
+   "steps": {
+    "fetch_urls": [
+     "https://supplier.example.test/energy/inverter-5kw-quote",
+     "https://market.example.test/lagos/inverters-5kw",
+     "https://market.example.test/accra/inverters"
+    ],
+    "operation": {
+     "tool": "commerce.score",
+     "args": {
+      "product": "5kW hybrid inverter",
+      "required_keys": ["unit_price"]
+     }
+    }
+   },
+   "expect": {
+    "min_sources": 3,
+    "factors_excluded": ["price_spread"]
+   }
+  },
+  {
+   "name": "supplier_comparison_conflict",
+   "steps": {
+    "fetch_urls": [
+     "https://supplier.example.test/energy/inverter-5kw-quote",
+     "https://supplier.example.test/energy/inverter-5kw-quote-b"
+    ],
+    "operation": {
+     "tool": "commerce.compare_suppliers",
+     "args": {"required_keys": ["duty_rate_pct"]}
+    }
+   },
+   "expect": {
+    "min_sources": 2,
+    "supplier_count": 2,
+    "conflicts": ["unit_price", "moq", "lead_time_days", "shipping_total", "warranty_months"],
+    "gaps": ["duty_rate_pct"]
+   }
+  },
+  {
+   "name": "ad_library_no_performance_claims",
+   "steps": {
+    "ad_library_query": "solar inverter ad",
+    "fetch_urls": ["https://ads.example.test/library/energy-q3"],
+    "operation": null
+   },
+   "expect": {
+    "min_sources": 1,
+    "ads": 1,
+    "ad_attributes_contains": ["advertiser", "ad_id", "first_seen", "regions", "creative"],
+    "ad_attributes_excludes": ["ctr"],
+    "ad_performance_excluded": true
+   }
+  },
+  {
+   "name": "ad_library_zero_results_is_honest",
+   "steps": {
+    "ad_library_query": "hair dryer salon promotion",
+    "operation": null
+   },
+   "expect": {
+    "min_sources": 0,
+    "ads": 0
+   }
+  },
+  {
+   "name": "vehicle_spec_check",
+   "steps": {
+    "fetch_urls": [
+     "https://auctions.example.test/lot/hilux-2019-lot42",
+     "https://dealer.example.test/trucks/hilux-2019"
+    ],
+    "operation": {
+     "tool": "commerce.vehicle_check",
+     "args": {
+      "specs": {
+       "make": "Toyota",
+       "model": "Hilux",
+       "year_min": "2015",
+       "year_max": "2021",
+       "mileage_km_max": "120000",
+       "budget_max": "25000"
+      }
+     }
+    }
+   },
+   "expect": {
+    "min_sources": 2,
+    "rows": 2,
+    "mismatch_keys": ["mileage_km_max"],
+    "conflicts": ["mileage_km"]
+   }
+  },
+  {
+   "name": "landed_cost_typing",
+   "steps": {
+    "fetch_urls": [
+     "https://dealer.example.test/trucks/hilux-2019",
+     "https://tariff.example.test/ng/import-duty-solar"
+    ],
+    "operation": {
+     "tool": "commerce.landed_cost",
+     "args": {
+      "unit_price": 22800,
+      "currency": "USD",
+      "qty": 1,
+      "shipping_total": 800,
+      "duty_rate_pct": 5,
+      "unit_price_kind": "estimate",
+      "duty_kind": "observed"
+     }
+    }
+   },
+   "expect": {
+    "min_sources": 2,
+    "line_kinds": {"unit_price": "estimate", "duty": "observed", "shipping": "assumption"},
+    "landed_total": 24740.0
+   }
+  }
+ ]
+}
