@@ -51,6 +51,12 @@ class Settings(BaseSettings):
     telegram_init_data_max_age_seconds: int = 86400
     mini_app_url: str = "https://t.me/XPDevBot/app"
 
+    # -- sessions (phase-2 hardening) ------------------------------------------
+    # Short-lived bearer sessions (trust boundary control: "Short-lived
+    # sessions and authorization checks"). The Mini App re-exchanges fresh
+    # initData on every launch, so a short TTL costs nothing in UX.
+    session_ttl_hours: int = 24
+
     # -- pricing (published sats->XP conversion; pricing_requirements #1) -----
     sats_per_xp: int = 10
 

@@ -9,6 +9,7 @@
 
 import type {
   ArtifactOut,
+  SessionInfo,
   BalanceOut,
   CapabilitiesOut,
   DemoPdfIn,
@@ -24,6 +25,8 @@ export interface XpClientConfig {
   apiPort?: string | number;
   apiBase?: string;
   fetchImpl?: typeof fetch;
+  /** Raw bearer token provider; set by the Mini App from local storage. */
+  getToken?: () => string | null;
 }
 
 export interface XpClient {
@@ -39,6 +42,9 @@ export interface XpClient {
   listArtifacts: () => Promise<ArtifactOut[]>;
   createDemoPdf: (payload: DemoPdfIn) => Promise<ArtifactOut>;
   artifactDownloadUrl: (artifact: ArtifactOut) => string;
+  logout: () => Promise<{ status: string; revoked: boolean }>;
+  listSessions: () => Promise<SessionInfo[]>;
+  revokeSession: (sessionId: string) => Promise<{ status: string; session_id: string }>;
 }
 
 export function createXpClient(config: XpClientConfig = {}): XpClient {
@@ -61,9 +67,15 @@ export function createXpClient(config: XpClientConfig = {}): XpClient {
   }
 
   async function request<T>(path: string, init?: RequestInit): Promise<T> {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...((init?.headers as Record<string, string>) ?? {}),
+    };
+    const token = config.getToken?.();
+    if (token) headers.Authorization = `Bearer ${token}`;
     const res = await doFetch(buildUrl(path), {
-      headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
       ...init,
+      headers,
     });
     if (!res.ok) {
       let detail = res.statusText;
@@ -106,5 +118,12 @@ export function createXpClient(config: XpClientConfig = {}): XpClient {
         body: JSON.stringify(payload),
       }),
     artifactDownloadUrl: (artifact) => buildUrl(`/api/v1/artifacts/${artifact.id}/download`),
+    logout: () =>
+      request<{ status: string; revoked: boolean }>("/api/v1/auth/logout", { method: "POST" }),
+    listSessions: () => request<SessionInfo[]>("/api/v1/auth/sessions"),
+    revokeSession: (sessionId) =>
+      request<{ status: string; session_id: string }>(`/api/v1/auth/sessions/${sessionId}`, {
+        method: "DELETE",
+      }),
   };
 }

@@ -16,9 +16,52 @@
 
     <section class="card">
       <h2>Session</h2>
-      <p class="sub">Bearer session with server-side expiry; revocation hardening lands in phase 2.</p>
-      <button class="btn" @click="logout">Log out (clear local token)</button>
+      <p class="sub">
+        Sessions are short-lived ({{ ttlNote }}), stored server-side as a hash only, and
+        revocation takes effect immediately — logout kills the session on the server, not
+        just in this webview.
+      </p>
+      <button
+        class="btn sensitive-action"
+        :disabled="loggingOut"
+        @click="logout"
+      >
+        <span v-if="loggingOut" class="spinner" /> ⚠️ Log out (revoke this session)
+      </button>
       <span class="small dim" style="margin-left: 10px">{{ sessionNote }}</span>
+    </section>
+
+    <section class="card">
+      <h2>Active sessions</h2>
+      <p class="small dim">
+        Every live bearer session issued for your account. Revoke anything you do not
+        recognise — revocation is instant and permanent for that token.
+      </p>
+      <p v-if="sessionsError" class="small" style="color: #f59e0b">{{ sessionsError }}</p>
+      <p v-else-if="!sessions.length" class="small dim">
+        {{ noSessionsNote }}
+      </p>
+      <div v-else class="session-list">
+        <div v-for="s in sessions" :key="s.id" class="session-row">
+          <div>
+            <div class="small">
+              <b>{{ s.created_via }}</b> · created {{ fmt(s.created_at) }} · expires
+              {{ fmt(s.expires_at) }}
+            </div>
+            <div class="small dim">
+              last used: {{ s.last_used_at ? fmt(s.last_used_at) : "never" }} ·
+              <code class="sid">{{ s.id.slice(0, 8) }}</code>
+            </div>
+          </div>
+          <button
+            class="btn ghost sensitive-action"
+            :disabled="revokingId === s.id"
+            @click="revoke(s.id)"
+          >
+            <span v-if="revokingId === s.id" class="spinner" /> Revoke
+          </button>
+        </div>
+      </div>
     </section>
 
     <section class="card">
@@ -34,7 +77,7 @@
     <section class="card">
       <h2>Environment</h2>
       <p class="small dim">
-        Current build: phase 1 scaffold · DEV_MODE grants are enabled · no
+        Current build: phase 2 hardening · DEV_MODE grants are enabled · no
         production secrets exist in this environment.
       </p>
     </section>
@@ -42,16 +85,72 @@
 </template>
 
 <script setup lang="ts">
-const sessionNote = ref("");
+import type { SessionInfo } from "@xp/shared-types";
 
-function logout() {
+const api = useXpApi();
+const sessionNote = ref("");
+const sessions = ref<SessionInfo[]>([]);
+const sessionsError = ref("");
+const loggingOut = ref(false);
+const revokingId = ref<string | null>(null);
+
+const ttlNote = "24h";
+const noSessionsNote =
+  "No user-issued session found in this webview. The app may be running on the DEV_MODE " +
+  "fallback user (no stored token) — open the app fresh from Telegram to issue a real session.";
+
+function fmt(iso: string): string {
   try {
-    localStorage.removeItem("xp_session_token");
-    sessionStorage.removeItem("xp_session_token");
-    sessionNote.value = "local token cleared";
+    return new Date(iso).toLocaleString();
   } catch {
-    sessionNote.value = "storage unavailable";
+    return iso;
   }
-  setTimeout(() => (sessionNote.value = ""), 2500);
 }
+
+function note(msg: string) {
+  sessionNote.value = msg;
+  setTimeout(() => (sessionNote.value = ""), 3000);
+}
+
+async function loadSessions() {
+  sessionsError.value = "";
+  try {
+    sessions.value = await api.listSessions();
+  } catch (err) {
+    sessionsError.value = String(err instanceof Error ? err.message : err);
+  }
+}
+
+async function logout() {
+  if (!window.confirm("Log out and revoke this session on the server?")) return;
+  loggingOut.value = true;
+  try {
+    await api.logout();
+    for (const store of [window.localStorage, window.sessionStorage]) {
+      store.removeItem("xp_session_token");
+    }
+    note("server-side revocation confirmed");
+    await loadSessions();
+  } catch (err) {
+    note(String(err instanceof Error ? err.message : err));
+  } finally {
+    loggingOut.value = false;
+  }
+}
+
+async function revoke(sessionId: string) {
+  if (!window.confirm(`Revoke session ${sessionId.slice(0, 8)}? Devices using it are logged out immediately.`)) return;
+  revokingId.value = sessionId;
+  try {
+    await api.revokeSession(sessionId);
+    note(`session ${sessionId.slice(0, 8)} revoked`);
+    await loadSessions();
+  } catch (err) {
+    note(String(err instanceof Error ? err.message : err));
+  } finally {
+    revokingId.value = null;
+  }
+}
+
+onMounted(loadSessions);
 </script>

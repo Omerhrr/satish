@@ -41,10 +41,10 @@
       <p class="sub">Internal usage credits — not Bitcoin, not a token. Rate: {{ balance?.sats_per_xp ?? "…" }} sats/XP.</p>
       <div class="balance-big">{{ balance ? balance.balance_xp.toLocaleString() + " XP" : "…" }}</div>
       <div style="display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap">
-        <button class="btn primary" :disabled="granting" @click="grant(1000)">
+        <button class="btn primary sensitive-action" :disabled="granting" @click="grant(1000)">
           <span v-if="granting" class="spinner" /> Seed +1,000 XP
         </button>
-        <button class="btn" :disabled="granting" @click="grant(10000)">Seed +10,000 XP</button>
+        <button class="btn sensitive-action" :disabled="granting" @click="grant(10000)">Seed +10,000 XP</button>
         <NuxtLink class="btn ghost" to="/xp">Open ledger →</NuxtLink>
       </div>
       <div class="notice small">

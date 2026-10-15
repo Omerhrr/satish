@@ -65,6 +65,9 @@ class Session(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    # Phase-2 hardening: visibility + audit for the session lifecycle UI.
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_via: Mapped[str] = mapped_column(String(32), default="miniapp")
 
 
 # -- wallets -------------------------------------------------------------------

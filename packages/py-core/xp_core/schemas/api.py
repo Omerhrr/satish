@@ -42,6 +42,16 @@ class SessionOut(BaseModel):
     mode: Literal["telegram", "dev"]
 
 
+class SessionInfoOut(BaseModel):
+    """Session metadata for the lifecycle UI — never the token or its hash."""
+
+    id: str
+    created_via: str
+    created_at: datetime
+    last_used_at: datetime | None
+    expires_at: datetime
+
+
 # -- XP ---------------------------------------------------------------------------
 
 

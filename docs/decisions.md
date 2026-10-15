@@ -76,7 +76,7 @@ for public marketing pages later.
 - No real web-search provider behind `web.search` stub (phase 4).
 - No payment provider settlement verification (phase 4 XP purchases).
 - Dev grants exist ONLY under DEV_MODE and are audit-logged.
-- Telegram session revocation hardening scheduled for phase 2.
+- ~~Telegram session revocation hardening~~ — delivered in phase 2 (short-lived sessions, server-side logout/revoke, lifecycle UI).
 
 ## D8 — DSH "upstream" = pinned DeepSeek API surface, not a package
 
@@ -103,3 +103,25 @@ keeps the adapter the only place that knows them.
 test) plus `make dsh-verify` live proof; no import-time coupling to any
 harness package. Revisit if a canonical DSH package appears or if DeepSeek
 ships an incompatible wire-format change.
+
+## D9 — Short-lived sessions + server-side revocation model
+
+**Decision:** bearer sessions live 24h (`XP_SESSION_TTL_HOURS`, down from 14
+days), are stored as SHA-256 hashes, and all lifecycle actions are
+server-authoritative: `POST /auth/logout` revokes the presented token,
+`GET /auth/sessions` lists live sessions, `DELETE /auth/sessions/{id}`
+revokes one by id with strict ownership (foreign ids return the same 404 as
+missing ones — no oracle). A throttled `last_used_at` heartbeat (5-min
+window) powers the visibility UI without write amplification.
+
+**Why:** phase-2 acceptance demands "forged or expired payloads rejected"
+and the trust boundary demands "short-lived sessions"; the Mini App
+re-exchanges fresh initData on every launch, so a short TTL costs nothing
+in UX. Client-side token dropping alone (the scaffold's logout) left
+stolen tokens valid for weeks — unacceptable for a product whose threat
+model includes Telegram-account compromise.
+
+**Consequences:** the settings screen gains a real "Active sessions"
+surface; expired/revoked tokens return 401 on every endpoint via the shared
+dependency. Logout requires a bearer token even in DEV_MODE so clients
+cannot mistake "cleared local copy" for "revoked server-side".

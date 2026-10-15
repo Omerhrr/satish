@@ -14,6 +14,17 @@ export function useXpApi(): XpClient {
   cached = createXpClient({
     apiPort: config.public.apiPort || undefined,
     apiBase: config.public.apiBase || undefined,
+    getToken: () => {
+      if (typeof window === "undefined") return null;
+      try {
+        return (
+          localStorage.getItem("xp_session_token") ??
+          sessionStorage.getItem("xp_session_token")
+        );
+      } catch {
+        return null;
+      }
+    },
   });
   return cached;
 }

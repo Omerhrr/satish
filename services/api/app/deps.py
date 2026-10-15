@@ -28,6 +28,9 @@ async def current_user(
         token = authorization.split(" ", 1)[1].strip()
         user = await resolve_user_from_token(session, token)
         if user is not None:
+            # Persist the throttled last_used_at heartbeat (independent of
+            # whatever the endpoint itself commits later).
+            await session.commit()
             return user
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

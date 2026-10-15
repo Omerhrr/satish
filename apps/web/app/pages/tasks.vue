@@ -62,7 +62,7 @@
               <td>
                 <button
                   v-if="!['completed', 'failed', 'cancelled'].includes(t.status)"
-                  class="btn small ghost"
+                  class="btn sensitive-action small ghost"
                   @click="cancel(t.id)"
                 >
                   Cancel

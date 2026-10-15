@@ -45,6 +45,14 @@ export interface SessionOut {
   mode: "telegram" | "dev";
 }
 
+export interface SessionInfo {
+  id: string;
+  created_via: string;
+  created_at: string;
+  last_used_at: string | null;
+  expires_at: string;
+}
+
 export interface BalanceOut {
   balance_xp: number;
   sats_per_xp: number;

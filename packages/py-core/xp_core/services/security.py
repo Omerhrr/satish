@@ -4,6 +4,9 @@ The Mini App sends Telegram initData; the SERVER validates it (architecture
 security_notes: reject forged or stale authentication payloads). Seed phrases
 or private keys are never requested here — Telegram is an interface, not a
 key vault.
+
+Phase-2 hardening: short-lived sessions, server-side revocation (logout,
+per-session revoke), and last-used tracking for the session lifecycle UI.
 """
 
 from __future__ import annotations
@@ -18,7 +21,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from xp_core.config import Settings
+from xp_core.config import Settings, get_settings
 from xp_core.db import new_id
 from xp_core.logging import get_logger
 from xp_core.models.entities import Session, TelegramAccount, User
@@ -94,15 +97,21 @@ def hash_token(token: str) -> str:
 
 
 async def create_session(
-    session: AsyncSession, user_id: str, settings: Settings | None = None
+    session: AsyncSession,
+    user_id: str,
+    settings: Settings | None = None,
+    *,
+    created_via: str = "miniapp",
 ) -> tuple[str, Session]:
-    """Issue a new bearer session; only the SHA-256 hash is persisted."""
+    """Issue a short-lived bearer session; only the SHA-256 hash is persisted."""
+    s = settings or get_settings()
     token = new_id() + new_id().replace("-", "")
-    expires = datetime.now(UTC) + timedelta(days=14)
+    expires = datetime.now(UTC) + timedelta(hours=max(1, s.session_ttl_hours))
     row = Session(
         user_id=user_id,
         token_hash=hash_token(token),
         expires_at=expires,
+        created_via=created_via,
     )
     session.add(row)
     await session.flush()
@@ -138,6 +147,10 @@ async def get_or_create_dev_user(session: AsyncSession) -> User:
     return user
 
 
+# Write-amplification guard: refresh last_used_at at most once per window.
+LAST_USED_REFRESH_SECONDS = 300
+
+
 async def resolve_user_from_token(session: AsyncSession, token: str) -> User | None:
     row = (
         await session.execute(select(Session).where(Session.token_hash == hash_token(token)))
@@ -149,9 +162,66 @@ async def resolve_user_from_token(session: AsyncSession, token: str) -> User | N
         expires = expires.replace(tzinfo=UTC)
     if expires < datetime.now(UTC):
         return None
+    now = datetime.now(UTC)
+    last_used = row.last_used_at
+    if last_used is not None and last_used.tzinfo is None:
+        last_used = last_used.replace(tzinfo=UTC)
+    if last_used is None or (now - last_used).total_seconds() >= LAST_USED_REFRESH_SECONDS:
+        row.last_used_at = now
     return (
         await session.execute(select(User).where(User.id == row.user_id))
     ).scalar_one_or_none()
+
+
+# -- session lifecycle (phase 2: "Session lifecycle and logout") ---------------
+
+
+async def revoke_session_by_token(session: AsyncSession, token: str) -> bool:
+    """Revoke the session matching a raw bearer token. False if already gone."""
+    row = (
+        await session.execute(select(Session).where(Session.token_hash == hash_token(token)))
+    ).scalar_one_or_none()
+    if row is None or row.revoked_at is not None:
+        return False
+    row.revoked_at = datetime.now(UTC)
+    log.info("session_revoked", session_id=row.id, by="logout")
+    return True
+
+
+async def revoke_session_by_id(
+    session: AsyncSession, user_id: str, session_id: str
+) -> bool:
+    """Revoke one of the caller's own sessions by id — ownership enforced."""
+    row = (
+        await session.execute(
+            select(Session).where(Session.id == session_id, Session.user_id == user_id)
+        )
+    ).scalar_one_or_none()
+    if row is None or row.revoked_at is not None:
+        return False
+    row.revoked_at = datetime.now(UTC)
+    log.info("session_revoked", session_id=row.id, by="owner")
+    return True
+
+
+async def list_active_sessions(session: AsyncSession, user_id: str) -> list[Session]:
+    """The caller's live sessions (not revoked, not expired), newest first."""
+    now = datetime.now(UTC)
+    rows = (
+        await session.execute(
+            select(Session)
+            .where(Session.user_id == user_id, Session.revoked_at.is_(None))
+            .order_by(Session.created_at.desc())
+        )
+    ).scalars().all()
+    live: list[Session] = []
+    for row in rows:
+        expires = row.expires_at
+        if expires.tzinfo is None:
+            expires = expires.replace(tzinfo=UTC)
+        if expires >= now:
+            live.append(row)
+    return live
 
 
 async def get_or_create_user_from_telegram(
