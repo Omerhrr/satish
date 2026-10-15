@@ -26,6 +26,7 @@ import type {
   TaskEstimateOut,
   TaskEventPageOut,
   TaskOut,
+  TaskResultOut,
   TaskStepOut,
 } from "@xp/shared-types";
 
@@ -180,6 +181,8 @@ export function createXpClient(config: XpClientConfig = {}): XpClient {
         method: "POST",
         body: JSON.stringify({ additional_xp: additionalXp }),
       }),
+    taskResult: (taskId) =>
+      request<TaskResultOut>(`/api/v1/tasks/${taskId}/result`),
     listArtifacts: () => request<ArtifactOut[]>("/api/v1/artifacts"),
     createDemoPdf: (payload) =>
       request<ArtifactOut>("/api/v1/artifacts/demo-pdf", {

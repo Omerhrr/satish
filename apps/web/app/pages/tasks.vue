@@ -73,6 +73,13 @@
                   Events
                 </button>
                 <button
+                  v-if="['completed', 'failed', 'cancelled'].includes(t.status)"
+                  class="btn small"
+                  @click="showResult(t.id)"
+                >
+                  Result
+                </button>
+                <button
                   v-if="!['completed', 'failed', 'cancelled'].includes(t.status)"
                   class="btn sensitive-action small ghost"
                   @click="cancel(t.id)"
@@ -117,11 +124,56 @@
         </div>
       </div>
     </section>
+
+    <section v-if="result" class="card">
+      <h2>Result <span class="dim small">task {{ result.task_id.slice(0, 8) }}</span></h2>
+      <p class="small" style="margin: 6px 0">
+        <strong>Deliverable:</strong> {{ result.deliverable || "—" }}
+      </p>
+
+      <h3 class="small" style="margin: 14px 0 4px">Artifacts (validated, private)</h3>
+      <ul class="small">
+        <li v-for="a in result.artifacts" :key="a.id">
+          <a :href="artifactHref(a.download_url)" target="_blank" rel="noopener">{{ a.filename }}</a>
+          · {{ a.content_type }} · {{ (a.size_bytes / 1024).toFixed(1) }} KB
+          · sha256 {{ (a.sha256 || "").slice(0, 12) }}…
+        </li>
+        <li v-if="result.artifacts.length === 0" class="dim">No artifacts were produced.</li>
+      </ul>
+
+      <h3 class="small" style="margin: 14px 0 4px">Sources &amp; provenance</h3>
+      <ul class="small">
+        <li v-for="(s, i) in result.sources" :key="i">
+          [{{ i + 1 }}] <span class="badge" :class="s.status">{{ s.status }}</span>
+          {{ s.title || "(untitled)" }} — <span class="mono small">{{ s.url }}</span>
+          · {{ s.fact_count }} facts · {{ s.retrieval_mode }}
+        </li>
+        <li v-if="result.sources.length === 0" class="dim">No sources were collected.</li>
+      </ul>
+
+      <div v-if="result.conflicts.length" class="notice small" style="border-left-color: var(--red)">
+        <strong>Conflicts between sources</strong>
+        <div v-for="(c, i) in result.conflicts" :key="i">{{ c.subject }} — {{ c.detail }}</div>
+      </div>
+      <div v-if="result.gaps.length" class="notice small">
+        <strong>Coverage gaps:</strong> {{ result.gaps.join(", ") }}
+      </div>
+
+      <h3 class="small" style="margin: 14px 0 4px">Limitations</h3>
+      <ul class="small dim">
+        <li v-for="(l, i) in result.limitations" :key="i">{{ l }}</li>
+      </ul>
+
+      <h3 class="small" style="margin: 14px 0 4px">XP receipt</h3>
+      <p class="small mono">
+        {{ receiptLine }}
+      </p>
+    </section>
   </div>
 </template>
 
 <script setup lang="ts">
-import type { ApprovalOut, TaskEventOut, TaskOut } from "@xp/shared-types";
+import type { ApprovalOut, TaskEventOut, TaskOut, TaskResultOut } from "@xp/shared-types";
 
 const api = useXpApi();
 const tasks = ref<TaskOut[]>([]);
@@ -135,6 +187,7 @@ const eventTask = ref<string | null>(null);
 const eventStatus = ref("");
 const events = ref<TaskEventOut[]>([]);
 const pendingApprovals = ref<ApprovalOut[]>([]);
+const result = ref<TaskResultOut | null>(null);
 
 function shortTime(iso: string) {
   return new Date(iso).toLocaleString(undefined, {
@@ -193,6 +246,29 @@ async function loadEvents(id: string) {
 async function showEvents(id: string) {
   await loadEvents(id);
 }
+
+async function showResult(id: string) {
+  try {
+    result.value = await api.taskResult(id);
+  } catch (e) {
+    alert(String(e).replace("XP API ", ""));
+  }
+}
+
+function artifactHref(url: string): string {
+  // download_url is already a same-origin API path; auth rides the session cookie
+  // in gateway mode or the token query in direct mode (api-client buildUrl).
+  return url;
+}
+
+const receiptLine = computed(() => {
+  const r = result.value?.xp_receipt;
+  if (!r) return "";
+  const base = `budget ${r.budget_xp.toLocaleString()} XP · charged ${r.actual_xp.toLocaleString()} XP · released ${r.released_xp.toLocaleString()} XP · ${r.status.replace("_", " ")}`;
+  const balance = r.balance_after !== null ? ` · balance after ${r.balance_after.toLocaleString()} XP` : "";
+  const entry = r.charge_entry_id ? ` · entry ${r.charge_entry_id.slice(0, 8)}…` : "";
+  return base + balance + entry;
+});
 
 async function decide(approvalId: string, approve: boolean) {
   if (!eventTask.value) return;

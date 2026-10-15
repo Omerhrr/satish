@@ -13,6 +13,7 @@ dist/
 
 # Databases & local data
 data/
+!tests/data/
 *.db
 *.sqlite3
 

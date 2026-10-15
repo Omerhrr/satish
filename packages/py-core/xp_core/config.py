@@ -110,6 +110,20 @@ class Settings(BaseSettings):
     agent_default_tool_timeout_seconds: int = 30
     agent_max_budget_xp: int = 100_000
 
+    # -- research tools (phase 7) ------------------------------------------------
+    # search: canned only (a live provider needs a search API key — none is
+    # configured, and pretending otherwise would fabricate results).
+    research_search_mode: str = "canned"
+    # fetch: canned (offline eval corpus) or http (real retrieval behind the
+    # FetchPolicy wall: http/https only, ports 80/443, public IPs only,
+    # size + content-type caps, per-hop redirect re-checks).
+    research_fetch_mode: str = "canned"
+    research_fetch_max_bytes: int = 262_144
+    research_fetch_timeout_seconds: int = 20
+    # Evaluation corpus for canned search/fetch + the repeatable research
+    # evaluation set (phase-7 acceptance #5). Relative to repo root.
+    research_eval_set_path: str = "tests/data/research_eval_set.json"
+
     # -- worker ----------------------------------------------------------------
     pdf_storage_dir: str = "./data/artifacts"
     reconcile_interval_seconds: int = 3600  # billing_flow #8

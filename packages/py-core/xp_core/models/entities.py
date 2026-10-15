@@ -1,4 +1,4 @@
-"""XP data model — 16 tables from the product plan (data_model.tables).
+"""XP data model — product-plan tables (data_model.tables).
 
 Conventions (data_rules):
 - UTC datetimes, integer satoshi and integer XP units (never floats),
@@ -298,6 +298,37 @@ class ScheduledJob(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
+class ResearchSource(Base):
+    """Durable provenance for research tasks (phase 7).
+
+    One row per (task, url): search listings start at ``listed`` and are
+    upgraded by a successful fetch; unavailable/denied/errored fetches are
+    KEPT and disclosed rather than dropped. Facts are typed
+    observed|estimate|assumption so reports never pass a listing snapshot
+    off as a live quote.
+    """
+
+    __tablename__ = "research_sources"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    task_id: Mapped[str] = mapped_column(ForeignKey("tasks.id"), index=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    url: Mapped[str] = mapped_column(String(2048))
+    title: Mapped[str] = mapped_column(String(512), default="")
+    status: Mapped[str] = mapped_column(String(16), default="listed")
+    # listed | ok | unavailable | denied | error
+    retrieval_mode: Mapped[str] = mapped_column(String(16), default="canned")  # canned | http
+    facts: Mapped[list[Any] | None] = mapped_column(JSON, nullable=True)
+    fact_count: Mapped[int] = mapped_column(Integer, default=0)
+    content_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    note: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    retrieved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+    __table_args__ = (UniqueConstraint("task_id", "url", name="uq_research_source_task_url"),)
+
+
 class AuditEvent(Base):
     """Security and business event trail. Never store secrets in metadata."""
 
@@ -335,5 +366,6 @@ ALL_TABLES = [
     ConnectedService,
     Artifact,
     ScheduledJob,
+    ResearchSource,
     AuditEvent,
 ]

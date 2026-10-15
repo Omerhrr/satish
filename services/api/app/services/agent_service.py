@@ -27,16 +27,23 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
+from app.services.research_tools import build_product_registry
+from app.services.task_events import append_event, load_events
 from dsh_adapter.client import make_chat_client
 from dsh_adapter.evaluation import evaluate_run
 from dsh_adapter.runner import PersistenceHooks, PlanRunner
-from dsh_adapter.tools import default_registry
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from xp_core.config import Settings
 from xp_core.logging import get_logger
-from xp_core.models.entities import Approval, AuditEvent, Task, TaskEvent, TaskStep
+from xp_core.models.entities import Approval, AuditEvent, Task, TaskStep
 from xp_core.services import ledger
+from xp_core.services.storage import LocalStorage
+
+
+def _registry_for(session, task, settings, storage):
+    """Registry seam (patch point for tests injecting custom registries)."""
+    return build_product_registry(session=session, task=task, settings=settings, storage=storage)
 
 log = get_logger(__name__)
 
@@ -56,38 +63,8 @@ class TaskNotRunnable(AgentRuntimeError):
 
 
 # -- event stream helpers ------------------------------------------------------------
-
-
-async def _next_seq(session: AsyncSession, task_id: str) -> int:
-    current = (
-        await session.execute(
-            select(func.coalesce(func.max(TaskEvent.seq), 0)).where(
-                TaskEvent.task_id == task_id
-            )
-        )
-    ).scalar_one()
-    return int(current) + 1
-
-
-async def append_event(
-    session: AsyncSession, task_id: str, event_type: str, payload: dict[str, Any] | None
-) -> TaskEvent:
-    row = TaskEvent(
-        task_id=task_id,
-        seq=await _next_seq(session, task_id),
-        event_type=event_type,
-        payload=payload or {},
-    )
-    session.add(row)
-    await session.flush()
-    return row
-
-
-async def load_events(session: AsyncSession, task_id: str) -> list[TaskEvent]:
-    rows = await session.execute(
-        select(TaskEvent).where(TaskEvent.task_id == task_id).order_by(TaskEvent.seq)
-    )
-    return list(rows.scalars())
+# append_event / load_events live in task_events.py (shared with the research
+# tool handlers); re-exported here for the routers' import compatibility.
 
 
 # -- persistence hooks --------------------------------------------------------------
@@ -336,7 +313,12 @@ async def run_agent_task(
 
         runner = PlanRunner(
             make_chat_client(settings),
-            default_registry(),
+            _registry_for(
+                session=session,
+                task=task,
+                settings=settings,
+                storage=LocalStorage(settings.artifact_dir),
+            ),
             persistence=hooks,
             max_steps=settings.agent_max_steps,
             should_cancel=cancelled_in_db,

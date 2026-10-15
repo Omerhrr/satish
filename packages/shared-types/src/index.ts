@@ -116,6 +116,51 @@ export interface ArtifactOut {
   created_at: string;
 }
 
+// -- task result: explicit result + limitations + XP receipt (phase 7) ------------
+
+export interface ResultArtifactOut {
+  id: string;
+  filename: string;
+  content_type: string;
+  size_bytes: number;
+  sha256: string | null;
+  download_url: string;
+}
+
+export interface ResultSourceOut {
+  url: string;
+  title: string;
+  status: "listed" | "ok" | "unavailable" | "denied" | "error";
+  retrieval_mode: "canned" | "http";
+  fact_count: number;
+  retrieved_at: string | null;
+  note: string | null;
+}
+
+export interface XpReceiptOut {
+  budget_xp: number;
+  actual_xp: number;
+  released_xp: number;
+  charge_entry_id: string | null;
+  settled_at: string | null;
+  balance_after: number | null;
+  status: "settled" | "pending_settlement" | "no_charge";
+}
+
+export interface TaskResultOut {
+  task_id: string;
+  status: TaskStatus;
+  objective: string;
+  deliverable: string | null;
+  completed_at: string | null;
+  artifacts: ResultArtifactOut[];
+  sources: ResultSourceOut[];
+  conflicts: Array<{ subject: string; detail: string; values?: unknown[] }>;
+  gaps: string[];
+  limitations: string[];
+  xp_receipt: XpReceiptOut;
+}
+
 // -- request payloads -------------------------------------------------------------
 
 export interface TaskCreateIn {

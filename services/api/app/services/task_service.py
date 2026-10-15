@@ -20,6 +20,7 @@ Rules implemented here, all deterministic backend code:
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import HTTPException
 from sqlalchemy import select
@@ -169,4 +170,162 @@ async def fail_task(session: AsyncSession, *, user_id: str, task_id: str, reason
     return task
 
 
-__all__ = ["fail_task", "get_owned_task", "increase_budget", "settle_task_usage"]
+async def build_task_result(
+    session: AsyncSession, *, user_id: str, task_id: str
+) -> Any:
+    """Explicit task result: deliverable, artifacts, provenance, limitations,
+    and the XP receipt (phase-7 acceptance #4).
+
+    Derived entirely from durable rows — no hidden state: artifacts and
+    research sources by task, the latest research.compared verdict, the
+    evaluation notes, and the ledger entries that reference the task.
+    """
+    from xp_core.models.entities import (
+        Artifact,
+        ResearchSource,
+        TaskEvent,
+        XpLedgerEntry,
+    )
+    from xp_core.schemas.api import (
+        ResultArtifactOut,
+        ResultSourceOut,
+        TaskResultOut,
+        XpReceiptOut,
+    )
+
+    task = await get_owned_task(session, user_id, task_id)
+
+    artifact_rows = (
+        await session.execute(
+            select(Artifact)
+            .where(Artifact.task_id == task.id, Artifact.status == "ready")
+            .order_by(Artifact.created_at)
+        )
+    ).scalars().all()
+    artifacts = [
+        ResultArtifactOut(
+            id=a.id,
+            filename=a.object_key.rsplit("/", 1)[-1],
+            content_type=a.content_type,
+            size_bytes=a.size_bytes,
+            sha256=a.sha256,
+            download_url=f"/api/v1/artifacts/{a.id}/download",
+        )
+        for a in artifact_rows
+    ]
+
+    source_rows = (
+        await session.execute(
+            select(ResearchSource)
+            .where(ResearchSource.task_id == task.id)
+            .order_by(ResearchSource.created_at)
+        )
+    ).scalars().all()
+    sources = [
+        ResultSourceOut(
+            url=s.url,
+            title=s.title,
+            status=s.status,
+            retrieval_mode=s.retrieval_mode,
+            fact_count=s.fact_count,
+            retrieved_at=s.retrieved_at,
+            note=s.note,
+        )
+        for s in source_rows
+    ]
+
+    compared = (
+        await session.execute(
+            select(TaskEvent)
+            .where(
+                TaskEvent.task_id == task.id, TaskEvent.event_type == "research.compared"
+            )
+            .order_by(TaskEvent.seq.desc())
+            .limit(1)
+        )
+    ).scalars().first()
+    conflicts: list[dict[str, Any]] = []
+    gaps: list[str] = []
+    disclosures: list[str] = []
+    if compared is not None:
+        payload = compared.payload or {}
+        conflicts = list(payload.get("conflicts", []))
+        gaps = list(payload.get("gaps", []))
+        disclosures = list(payload.get("disclosures", []))
+
+    evaluation = (
+        await session.execute(
+            select(TaskEvent)
+            .where(
+                TaskEvent.task_id == task.id,
+                TaskEvent.event_type == "evaluation.completed",
+            )
+            .order_by(TaskEvent.seq.desc())
+            .limit(1)
+        )
+    ).scalars().first()
+    limitations = list(disclosures)
+    if evaluation is not None:
+        limitations.extend(str(n) for n in (evaluation.payload or {}).get("notes", []))
+    limitations.extend(
+        f"source {s.url} is {s.status}: {s.note or 'no reason recorded'}"
+        for s in source_rows
+        if s.status in {"unavailable", "denied", "error"}
+    )
+
+    # XP receipt from the ledger — the append-only trail IS the receipt.
+    entries = (
+        await session.execute(
+            select(XpLedgerEntry)
+            .where(
+                XpLedgerEntry.reference_type == "task",
+                XpLedgerEntry.reference_id == task.id,
+                XpLedgerEntry.entry_type.in_(
+                    {"reservation", "reservation_release", "charge"}
+                ),
+            )
+            .order_by(XpLedgerEntry.created_at)
+        )
+    ).scalars().all()
+    charge = next((e for e in entries if e.entry_type == "charge"), None)
+    if task.status == "completed" and charge is not None:
+        receipt_status = "settled"
+        released = task.budget_xp - task.actual_xp
+    elif task.status in {"failed", "cancelled"}:
+        receipt_status = "no_charge"
+        released = task.budget_xp
+    else:
+        receipt_status = "pending_settlement"
+        released = 0
+    receipt = XpReceiptOut(
+        budget_xp=task.budget_xp,
+        actual_xp=task.actual_xp,
+        released_xp=released,
+        charge_entry_id=charge.id if charge else None,
+        settled_at=charge.created_at if charge else None,
+        balance_after=charge.balance_after if charge else None,
+        status=receipt_status,
+    )
+
+    return TaskResultOut(
+        task_id=task.id,
+        status=task.status,
+        objective=task.objective,
+        deliverable=task.deliverable,
+        completed_at=task.completed_at,
+        artifacts=artifacts,
+        sources=sources,
+        conflicts=conflicts,
+        gaps=gaps,
+        limitations=limitations,
+        xp_receipt=receipt,
+    )
+
+
+__all__ = [
+    "build_task_result",
+    "fail_task",
+    "get_owned_task",
+    "increase_budget",
+    "settle_task_usage",
+]

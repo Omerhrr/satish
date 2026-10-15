@@ -403,7 +403,7 @@ async def test_approval_gate_blocks_then_resume_executes(
     monkeypatch.setattr(
         agent_service, "make_chat_client", lambda settings: ScriptedClient(plan)
     )
-    monkeypatch.setattr(agent_service, "default_registry", build_approval_registry)
+    monkeypatch.setattr(agent_service, "_registry_for", lambda **kwargs: build_approval_registry())
 
     task = (
         await client.post(
@@ -450,7 +450,7 @@ async def test_approval_denial_blocks_execution(client, session, dev_user, facto
     monkeypatch.setattr(
         agent_service, "make_chat_client", lambda settings: ScriptedClient(plan)
     )
-    monkeypatch.setattr(agent_service, "default_registry", build_approval_registry)
+    monkeypatch.setattr(agent_service, "_registry_for", lambda **kwargs: build_approval_registry())
 
     task = (
         await client.post(
@@ -500,7 +500,7 @@ async def test_state_survives_restart_and_resume(
     monkeypatch.setattr(
         agent_service, "make_chat_client", lambda settings: ScriptedClient(plan)
     )
-    monkeypatch.setattr(agent_service, "default_registry", build_approval_registry)
+    monkeypatch.setattr(agent_service, "_registry_for", lambda **kwargs: build_approval_registry())
 
     task = (
         await client.post(
@@ -588,7 +588,7 @@ async def test_durable_cancel_between_steps(client, session, dev_user, factory, 
     monkeypatch.setattr(
         agent_service, "make_chat_client", lambda settings: ScriptedClient(plan)
     )
-    monkeypatch.setattr(agent_service, "default_registry", lambda: registry)
+    monkeypatch.setattr(agent_service, "_registry_for", lambda **kwargs: registry)
 
     task = (
         await client.post(

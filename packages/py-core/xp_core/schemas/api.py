@@ -202,6 +202,52 @@ class ApprovalOut(BaseModel):
     expires_at: datetime | None
 
 
+# -- task result: explicit result + limitations + XP receipt (phase 7) ---------------
+
+
+class ResultArtifactOut(BaseModel):
+    id: str
+    filename: str
+    content_type: str
+    size_bytes: int
+    sha256: str | None
+    download_url: str
+
+
+class ResultSourceOut(BaseModel):
+    url: str
+    title: str
+    status: str
+    retrieval_mode: str
+    fact_count: int
+    retrieved_at: datetime | None
+    note: str | None
+
+
+class XpReceiptOut(BaseModel):
+    budget_xp: int
+    actual_xp: int
+    released_xp: int
+    charge_entry_id: str | None
+    settled_at: datetime | None
+    balance_after: int | None
+    status: str  # settled | pending_settlement | no_charge
+
+
+class TaskResultOut(BaseModel):
+    task_id: str
+    status: str
+    objective: str
+    deliverable: str | None
+    completed_at: datetime | None
+    artifacts: list[ResultArtifactOut]
+    sources: list[ResultSourceOut]
+    conflicts: list[dict[str, Any]]
+    gaps: list[str]
+    limitations: list[str]
+    xp_receipt: XpReceiptOut
+
+
 class ApprovalDecisionIn(BaseModel):
     approve: bool
 

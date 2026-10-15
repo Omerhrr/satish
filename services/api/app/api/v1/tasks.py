@@ -24,6 +24,7 @@ from xp_core.schemas.api import (
     TaskEventOut,
     TaskEventPageOut,
     TaskOut,
+    TaskResultOut,
 )
 from xp_core.services import ledger
 
@@ -139,6 +140,17 @@ async def settle_task(
         session, user_id=user.id, task_id=task_id, actual_xp=payload.actual_xp
     )
     return _task_out(task)
+
+
+@router.get("/{task_id}/result", response_model=TaskResultOut)
+async def task_result(task_id: str, user: CurrentUser, session: DbSession) -> TaskResultOut:
+    """Explicit result for a finished task (phase-7 acceptance #4): the
+    deliverable, validated artifacts, source provenance, conflicts and gaps,
+    limitations, and the XP receipt from the ledger trail."""
+    result: TaskResultOut = await task_service.build_task_result(
+        session, user_id=user.id, task_id=task_id
+    )
+    return result
 
 
 @router.post("/{task_id}/cancel", response_model=TaskOut)

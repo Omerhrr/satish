@@ -105,6 +105,7 @@ make lint    # ruff
 - `docs/architecture.md` — components, trust boundaries, data model
 - `docs/threat-model.md` — assets, adversaries, mitigations, release gates
 - `docs/decisions.md` — decision log incl. what is deliberately NOT done yet
+- `docs/research-tools.md` — phase-7 research pipeline: permission wall, provenance, quality gates, evaluation set
 
 ## License & principles
 

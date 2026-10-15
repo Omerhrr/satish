@@ -254,3 +254,44 @@ in-memory coordination.
 stays minimal (digest-level tool facts), `task_events` carries the replay
 stream with shape-level payloads (no raw tool output), keeping the stream
 inspectable without leaking untrusted content into every consumer.
+
+## D14 — Research tools: canned-search honesty, SSRF-walled fetch, provenance in the DB, quality gates in backend code (2026-10-15, phase 7)
+
+**Context:** phase 7 asks for a web search adapter, permitted page
+retrieval, a source citation/provenance model, cross-source comparison,
+PDF/CSV/XLSX generation, private artifact storage, report quality checks,
+and a repeatable evaluation set. Two hard constraints shaped everything:
+(1) no search API key exists in this environment, and fabricating "search
+results" would violate the plan's own research_quality rules; (2) retrieved
+web content is untrusted and must not be able to reach private networks
+(SSRF) or override policy (prompt injection).
+
+**Decision:** a dedicated `research-adapter` package owns the network
+boundary. Search is canned-only over the committed evaluation corpus and
+labels itself as such on every response — an honest offline equivalent, not
+a fake live web. Fetch has two transports: the same canned corpus, and a
+real httpx provider behind `FetchPolicy` (http/https only, ports 80/443,
+no userinfo, localhost/reserved hostnames denied, every resolved IP must be
+globally routable — DNS rebinding fails closed, redirects re-pass the full
+wall per hop, size + content-type caps). Provenance persists in an 18th
+table, `research_sources`, keyed `(task, url)`: search listings start
+`listed`, fetches upgrade to `ok`, and unavailable/denied/errored fetches
+are KEPT as first-class records and disclosed — never silently dropped.
+Facts are typed observed|estimate|assumption; price figures from listing
+snapshots are typed `estimate` with a staleness note, so no listing price
+can masquerade as a live quote. The report builder in the API assembles a
+`ReportSpec` from durable rows; `xp_core.services.documents` enforces the
+quality gates (every claim cited, every citation resolvable, duplicate-free
+sources) and REFUSES to render violations, then validates generated files
+by magic bytes/structure before private storage. The tool handlers return
+shape only (ids, counts, fact keys) to the model — page content never
+enters agent context raw.
+
+**Consequences:** 18 tables (migration `a9b0c1d2e3f4`); `docs.generate_pdf`
+in the product registry is real (the phase-6 stub plan cost math is
+preserved, so the golden-path settlement is unchanged); the evaluation set
+(`tests/data/research_eval_set.json` + `make research-eval`) makes the
+quality bars a repeatable regression harness with 5 cases covering
+citations, conflicts, unavailable disclosure, estimate typing, and the
+honest-empty report. Live search awaits a search API key (tracked open
+item); live fetch works wherever the sandbox has egress.

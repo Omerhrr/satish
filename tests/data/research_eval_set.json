@@ -1,0 +1,132 @@
+{
+  "_meta": {
+    "name": "xp research evaluation set",
+    "phase": 7,
+    "purpose": "Repeatable regression harness for the research pipeline: search -> permitted fetch -> extraction -> provenance classification -> cross-source comparison -> cited report. All pages are offline fixtures (.test TLD); no network is touched.",
+    "quality_bars": [
+      "every claim in the generated report is cited",
+      "conflicts between sources are detected and disclosed",
+      "unavailable sources and coverage gaps are disclosed",
+      "listing-snapshot prices are typed 'estimate', never presented as live",
+      "the rendered PDF passes structural validation"
+    ]
+  },
+  "corpus": [
+    {
+      "url": "https://shop.example.test/solar/inverter-5kw",
+      "title": "5kW Hybrid Inverter - Market Listing A",
+      "keywords": ["solar", "inverter", "5kw", "price", "lagos", "hybrid"],
+      "snippet": "Listing snapshot of a 5kW hybrid inverter on a marketplace.",
+      "is_listing": true,
+      "text": "5kW Hybrid Inverter Listing\nbrand: Growatt\nmodel: SPF-5000ES\nprice: 1450000\nwarranty: 5 years\nstock: available\nseller: Lagos Power Store"
+    },
+    {
+      "url": "https://shop.example.test/solar/inverter-5kw-b",
+      "title": "5kW Hybrid Inverter - Market Listing B",
+      "keywords": ["solar", "inverter", "5kw", "price", "lagos", "hybrid"],
+      "snippet": "Second listing for the same 5kW hybrid inverter at a different price.",
+      "is_listing": true,
+      "text": "5kW Hybrid Inverter Listing B\nbrand: Growatt\nmodel: SPF-5000ES\nprice: 1395000\nwarranty: 5 years\nstock: limited\nseller: Energy Hub NG"
+    },
+    {
+      "url": "https://guides.energypedia.test/inverter-sizing",
+      "title": "How to size a hybrid inverter and battery bank",
+      "keywords": ["solar", "inverter", "sizing", "battery", "guide", "efficiency"],
+      "snippet": "Technical guide on inverter sizing and battery pairing.",
+      "is_listing": false,
+      "text": "Sizing a Hybrid Inverter\nrecommended_min_battery: 10kWh\npeak_efficiency: 97 percent\nrated_output: 5000W\nbattery_voltage: 48V"
+    },
+    {
+      "url": "https://market.example.test/lagos/batteries",
+      "title": "48V LiFePO4 Battery - Market Listing",
+      "keywords": ["battery", "lifepo4", "48v", "price", "lagos"],
+      "snippet": "Listing snapshot of a 48V LiFePO4 battery pack.",
+      "is_listing": true,
+      "text": "48V LiFePO4 Battery Listing\nchemistry: LiFePO4\nvoltage: 48V\ncapacity: 100Ah\nprice: 210000\ncycle_life: 6000 cycles\nseller: Battery Point"
+    },
+    {
+      "url": "https://guides.energypedia.test/battery-care",
+      "title": "LiFePO4 battery care and cycle expectations",
+      "keywords": ["battery", "lifepo4", "care", "cycles", "maintenance"],
+      "snippet": "Maintenance guide with independent cycle-life expectations.",
+      "is_listing": false,
+      "text": "LiFePO4 Battery Care\nexpected_cycle_life: 4000 cycles\ncharge_temp_min: 0C\nbalancing: passive"
+    }
+  ],
+  "cases": [
+    {
+      "name": "citations_and_snapshot_estimate",
+      "goal": "solar inverter 5kw price",
+      "fetch_urls": [
+        "https://shop.example.test/solar/inverter-5kw",
+        "https://guides.energypedia.test/inverter-sizing"
+      ],
+      "required_keys": ["price"],
+      "expect": {
+        "min_sources": 2,
+        "conflicts": [],
+        "gaps": [],
+        "estimates": ["price"],
+        "discloses_unavailable": []
+      }
+    },
+    {
+      "name": "cross_source_price_conflict",
+      "goal": "solar inverter 5kw lagos",
+      "fetch_urls": [
+        "https://shop.example.test/solar/inverter-5kw",
+        "https://shop.example.test/solar/inverter-5kw-b"
+      ],
+      "required_keys": ["price", "brand"],
+      "expect": {
+        "min_sources": 2,
+        "conflicts": ["price", "seller", "stock"],
+        "gaps": [],
+        "estimates": ["price"],
+        "discloses_unavailable": []
+      }
+    },
+    {
+      "name": "unavailable_source_and_gap_disclosed",
+      "goal": "solar inverter sizing battery guide",
+      "fetch_urls": [
+        "https://guides.energypedia.test/inverter-sizing",
+        "https://guides.energypedia.test/missing-page"
+      ],
+      "required_keys": ["warranty"],
+      "expect": {
+        "min_sources": 1,
+        "conflicts": [],
+        "gaps": ["warranty"],
+        "estimates": [],
+        "discloses_unavailable": ["https://guides.energypedia.test/missing-page"]
+      }
+    },
+    {
+      "name": "stale_listing_never_live",
+      "goal": "battery lifepo4 48v price lagos",
+      "fetch_urls": ["https://market.example.test/lagos/batteries"],
+      "required_keys": ["price"],
+      "expect": {
+        "min_sources": 1,
+        "conflicts": [],
+        "gaps": [],
+        "estimates": ["price"],
+        "discloses_unavailable": []
+      }
+    },
+    {
+      "name": "no_sources_honest_empty_report",
+      "goal": "quantum flux capacitor regression assembly",
+      "fetch_urls": [],
+      "required_keys": ["price"],
+      "expect": {
+        "min_sources": 0,
+        "conflicts": [],
+        "gaps": ["price"],
+        "estimates": [],
+        "discloses_unavailable": []
+      }
+    }
+  ]
+}
