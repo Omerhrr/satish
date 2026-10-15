@@ -1,0 +1,103 @@
+{
+  "manifest_version": 1,
+  "component": "dsh",
+  "revision_id": "dsh-pin-2026-10-15-flash-v4-1",
+  "pinned_at": "2026-10-15",
+  "verified_by": "phase-0 DSH integration spike: api-docs.deepseek.com change log, Models & Pricing, and Thinking Mode guide retrieved and reviewed 2026-10-15",
+  "sources": [
+    "https://api-docs.deepseek.com/updates",
+    "https://api-docs.deepseek.com/quick_start/pricing",
+    "https://api-docs.deepseek.com/guides/thinking_mode"
+  ],
+  "provider": {
+    "name": "DeepSeek",
+    "wire_format": "openai-chat-completions",
+    "base_url": "https://api.deepseek.com",
+    "base_url_anthropic_format": "https://api.deepseek.com/anthropic",
+    "auth": "Bearer API key (XP_DEEPSEEK_API_KEY); no key => adapter stub mode"
+  },
+  "models": {
+    "primary": {
+      "name": "deepseek-flash",
+      "upstream_version": "DeepSeek-V4.1-Flash",
+      "upstream_released": "2026-09-10",
+      "context_tokens": 1000000,
+      "max_output_tokens": 384000,
+      "thinking_mode_default": true,
+      "capabilities": {
+        "tool_calls": true,
+        "json_output": true,
+        "responses_api": true,
+        "anthropic_api": true,
+        "vision": true
+      },
+      "pricing_usd_per_1m_tokens": {
+        "input_cache_hit": { "off_peak": 0.003, "peak": 0.006 },
+        "input_cache_miss": { "off_peak": 0.15, "peak": 0.3 },
+        "output": { "off_peak": 0.6, "peak": 1.2 }
+      },
+      "concurrency_limit": 2500
+    },
+    "heavy": {
+      "name": "deepseek-v4-pro",
+      "upstream_version": "DeepSeek-V4-Pro-0813",
+      "upstream_released": "2026-08-13",
+      "context_tokens": 1000000,
+      "max_output_tokens": 384000,
+      "thinking_mode_default": true,
+      "capabilities": {
+        "tool_calls": true,
+        "json_output": true,
+        "responses_api": true,
+        "anthropic_api": true,
+        "vision": false
+      },
+      "pricing_usd_per_1m_tokens": {
+        "input_cache_hit": { "off_peak": 0.022, "peak": 0.044 },
+        "input_cache_miss": { "off_peak": 0.66, "peak": 1.32 },
+        "output": { "off_peak": 1.98, "peak": 3.96 }
+      },
+      "concurrency_limit": 500
+    }
+  },
+  "adapter_contract": {
+    "mode_for_plan_drafting": "non-thinking (deterministic JSON plans, no reasoning_content passback needed)",
+    "thinking_toggle_openai_format": {
+      "parameter": "extra_body.thinking.type",
+      "values": ["enabled", "disabled"],
+      "note": "thinking is ON by default with effort=high; adapter disables it for the plan/tool loop"
+    },
+    "sampling_note": "V4.x: temperature/presence_penalty/frequency_penalty are inert in thinking mode and temperature is fixed at 1.0 in non-thinking mode; the adapter therefore does NOT send temperature",
+    "reasoning_content": "thinking mode returns chain-of-thought in reasoning_content; must be passed back on subsequent tool-loop turns that carry tools — the adapter avoids this by running non-thinking for planning",
+    "adapter_limits": {
+      "request_timeout_seconds": 60,
+      "max_retries": 2,
+      "retry_backoff_base_seconds": 0.5,
+      "max_concurrent_requests": 4,
+      "max_output_chars": 20000,
+      "plan_max_tokens": 2048
+    }
+  },
+  "legacy_aliases": [
+    {
+      "name": "deepseek-chat",
+      "status": "discontinued-2026-07-24",
+      "note": "legacy alias; remapped 2025-12-01 to deepseek-v4-flash non-thinking mode, then discontinued"
+    },
+    {
+      "name": "deepseek-reasoner",
+      "status": "discontinued-2026-07-24",
+      "note": "legacy alias; remapped 2025-12-01 to deepseek-v4-flash thinking mode, then discontinued"
+    },
+    {
+      "name": "deepseek-v4-flash",
+      "status": "retired-served-by-v4-1-flash",
+      "note": "still accepted; requests served by DeepSeek-V4.1-Flash at Flash price"
+    },
+    {
+      "name": "deepseek-v4-flash-vision-exp",
+      "status": "retired-served-by-v4-1-flash",
+      "note": "still accepted; requests served by DeepSeek-V4.1-Flash at Flash price"
+    }
+  ]
+}

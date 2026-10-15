@@ -77,3 +77,29 @@ for public marketing pages later.
 - No payment provider settlement verification (phase 4 XP purchases).
 - Dev grants exist ONLY under DEV_MODE and are audit-logged.
 - Telegram session revocation hardening scheduled for phase 2.
+
+## D8 — DSH "upstream" = pinned DeepSeek API surface, not a package
+
+**Decision:** the phase-0 spike found no canonical importable open-source
+"DeepSeek Harness" package to pin. The upstream surface is pinned instead
+via `services/agent-adapter/dsh_adapter/dsh_revision.json`: wire format
+(OpenAI Chat Completions), base URL, model revisions (`deepseek-flash` /
+DeepSeek-V4.1-Flash as primary, `deepseek-v4-pro` as heavy), thinking-mode
+contract (disabled for planning; toggle via `extra_body.thinking.type`),
+sampling-params inertness, pricing, and adapter limits. A sha256 drift gate
+in `tests/test_dsh_revision.py` makes pin changes conscious; discontinued
+legacy aliases (`deepseek-chat`, `deepseek-reasoner`, dead 2026-07-24) are
+rejected at startup. Full contract: docs/dsh-integration.md.
+
+**Why:** the plan requires "pin a tested upstream DSH revision" while
+allowing "a separately pinned dependency, submodule, or documented
+integration." Research (2026-10-15, api-docs.deepseek.com change log,
+pricing, thinking-mode guide) showed the drift risk is in the API surface —
+our original scaffold default `deepseek-chat` had already been discontinued
+upstream. A manifest pin captures exactly the facts that can break us and
+keeps the adapter the only place that knows them.
+
+**Consequences:** re-pinning is a deliberate two-step (manifest + checksum
+test) plus `make dsh-verify` live proof; no import-time coupling to any
+harness package. Revisit if a canonical DSH package appears or if DeepSeek
+ships an incompatible wire-format change.

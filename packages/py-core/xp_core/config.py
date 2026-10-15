@@ -55,10 +55,14 @@ class Settings(BaseSettings):
     sats_per_xp: int = 10
 
     # -- agent / DSH ----------------------------------------------------------
-    dsh_revision: str = "unpinned-spike-0"  # pin a tested revision per plan
+    # Revision is pinned in services/agent-adapter/dsh_adapter/dsh_revision.json
+    # (phase-0 spike); dsh_revision below is only an informational label.
+    dsh_revision: str = "dsh-pin-2026-10-15-flash-v4-1"
     deepseek_api_key: str | None = None
-    deepseek_base_url: str = "https://api.deepseek.com"
-    deepseek_model: str = "deepseek-chat"
+    deepseek_base_url: str | None = None  # None => pinned base_url
+    # None => pinned primary model (deepseek-flash). A discontinued legacy
+    # alias here fails loudly at client construction (see revision.py).
+    deepseek_model: str | None = None
 
     # -- worker ----------------------------------------------------------------
     pdf_storage_dir: str = "./data/artifacts"

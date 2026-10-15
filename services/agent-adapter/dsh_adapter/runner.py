@@ -8,6 +8,7 @@ persistence callbacks, never in transient model context (dsh_integration).
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
@@ -65,6 +66,54 @@ class PlanRunner:
         self.registry = registry
         self.persistence = persistence or NullPersistence()
         self.max_steps = max_steps
+        # Cancellation: cooperative flag checked between stages/steps
+        # (dsh_integration requirement #7). cancel() is safe from any task.
+        self._cancel_event = asyncio.Event()
+        # Model usage ledger for this runner instance: one entry per model
+        # call (dsh_integration requirement #8 — track cost where measurable).
+        self.model_usage: list[dict[str, Any]] = []
+
+    def cancel(self) -> None:
+        self._cancel_event.set()
+
+    @property
+    def cancelled(self) -> bool:
+        return self._cancel_event.is_set()
+
+    def _record_usage(self, response: dict[str, Any]) -> None:
+        usage = response.get("usage")
+        if usage:
+            self.model_usage.append(
+                {
+                    "model": response.get("model"),
+                    "revision_id": response.get("revision_id"),
+                    **usage,
+                }
+            )
+
+    def _usage_summary(self) -> dict[str, Any]:
+        total_cost = 0.0
+        cost_known = True
+        prompt = completion = cache_hit = 0
+        for u in self.model_usage:
+            prompt += u.get("prompt_tokens", 0) or 0
+            completion += u.get("completion_tokens", 0) or 0
+            cache_hit += u.get("cache_hit_tokens", 0) or 0
+            cost = u.get("estimated_cost_usd")
+            if cost is None:
+                cost_known = False
+            else:
+                total_cost += cost
+        summary: dict[str, Any] = {
+            "model_calls": len(self.model_usage),
+            "prompt_tokens": prompt,
+            "completion_tokens": completion,
+            "cache_hit_tokens": cache_hit,
+            "estimated_cost_usd": round(total_cost, 6) if cost_known else None,
+        }
+        if not cost_known:
+            summary["cost_note"] = "some model calls have no pinned pricing; estimate omitted"
+        return summary
 
     async def draft_plan(self, goal: str, constraints: dict[str, Any] | None = None) -> dict[str, Any]:
         """Stage 1-3: goal + constraints -> plan, deliverable, XP estimate."""
@@ -81,12 +130,14 @@ class PlanRunner:
             },
         ]
         response = await self.client.complete(messages, tools=self.registry.openai_tools())
+        self._record_usage(response)
         try:
             import json
 
             plan = json.loads(response.get("content", "{}"))
         except Exception:  # noqa: BLE001 - malformed model JSON -> safe empty plan
             plan = {"plan": [], "estimated_xp": 0, "deliverable": goal}
+        plan["model_usage"] = self._usage_summary()
         await self.persistence.on_plan(plan)
         return plan
 
@@ -151,6 +202,18 @@ class PlanRunner:
         spent = 0
         run_steps: list[dict[str, Any]] = []
         for step in steps:
+            if self.cancelled:
+                await self.persistence.on_step(
+                    int(step.get("step", 0)), step.get("tool"), "cancelled", {}
+                )
+                return RunResult(
+                    status="cancelled",
+                    deliverable=plan.get("deliverable"),
+                    estimated_xp=int(plan.get("estimated_xp", 0)),
+                    spent_xp=spent,
+                    steps=run_steps,
+                    report={"goal": goal, "model_usage": self._usage_summary()},
+                )
             tool_name = step.get("tool")
             cost = 0
             if tool_name and self.registry.allowed(tool_name, scopes):
@@ -173,6 +236,7 @@ class PlanRunner:
             "estimated_xp": int(plan.get("estimated_xp", 0)),
             "spent_xp": spent,
             "steps": run_steps,
+            "model_usage": self._usage_summary(),
             "limitations": ["scaffold: research tools are stubs until phase 4"],
             "sources": [],
         }
