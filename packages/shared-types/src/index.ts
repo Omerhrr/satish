@@ -134,3 +134,72 @@ export interface DemoPdfIn {
   sections?: string[];
   metadata?: Record<string, unknown>;
 }
+
+// -- Lightning (phase 4) ---------------------------------------------------------
+
+export type LightningIntentStatus =
+  | "created"
+  | "pending"
+  | "prepared"
+  | "authorized"
+  | "in_flight"
+  | "settled"
+  | "succeeded"
+  | "failed"
+  | "expired";
+
+export interface LightningIntentOut {
+  payment_hash: string;
+  id: string;
+  direction: "receive" | "send";
+  amount_sats: number;
+  xp_amount: number;
+  status: LightningIntentStatus;
+  bolt11: string | null;
+  fee_msat: number | null;
+  expires_at: string | null;
+  settled_at: string | null;
+  created_at: string;
+}
+
+export interface LightningPrepareOut {
+  payment_id: string;
+  state: "prepared";
+  amount_msat: number;
+  fee_estimate_msat: number;
+  fee_limit_msat: number;
+  fee_clamped: boolean;
+  authorization_digest: string;
+  description: string;
+  note: string;
+}
+
+export interface LightningChannelsOut {
+  channels: Array<{
+    channel_id: string;
+    peer_pubkey: string;
+    capacity_msat: number;
+    local_msat: number;
+    remote_msat: number;
+    active: boolean;
+  }>;
+  outbound_msat: number;
+  inbound_msat: number;
+  disclosures: string[];
+  inbound_constrained: boolean;
+}
+
+export interface LightningCapabilitiesOut {
+  mode: "canned" | "lnd";
+  network: string;
+  implementation: string;
+  invoice_expiry_seconds: number;
+  fee_policy: {
+    base_fee_msat: number;
+    fee_ppm: number;
+    max_fee_msat: number;
+    note: string;
+  };
+  sats_to_xp: { xp_per_sat: number; can_change: boolean; note: string };
+  custody_disclosure: string[];
+}

@@ -63,7 +63,7 @@ class NotYetSelectedError(RuntimeError):
 
 # -- phase-3: BDK-backed provider (decision D10) ---------------------------------
 
-from wallet_adapter.bdk_provider import (
+from wallet_adapter.bdk_provider import (  # noqa: E402 - protocol classes must be defined first
     AgentSigningForbidden,
     AuthorizationMismatch,
     BalanceInfo,
@@ -87,7 +87,7 @@ from wallet_adapter.bdk_provider import (
     WalletNotFound,
     authorization_digest,
 )
-from wallet_adapter.rpc import BitcoindRpc, RpcError, RpcRejected, RpcUnavailable
+from wallet_adapter.rpc import BitcoindRpc, RpcError, RpcRejected, RpcUnavailable  # noqa: E402 - protocol classes must be defined first
 
 __all__ = [
     "AgentSigningForbidden",

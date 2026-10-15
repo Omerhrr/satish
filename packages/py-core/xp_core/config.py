@@ -83,6 +83,19 @@ class Settings(BaseSettings):
     wallet_max_fee_rate_sat_vb: int = 50  # fee cap policy (transaction_policy)
     wallet_default_word_count: int = 24  # 12 or 24 BIP39 words on creation
 
+    # -- lightning (phase 4) ----------------------------------------------------
+    lightning_mode: str = "canned"  # canned | lnd (lnd v0.21.4-beta via gRPC)
+    lightning_network: str = "regtest"  # mainnet refused at provider construction
+    lnd_rpc_host: str | None = None  # e.g. 127.0.0.1:10109
+    lnd_tls_cert_path: str | None = None
+    lnd_macaroon_path: str | None = None
+    lightning_invoice_expiry_seconds: int = 3600  # bolt11 expiry for receive intents
+    lightning_base_fee_msat: int = 1_000  # fee preview policy (published)
+    lightning_fee_ppm: int = 1
+    lightning_max_fee_msat: int = 10_000  # fee cap policy (payment authorization)
+    lightning_min_inbound_msat: int = 1_000_000  # below this, receive is disclosed as constrained
+    xp_per_sat: int = 100  # provisional sats→XP conversion (published; phase 5 finalizes)
+
     # -- worker ----------------------------------------------------------------
     pdf_storage_dir: str = "./data/artifacts"
 

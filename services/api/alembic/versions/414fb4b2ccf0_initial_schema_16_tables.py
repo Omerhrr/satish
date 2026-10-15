@@ -1,7 +1,7 @@
 """initial schema: 16 tables
 
 Revision ID: 414fb4b2ccf0
-Revises: 
+Revises:
 Create Date: 2026-10-14 18:02:53.820300
 """
 from __future__ import annotations

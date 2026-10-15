@@ -1,0 +1,21 @@
+# Ruff configuration for the xp monorepo.
+# Generated code (lnd gRPC stubs) and standalone drill/probe instruments are
+# excluded: they are not app code and must not gate CI.
+exclude = [
+    ".venv",
+    "services/lightning-adapter/lightning_adapter/lnd_stubs",
+    "scripts",
+    "apps/web",
+]
+
+[lint]
+select = ["E", "F", "W", "I", "B", "UP", "RUF", "SIM"]
+ignore = [
+    "E501",  # line length is enforced contextually; generated & prose lines vary
+]
+
+[lint.per-file-ignores]
+# tests: white-box provider seams (underscore access) + long literals
+"tests/*" = ["SLF001"]
+# adapter internals: deliberate dataclass/state patterns
+"services/lightning-adapter/*" = ["RUF012"]

@@ -131,7 +131,12 @@ class PaymentIntent(Base):
     amount_sats: Mapped[int] = mapped_column(BigInteger)
     xp_amount: Mapped[int] = mapped_column(Integer)
     status: Mapped[str] = mapped_column(String(32), default="created")
-    # created | paid | settled | expired | failed
+    # receive: created | pending | settled | expired
+    # send:    created | prepared | authorized | in_flight | succeeded | failed
+    direction: Mapped[str] = mapped_column(String(16), default="receive")
+    bolt11: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    fee_msat: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    authorization_digest: Mapped[str | None] = mapped_column(String(64), nullable=True)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     settled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     idempotency_key: Mapped[str] = mapped_column(String(191), unique=True)

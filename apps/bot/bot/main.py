@@ -47,7 +47,7 @@ async def _api_get(path: str) -> dict | None:
             resp = await client.get(f"{_api_url()}{path}")
             if resp.status_code == 200:
                 return resp.json()
-    except Exception:  # noqa: BLE001 - bot must survive any API failure
+    except Exception:
         return None
     return None
 
@@ -103,8 +103,8 @@ async def cmd_balance(message: Message) -> None:
         await message.answer("API is unreachable right now — try again shortly.")
         return
     await message.answer(
-        "On-chain balance lives in the Mini App wallet view "
-        "(wallet library integration is a phase-3 deliverable).",
+        "Balances live in the Mini App wallet view — on-chain (phase 3) and "
+        "Lightning invoices/payments (phase 4) are wired end-to-end there.",
         reply_markup=mini_app_keyboard(get_settings()),
     )
 

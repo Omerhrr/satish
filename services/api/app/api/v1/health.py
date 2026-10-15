@@ -18,7 +18,7 @@ async def _db_status(session: DbSession) -> ComponentStatus:
     try:
         await session.execute(text("SELECT 1"))
         return ComponentStatus(name="database", status="ok")
-    except Exception as exc:  # noqa: BLE001 - health must report, not raise
+    except Exception as exc:
         return ComponentStatus(name="database", status="error", detail=str(exc)[:200])
 
 

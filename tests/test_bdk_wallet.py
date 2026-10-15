@@ -48,7 +48,7 @@ RPC_USER, RPC_PASS = "xprpc", "xprpc-test"
 
 
 def _rpc(*args: object) -> object:
-    out = subprocess.run(  # noqa: PLW1510 — non-zero exit is handled explicitly below
+    out = subprocess.run(
         [str(CLI), "-regtest", f"-rpcuser={RPC_USER}", f"-rpcpassword={RPC_PASS}",
          f"-rpcport={RPC_PORT}", *[str(a) for a in args]],
         capture_output=True, text=True, timeout=30,
@@ -92,7 +92,7 @@ def bitcoind_regtest():
         try:
             _rpc("getblockchaininfo")
             break
-        except Exception:  # noqa: BLE001 — readiness probe retries on any failure
+        except Exception:
             time.sleep(1)
     else:
         proc.terminate()
@@ -106,7 +106,7 @@ def bitcoind_regtest():
         try:
             _rpc("stop")
             time.sleep(1.5)
-        except Exception:  # noqa: BLE001, S110 — best-effort shutdown on teardown
+        except Exception:
             pass
         proc.terminate()
         proc.wait(timeout=10)

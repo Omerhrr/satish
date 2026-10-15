@@ -172,3 +172,44 @@ restart story is honest: `reopen()` restores graph/balance state from public
 descriptors alone; signing always requires a fresh unlock. This is a
 server-side signing-vault build — docs and UI must not claim non-custodial
 or browser-side signing until those phases land.
+
+## D11 — Lightning: lnd v0.21.4-beta selected via empirical drill; canned semantics provider for offline-proofable lifecycles (2026-10-15, phase 4)
+
+**Context:** the plan requires a selected Lightning implementation, invoice
+and payment lifecycles, fee preview + authorization, channel-state backup and
+recovery drills, health/liquidity disclosure, and duplicate-callback-safe
+accounting — with regtest integration tests for the chosen implementation.
+
+**Decision:** lnd v0.21.4-beta, pinned and spoken to over gRPC through stubs
+generated from the release's own protos (`scripts/gen_lnd_stubs.py`), same
+manifest-pin philosophy as the DSH decision (D8). LDK Node was evaluated
+first (binding-philosophy parity with BDK) but has no wheel in this
+environment's registry; Core Lightning needs a source build with no official
+prebuilt binaries here; Eclair is JVM-only. A two-node regtest drill
+(`scripts/lnd_regtest_drill.py`) boots both nodes, exercises wallet init
+(from captured seeds), TLS/macaroon gRPC, unlock-after-restart, and invoice
+and backup RPCs, capturing version-specific API facts (v0.21.4 removed
+`seed_entropy` from InitWalletRequest; the state enum is `WalletState` with
+`RPC_ACTIVE`/`SERVER_ACTIVE` as ready states; the router stub is
+`RouterStub`; lnd authenticates via `macaroon` metadata, not bearer tokens).
+
+**Honest limitation (re-verified 2026-10-15):** the btcwallet
+block-processor stalls on this sandbox (upstream lnd #9108/#10389/#11004
+family) — on rpcpolling AND with a healthy loopback zmq probe, mined
+outputs are never credited, so live channel funding cannot complete
+in-sandbox. The drill reproduces cleanly: stages 1 (chain), 2 (two nodes
+ACTIVE), 7 (restart + unlock) PASS; stages 3–6 and 8 report BLOCKED with
+diagnostics instead of pretending. Instead of faking it, the phase ships:
+(a) the real gRPC adapter, (b) a canned provider with lnd-identical
+semantics (clocked expiry, preimage-bound settlement, digest-bound
+authorization, checksummed SCB) that makes every lifecycle/idempotency
+acceptance criterion testable offline, (c) the drill script as the re-run
+instrument for a healthy host.
+
+**Consequences:** settlement idempotency is enforced by a CAS status
+transition plus the ledger's idempotency key — duplicate callbacks are
+structurally incapable of double-crediting (tested with six repeats). Fee
+authorization binds the digest of what was shown; wrong digest → 409.
+Mainnet stays refused at provider construction (same release gate as D10).
+The canned provider is disclosed verbatim in `/lightning/capabilities` —
+not pretending a real node exists when it does not.

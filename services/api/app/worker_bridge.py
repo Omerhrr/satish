@@ -36,7 +36,7 @@ async def enqueue_pdf_job(
             await pool.close()
             assert job is not None
             return job.job_id
-        except Exception as exc:  # noqa: BLE001 - fall back to inline execution
+        except Exception as exc:
             log.error("arq_enqueue_failed_falling_back_inline", error=str(exc))
 
     # Inline dev execution (no Redis): run the same job function in a thread.

@@ -135,7 +135,7 @@ class PlanRunner:
             import json
 
             plan = json.loads(response.get("content", "{}"))
-        except Exception:  # noqa: BLE001 - malformed model JSON -> safe empty plan
+        except Exception:
             plan = {"plan": [], "estimated_xp": 0, "deliverable": goal}
         plan["model_usage"] = self._usage_summary()
         await self.persistence.on_plan(plan)

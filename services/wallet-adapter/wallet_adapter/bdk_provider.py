@@ -134,7 +134,7 @@ def _parses_on_other_network(destination: str, own: Network) -> bool:
         net = bdk.Network(_NETWORK_ORDINALS.index(name))
         try:
             bdk.Address(destination, net)
-        except Exception as exc:  # noqa: BLE001 — opaque uniffi errors by design
+        except Exception as exc:
             _ = exc  # parse failure on this network: try the next one
             continue
         if net != _bdk_network(own):

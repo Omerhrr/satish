@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from types import SimpleNamespace
 
 import pytest
 from dsh_adapter.client import DeepSeekChatClient, StubChatClient, make_chat_client
@@ -147,7 +148,6 @@ def attach(client: DeepSeekChatClient, fake: FakeCompletions) -> None:
     client._client = SimpleNamespace(chat=SimpleNamespace(completions=fake))
 
 
-from types import SimpleNamespace
 
 
 @pytest.fixture()

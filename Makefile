@@ -3,7 +3,7 @@ VENV := .venv
 PY := $(VENV)/bin/python
 API_URL := sqlite+aiosqlite:////$(CURDIR)/data/xp-dev.db
 
-.PHONY: help install migrate run-api run-worker run-bot run-web test lint dsh-verify wallet-regtest compose-up compose-down
+.PHONY: help install migrate run-api run-worker run-bot run-web test lint dsh-verify wallet-regtest lightning-drill compose-up compose-down
 
 help:
 	@echo "install      - install python (uv) + node (bun) dependencies"
@@ -12,6 +12,7 @@ help:
 	@echo "run-worker   - arq worker (needs XP_REDIS_URL)"
 	@echo "dsh-verify   - live-verify the pinned DSH revision (needs XP_DEEPSEEK_API_KEY)"
 	@echo "wallet-regtest - end-to-end BDK+bitcoind regtest proof (spawns its own node)"
+	@echo "lightning-drill - two-node lnd regtest drill (invoice/payment/recovery; needs healthy zmq)"
 	@echo "run-bot      - Telegram bot (needs XP_TELEGRAM_BOT_TOKEN)"
 	@echo "run-web      - Nuxt Mini App on :3000"
 	@echo "test / lint  - pytest / ruff"
@@ -48,6 +49,9 @@ dsh-verify:
 
 wallet-regtest:
 	$(PY) scripts/regtest_proof.py
+
+lightning-drill:
+	$(PY) scripts/lnd_regtest_drill.py
 
 compose-up:
 	docker compose -f infra/docker-compose.yml up -d
