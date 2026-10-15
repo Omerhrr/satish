@@ -61,6 +61,70 @@ class NotYetSelectedError(RuntimeError):
     """Raised by stubs until the wallet library decision spike (phase 3) lands."""
 
 
+# -- phase-3: BDK-backed provider (decision D10) ---------------------------------
+
+from wallet_adapter.bdk_provider import (
+    AgentSigningForbidden,
+    AuthorizationMismatch,
+    BalanceInfo,
+    BdkWalletProvider,
+    BroadcastRejected,
+    BroadcastUncertain,
+    CreatedWallet,
+    InsufficientFunds,
+    InvalidAddress,
+    InvalidAmount,
+    InvalidMnemonic,
+    MnemonicMismatch,
+    NetworkMismatch,
+    PreparedTransactionNotFound,
+    SignedTransaction,
+    SigningLocked,
+    TxStatus,
+    UnlockInfo,
+    WalletAlreadyExists,
+    WalletError,
+    WalletNotFound,
+    authorization_digest,
+)
+from wallet_adapter.rpc import BitcoindRpc, RpcError, RpcRejected, RpcUnavailable
+
+__all__ = [
+    "AgentSigningForbidden",
+    "AuthorizationMismatch",
+    "BalanceInfo",
+    "BdkWalletProvider",
+    "BitcoindRpc",
+    "BroadcastRejected",
+    "BroadcastUncertain",
+    "CreatedWallet",
+    "InsufficientFunds",
+    "InvalidAddress",
+    "InvalidAmount",
+    "InvalidMnemonic",
+    "MnemonicMismatch",
+    "Network",
+    "NetworkMismatch",
+    "NotYetSelectedError",
+    "PreparedTransaction",
+    "PreparedTransactionNotFound",
+    "RegtestStubProvider",
+    "RpcError",
+    "RpcRejected",
+    "RpcUnavailable",
+    "SignedTransaction",
+    "SigningBoundary",
+    "SigningLocked",
+    "TxStatus",
+    "UnlockInfo",
+    "WalletAlreadyExists",
+    "WalletError",
+    "WalletNotFound",
+    "WalletProvider",
+    "authorization_digest",
+]
+
+
 class RegtestStubProvider:
     """Scaffold implementation that validates shapes but performs no custody.
 

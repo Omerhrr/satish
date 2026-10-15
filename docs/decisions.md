@@ -125,3 +125,50 @@ model includes Telegram-account compromise.
 surface; expired/revoked tokens return 401 on every endpoint via the shared
 dependency. Logout requires a bearer token even in DEV_MODE so clients
 cannot mistake "cleared local copy" for "revoked server-side".
+
+## D10 — BDK (bdkpython) for the on-chain wallet; bitcoind RPC as the chain source
+
+**Decision:** phase-3 selects **BDK 1.x core via `bdkpython` 3.1.1** (UniFFI
+Python bindings) for keys, descriptors, PSBT construction and signing, with a
+**bitcoind JSON-RPC client** (`wallet_adapter/rpc.py`) as the chain source for
+fee estimation, mempool probing, broadcast and confirmation tracking. The
+choice was made empirically before implementation: `scripts/regtest_proof.py`
+stands up bitcoind 29.0 regtest inside one process tree and proves create →
+receive → balance → fee → PSBT build → sign → finalize → testmempoolaccept →
+broadcast → confirmation → restore plus three failure paths (overspend,
+unparseable address, cross-network address) against the real node. bdkpython
+installs as a manylinux wheel (no Rust toolchain at deploy time), which
+rules out the electrs-from-source path for this environment; the heavier
+alternatives (full bitcoind-wallet custody, Electrum as a library) were
+rejected on the plan's criteria: language binding quality, maintenance,
+license (BDK: MIT/Apache-2.0-compatible), signing options, and recovery docs.
+
+**Custody model inside this decision:**
+- Persisted wallet state (per-wallet BDK sqlite under `data/wallets/`) is
+  built from **public descriptors only** — tests assert the on-disk bytes
+  contain no mnemonic material and no `xprv`/`tprv` strings.
+- Signing happens in an **in-memory private wallet** built at unlock from the
+  user's recovery phrase; the phrase lives in process memory for the unlock
+  TTL (`XP_WALLET_UNLOCK_TTL_MINUTES`, default 10) and is dropped on
+  lock/expiry. The persisted (public) wallet owns the UTXO graph and builds
+  the PSBT; the unlocked private wallet signs it — proven by the offline
+  funding tests, which run the two-wallet flow without any chain source.
+- The signing boundary rejects agent actors unconditionally and binds every
+  signature to an authorization digest over the reviewed transaction fields
+  (destination, amount, fee, network). Validation failures do not consume the
+  prepared transaction (no DoS-by-retry); only a completed signature does.
+- Address aliases are labels: `prepare` resolves an alias once, the digest
+  binds the resolved address, and relabeling cannot redirect an existing
+  prepared transaction (tested).
+- Broadcast failures are explicit: definite rejections (502) vs. node
+  unreachable during send (504, "outcome unknown — resolve by txid").
+- Mainnet is hard-gated in the provider constructor pending the security
+  review release gate.
+
+**Consequences:** regtest needs no electrs/esplora — chain data enters the
+wallet graph via `import_transaction` (bring-your-own-chain-source), which is
+also the documented seam for a full Electrum/Esplora sync later. The API
+restart story is honest: `reopen()` restores graph/balance state from public
+descriptors alone; signing always requires a fresh unlock. This is a
+server-side signing-vault build — docs and UI must not claim non-custodial
+or browser-side signing until those phases land.

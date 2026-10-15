@@ -70,6 +70,19 @@ class Settings(BaseSettings):
     # alias here fails loudly at client construction (see revision.py).
     deepseek_model: str | None = None
 
+    # -- wallet (phase-3 on-chain self-custody) -------------------------------
+    # BDK-based provider (decision D10). The persisted wallet state uses PUBLIC
+    # descriptors only; signing happens in an in-memory private wallet built at
+    # unlock from the user's recovery phrase (never written to disk or DB).
+    wallet_data_dir: str = "./data/wallets"
+    bitcoind_rpc_url: str | None = None  # e.g. http://127.0.0.1:18443
+    bitcoind_rpc_user: str | None = None
+    bitcoind_rpc_password: str | None = None
+    wallet_unlock_ttl_minutes: int = 10  # inactivity lock for the signing vault
+    wallet_fallback_fee_rate_sat_vb: int = 2  # when estimatesmartfee has no data
+    wallet_max_fee_rate_sat_vb: int = 50  # fee cap policy (transaction_policy)
+    wallet_default_word_count: int = 24  # 12 or 24 BIP39 words on creation
+
     # -- worker ----------------------------------------------------------------
     pdf_storage_dir: str = "./data/artifacts"
 

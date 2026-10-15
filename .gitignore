@@ -34,3 +34,6 @@ dist/
 .idea/
 .vscode/
 *.log
+
+# Wallet tooling (50MB+ bitcoind binary + regtest state; fetch via make or docs)
+.tools/
