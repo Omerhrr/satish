@@ -30,6 +30,7 @@ from xp_core.services import ledger
 
 from app.deps import CurrentUser, DbSession
 from app.services import task_service
+from app.services.task_events import append_event
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -58,7 +59,9 @@ async def estimate(payload: TaskCreateIn) -> TaskEstimateOut:
 
 
 @router.post("", response_model=TaskOut, status_code=status.HTTP_201_CREATED)
-async def create_task(payload: TaskCreateIn, user: CurrentUser, session: DbSession) -> TaskOut:
+async def create_task(
+    payload: TaskCreateIn, user: CurrentUser, session: DbSession
+) -> TaskOut:
     """Create a task and atomically reserve its XP budget (task_charge_flow #2-3)."""
     task = Task(
         user_id=user.id,
@@ -143,7 +146,9 @@ async def settle_task(
 
 
 @router.get("/{task_id}/result", response_model=TaskResultOut)
-async def task_result(task_id: str, user: CurrentUser, session: DbSession) -> TaskResultOut:
+async def task_result(
+    task_id: str, user: CurrentUser, session: DbSession
+) -> TaskResultOut:
     """Explicit result for a finished task (phase-7 acceptance #4): the
     deliverable, validated artifacts, source provenance, conflicts and gaps,
     limitations, and the XP receipt from the ledger trail."""
@@ -162,7 +167,9 @@ async def cancel_task(task_id: str, user: CurrentUser, session: DbSession) -> Ta
         )
     ).scalar_one_or_none()
     if task is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="task not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="task not found"
+        )
     if task.status in {"completed", "failed", "cancelled"}:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail=f"task already {task.status}"
@@ -195,7 +202,9 @@ async def cancel_task(task_id: str, user: CurrentUser, session: DbSession) -> Ta
 # -- agent runtime (phase 6) ------------------------------------------------------------
 
 
-@router.post("/{task_id}/run", response_model=TaskOut, status_code=status.HTTP_202_ACCEPTED)
+@router.post(
+    "/{task_id}/run", response_model=TaskOut, status_code=status.HTTP_202_ACCEPTED
+)
 async def run_task(task_id: str, user: CurrentUser, session: DbSession) -> TaskOut:
     """Start (or resume) the DSH run for this task.
 
@@ -205,7 +214,9 @@ async def run_task(task_id: str, user: CurrentUser, session: DbSession) -> TaskO
     """
     task = await task_service.get_owned_task(session, user.id, task_id)
     if task.status == "running":
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="task already running")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="task already running"
+        )
     if task.status in {"completed", "failed", "cancelled"}:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail=f"task already {task.status}"
@@ -227,7 +238,9 @@ async def run_task(task_id: str, user: CurrentUser, session: DbSession) -> TaskO
 
 
 @router.get("/{task_id}/events", response_model=TaskEventPageOut)
-async def task_events(task_id: str, user: CurrentUser, session: DbSession) -> TaskEventPageOut:
+async def task_events(
+    task_id: str, user: CurrentUser, session: DbSession
+) -> TaskEventPageOut:
     """The durable event stream: plan, steps, approvals, evaluation, outcome."""
     task = await task_service.get_owned_task(session, user.id, task_id)
     from app.services.agent_service import load_events
@@ -238,7 +251,10 @@ async def task_events(task_id: str, user: CurrentUser, session: DbSession) -> Ta
         status=task.status,
         events=[
             TaskEventOut(
-                seq=e.seq, event_type=e.event_type, payload=e.payload or {}, created_at=e.created_at
+                seq=e.seq,
+                event_type=e.event_type,
+                payload=e.payload or {},
+                created_at=e.created_at,
             )
             for e in rows
         ],
@@ -266,7 +282,9 @@ async def task_steps(task_id: str, user: CurrentUser, session: DbSession) -> lis
 
 
 @router.get("/{task_id}/approvals", response_model=list[ApprovalOut])
-async def list_approvals(task_id: str, user: CurrentUser, session: DbSession) -> list[ApprovalOut]:
+async def list_approvals(
+    task_id: str, user: CurrentUser, session: DbSession
+) -> list[ApprovalOut]:
     await task_service.get_owned_task(session, user.id, task_id)
     rows = await session.execute(
         select(Approval)
@@ -304,25 +322,54 @@ async def decide_approval(
     task = await task_service.get_owned_task(session, user.id, task_id)
     approval = (
         await session.execute(
-            select(Approval).where(Approval.id == approval_id, Approval.task_id == task.id)
+            select(Approval).where(
+                Approval.id == approval_id, Approval.task_id == task.id
+            )
         )
     ).scalar_one_or_none()
     if approval is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="approval not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="approval not found"
+        )
     if approval.status != "pending":
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail=f"approval already {approval.status}"
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"approval already {approval.status}",
+        )
+    expires = approval.expires_at
+    if expires is not None and expires.tzinfo is None:
+        expires = expires.replace(tzinfo=UTC)
+    if expires is not None and expires < datetime.now(UTC):
+        approval.status = "expired"
+        await append_event(
+            session,
+            task.id,
+            "approval.expired",
+            {
+                "approval_id": approval.id,
+                "tool": approval.action_type,
+                "digest": approval.action_digest,
+                "reason": "decision after expiry",
+            },
+        )
+        await session.commit()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="approval expired; the runner will request a fresh approval",
         )
     approval.status = "approved" if payload.approve else "denied"
     approval.approved_at = datetime.now(UTC) if payload.approve else None
     approval.revoked_at = None if payload.approve else datetime.now(UTC)
-    from app.services.agent_service import append_event
 
     await append_event(
         session,
         task.id,
         f"approval.{'approved' if payload.approve else 'denied'}",
-        {"approval_id": approval.id, "tool": approval.action_type, "digest": approval.action_digest},
+        {
+            "approval_id": approval.id,
+            "tool": approval.action_type,
+            "digest": approval.action_digest,
+        },
     )
     session.add(
         AuditEvent(

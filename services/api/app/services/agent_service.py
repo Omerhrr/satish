@@ -24,7 +24,7 @@ dsh_integration is enforced by DETERMINISTIC backend code:
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from app.services.research_tools import build_product_registry
@@ -34,7 +34,7 @@ from dsh_adapter.evaluation import evaluate_run
 from dsh_adapter.runner import PersistenceHooks, PlanRunner
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from xp_core.config import Settings
+from xp_core.config import Settings, get_settings
 from xp_core.logging import get_logger
 from xp_core.models.entities import Approval, AuditEvent, Task, TaskStep
 from xp_core.services import ledger
@@ -43,15 +43,25 @@ from xp_core.services.storage import LocalStorage
 
 def _registry_for(session, task, settings, storage):
     """Registry seam (patch point for tests injecting custom registries)."""
-    return build_product_registry(session=session, task=task, settings=settings, storage=storage)
+    return build_product_registry(
+        session=session, task=task, settings=settings, storage=storage
+    )
+
 
 log = get_logger(__name__)
 
 # Server-side scope policy for user-initiated agent tasks (least privilege):
 # tools NOT covered here are structurally unreachable, whatever the model
-# plans. email:send / automation:write arrive with their product surfaces in
-# later phases; their tools additionally carry requires_approval=True.
-USER_TASK_SCOPES = {"research:read", "documents:write", "email:draft"}
+# plans. Phase-9 adds the email/automation product surfaces: email:send and
+# automation:write are granted to tasks, and BOTH their tools still carry
+# requires_approval=True — the scope wall and the approval gate stack.
+USER_TASK_SCOPES = {
+    "research:read",
+    "documents:write",
+    "email:draft",
+    "email:send",
+    "automation:write",
+}
 
 
 class AgentRuntimeError(Exception):
@@ -74,9 +84,12 @@ class DbPersistenceHooks(PersistenceHooks):
     """Implements the runner's hooks on the application DB, committing as it
     goes so state survives a worker restart at any point."""
 
-    def __init__(self, session: AsyncSession, task: Task) -> None:
+    def __init__(
+        self, session: AsyncSession, task: Task, settings: Settings | None = None
+    ) -> None:
         self.session = session
         self.task = task
+        self.settings = settings or get_settings()
 
     async def on_plan(self, plan: dict[str, Any]) -> None:
         # TaskStep rows = the durable plan; TaskEvent rows = the stream.
@@ -117,11 +130,18 @@ class DbPersistenceHooks(PersistenceHooks):
     async def on_approval_required(self, action: dict[str, Any]) -> bool:
         """Determine approval from the DB — never from the model.
 
-        If the user already approved THIS digest (resume case) return True.
-        Otherwise create a pending Approval and stop the run.
+        If the user already approved THIS digest (resume case) AND the
+        approval is still within its TTL, return True. Expired approvals
+        (pending OR approved) are marked expired and a fresh request is
+        created: an approval binds to the action content AND a time window
+        (phase-9 acceptance: "Approval is bound to the specific action
+        content and expires"). Execution after expiry re-requests — no
+        stale sends.
         """
         digest = action.get("digest", "")
         tool = action.get("tool", "")
+        now = datetime.now(UTC)
+        ttl = timedelta(minutes=max(1, self.settings.approval_ttl_minutes))
         approved = (
             await self.session.execute(
                 select(Approval).where(
@@ -132,20 +152,63 @@ class DbPersistenceHooks(PersistenceHooks):
             )
         ).scalar_one_or_none()
         if approved is not None:
+            approved_at = approved.approved_at
+            if approved_at is not None and approved_at.tzinfo is None:
+                approved_at = approved_at.replace(tzinfo=UTC)
+            if approved_at is not None and now - approved_at <= ttl:
+                await append_event(
+                    self.session,
+                    self.task.id,
+                    "approval.reused",
+                    {"tool": tool, "digest": digest, "approval_id": approved.id},
+                )
+                await self.session.commit()
+                return True
+            # Approved but stale: expire it and require a fresh decision.
+            approved.status = "expired"
+            approved.expires_at = now
             await append_event(
                 self.session,
                 self.task.id,
-                "approval.reused",
-                {"tool": tool, "digest": digest, "approval_id": approved.id},
+                "approval.expired",
+                {
+                    "tool": tool,
+                    "digest": digest,
+                    "approval_id": approved.id,
+                    "reason": "approval TTL elapsed before execution",
+                },
             )
             await self.session.commit()
-            return True
+
+        # Expire any stale PENDING request for the same digest (its window
+        # has passed; the fresh request below carries a new expiry).
+        stale_pending = (
+            (
+                await self.session.execute(
+                    select(Approval).where(
+                        Approval.task_id == self.task.id,
+                        Approval.action_digest == digest,
+                        Approval.status == "pending",
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        for row in stale_pending:
+            expires = row.expires_at
+            if expires is not None and expires.tzinfo is None:
+                expires = expires.replace(tzinfo=UTC)
+            if expires is None or expires < now:
+                row.status = "expired"
+
         pending = Approval(
             user_id=self.task.user_id,
             task_id=self.task.id,
             action_type=f"tool.{tool}",
             action_digest=digest,
             status="pending",
+            expires_at=now + ttl,
         )
         self.session.add(pending)
         await self.session.flush()
@@ -153,13 +216,24 @@ class DbPersistenceHooks(PersistenceHooks):
             self.session,
             self.task.id,
             "approval.requested",
-            {"approval_id": pending.id, "tool": tool, "digest": digest},
+            {
+                "approval_id": pending.id,
+                "tool": tool,
+                "digest": digest,
+                "expires_at": pending.expires_at.isoformat()
+                if pending.expires_at
+                else None,
+            },
         )
         await self.session.commit()
         return False
 
     async def on_step(
-        self, step_index: int, tool_name: str | None, status: str, detail: dict[str, Any]
+        self,
+        step_index: int,
+        tool_name: str | None,
+        status: str,
+        detail: dict[str, Any],
     ) -> None:
         row = (
             await self.session.execute(
@@ -169,7 +243,9 @@ class DbPersistenceHooks(PersistenceHooks):
             )
         ).scalar_one_or_none()
         if row is None:
-            row = TaskStep(task_id=self.task.id, step_index=step_index, tool_name=tool_name)
+            row = TaskStep(
+                task_id=self.task.id, step_index=step_index, tool_name=tool_name
+            )
             self.session.add(row)
         row.tool_name = tool_name or row.tool_name
         row.status = status
@@ -212,7 +288,11 @@ class DbPersistenceHooks(PersistenceHooks):
 
         # Event payload keeps small structured facts; tool output is reduced
         # to shape (keys/status) so the stream stays replayable and clean.
-        payload: dict[str, Any] = {"step": step_index, "tool": tool_name, "status": status}
+        payload: dict[str, Any] = {
+            "step": step_index,
+            "tool": tool_name,
+            "status": status,
+        }
         result = detail.get("result")
         if isinstance(result, dict):
             payload["result_status"] = result.get("status")
@@ -226,12 +306,17 @@ class DbPersistenceHooks(PersistenceHooks):
         # The durable plan is the set of TaskStep rows; the report's run steps
         # carry per-step outcomes.
         plan_rows = (
-            await self.session.execute(
-                select(TaskStep).where(TaskStep.task_id == self.task.id)
+            (
+                await self.session.execute(
+                    select(TaskStep).where(TaskStep.task_id == self.task.id)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         plan_view = [
-            {"step": r.step_index, "tool": r.tool_name, "status": r.status} for r in plan_rows
+            {"step": r.step_index, "tool": r.tool_name, "status": r.status}
+            for r in plan_rows
         ]
         evaluation = evaluate_run(
             report=report, plan={"plan": plan_view}, steps=report.get("steps", [])
@@ -287,22 +372,29 @@ async def run_agent_task(
         skip: set[int] = set()
         if resume:
             done = (
-                await session.execute(
-                    select(TaskStep.step_index).where(
-                        TaskStep.task_id == task_id, TaskStep.status == "completed"
+                (
+                    await session.execute(
+                        select(TaskStep.step_index).where(
+                            TaskStep.task_id == task_id, TaskStep.status == "completed"
+                        )
                     )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             skip = {int(i) for i in done}
 
         task.status = "running"
         task.started_at = task.started_at or datetime.now(UTC)
         await append_event(
-            session, task_id, "task.started", {"resume": resume, "skipped_steps": sorted(skip)}
+            session,
+            task_id,
+            "task.started",
+            {"resume": resume, "skipped_steps": sorted(skip)},
         )
         await session.commit()
 
-        hooks = DbPersistenceHooks(session, task)
+        hooks = DbPersistenceHooks(session, task, settings)
 
         async def cancelled_in_db() -> bool:
             # Re-read committed state (a plain select always hits the DB).
@@ -356,7 +448,10 @@ async def run_agent_task(
                         event_type="task.settled",
                         resource_type="task",
                         resource_id=task_id,
-                        metadata_redacted={"actual_xp": actual, "budget_xp": task.budget_xp},
+                        metadata_redacted={
+                            "actual_xp": actual,
+                            "budget_xp": task.budget_xp,
+                        },
                     )
                 )
                 await session.commit()
@@ -403,13 +498,13 @@ async def run_agent_task(
                     amount=task.reserved_xp,
                 )
                 task.reserved_xp = 0
-            await append_event(
-                session, task_id, "task.failed", {"error": task.error}
-            )
+            await append_event(session, task_id, "task.failed", {"error": task.error})
             await session.commit()
             raise
         finally:
-            fresh_status = await session.scalar(select(Task.status).where(Task.id == task_id))
+            fresh_status = await session.scalar(
+                select(Task.status).where(Task.id == task_id)
+            )
             summary = {
                 "task_id": task_id,
                 "outcome": outcome_status,

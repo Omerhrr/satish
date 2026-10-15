@@ -10,17 +10,23 @@
 import type {
   ArtifactOut,
   ApprovalOut,
-  SessionInfo,
+  AutomationRunOut,
   BalanceOut,
   CapabilitiesOut,
+  ConnectionOut,
+  ConnectionProvidersOut,
   DemoPdfIn,
   DevGrantIn,
+  EmailDraftOut,
   HealthOut,
+  JobOut,
   LedgerPageOut,
+  NotificationsPageOut,
   PackOut,
   PurchaseCreateIn,
   PurchaseOut,
   RateOut,
+  SessionInfo,
   SessionOut,
   TaskCreateIn,
   TaskEstimateOut,
@@ -70,6 +76,32 @@ export interface XpClient {
   logout: () => Promise<{ status: string; revoked: boolean }>;
   listSessions: () => Promise<SessionInfo[]>;
   revokeSession: (sessionId: string) => Promise<{ status: string; session_id: string }>;
+  // -- phase 9: connections / drafts / automation / notifications ------------
+  connectionProviders: () => Promise<ConnectionProvidersOut>;
+  listConnections: () => Promise<ConnectionOut[]>;
+  linkConnection: (payload: {
+    provider: string;
+    scopes?: string[] | null;
+    credential: Record<string, unknown>;
+  }) => Promise<ConnectionOut>;
+  revokeConnection: (connectionId: string) => Promise<ConnectionOut>;
+  listDrafts: () => Promise<EmailDraftOut[]>;
+  getDraft: (draftId: string) => Promise<EmailDraftOut>;
+  listJobs: () => Promise<JobOut[]>;
+  createJob: (payload: {
+    objective: string;
+    schedule: string;
+    budget_per_run_xp: number;
+    budget_total_xp?: number | null;
+    conditions?: Record<string, unknown> | null;
+  }) => Promise<JobOut>;
+  pauseJob: (jobId: string) => Promise<JobOut>;
+  resumeJob: (jobId: string) => Promise<JobOut>;
+  cancelJob: (jobId: string) => Promise<JobOut>;
+  triggerJob: (jobId: string) => Promise<AutomationRunOut>;
+  jobRuns: (jobId: string) => Promise<AutomationRunOut[]>;
+  listNotifications: () => Promise<NotificationsPageOut>;
+  markNotificationRead: (notificationId: string) => Promise<NotificationOut>;
 }
 
 export function createXpClient(config: XpClientConfig = {}): XpClient {
@@ -196,6 +228,34 @@ export function createXpClient(config: XpClientConfig = {}): XpClient {
     revokeSession: (sessionId) =>
       request<{ status: string; session_id: string }>(`/api/v1/auth/sessions/${sessionId}`, {
         method: "DELETE",
+      }),
+    // -- phase 9 ---------------------------------------------------------------
+    connectionProviders: () => request<ConnectionProvidersOut>("/api/v1/connections/providers"),
+    listConnections: () => request<ConnectionOut[]>("/api/v1/connections"),
+    linkConnection: (payload) =>
+      request<ConnectionOut>("/api/v1/connections", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    revokeConnection: (connectionId) =>
+      request<ConnectionOut>(`/api/v1/connections/${connectionId}`, { method: "DELETE" }),
+    listDrafts: () => request<EmailDraftOut[]>("/api/v1/drafts"),
+    getDraft: (draftId) => request<EmailDraftOut>(`/api/v1/drafts/${draftId}`),
+    listJobs: () => request<JobOut[]>("/api/v1/jobs"),
+    createJob: (payload) =>
+      request<JobOut>("/api/v1/jobs", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    pauseJob: (jobId) => request<JobOut>(`/api/v1/jobs/${jobId}/pause`, { method: "POST" }),
+    resumeJob: (jobId) => request<JobOut>(`/api/v1/jobs/${jobId}/resume`, { method: "POST" }),
+    cancelJob: (jobId) => request<JobOut>(`/api/v1/jobs/${jobId}/cancel`, { method: "POST" }),
+    triggerJob: (jobId) => request<AutomationRunOut>(`/api/v1/jobs/${jobId}/run`, { method: "POST" }),
+    jobRuns: (jobId) => request<AutomationRunOut[]>(`/api/v1/jobs/${jobId}/runs`),
+    listNotifications: () => request<NotificationsPageOut>("/api/v1/notifications"),
+    markNotificationRead: (notificationId) =>
+      request<NotificationOut>(`/api/v1/notifications/${notificationId}/read`, {
+        method: "POST",
       }),
   };
 }

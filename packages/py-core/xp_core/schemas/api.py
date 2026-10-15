@@ -295,7 +295,9 @@ class ArtifactOut(BaseModel):
 
 class DemoPdfIn(BaseModel):
     title: str = Field(min_length=1, max_length=200)
-    sections: list[str] = Field(default_factory=lambda: ["Summary", "Findings", "Sources"])
+    sections: list[str] = Field(
+        default_factory=lambda: ["Summary", "Findings", "Sources"]
+    )
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -307,3 +309,101 @@ class CapabilitiesOut(BaseModel):
     lightning: str
     agent_runtime: str
     notes: list[str]
+
+
+# -- connections (phase 9) --------------------------------------------------------
+
+
+class ConnectionCreateIn(BaseModel):
+    provider: str
+    scopes: list[str] | None = None
+    # provider-specific payload (e.g. SMTP host/port/username/password);
+    # secret fields are encrypted at rest and NEVER returned by any API.
+    credential: dict[str, Any]
+
+
+class ConnectionOut(BaseModel):
+    id: str
+    provider: str
+    scopes: list[str]
+    status: str
+    credential_reference: str | None = None
+    created_at: datetime
+    revoked_at: datetime | None = None
+    disclosure: str | None = None
+
+
+# -- email drafts (phase 9) --------------------------------------------------------
+
+
+class EmailDraftOut(BaseModel):
+    id: str
+    task_id: str | None
+    connection_id: str | None
+    to_address: str
+    subject: str
+    body: str
+    digest: str
+    status: str
+    provider_mode: str | None
+    error: str | None
+    sent_at: datetime | None
+    created_at: datetime
+
+
+# -- automation jobs (phase 9) ------------------------------------------------------
+
+
+class JobCreateIn(BaseModel):
+    objective: str = Field(min_length=1, max_length=2000)
+    schedule: str = Field(min_length=1, max_length=128)
+    budget_per_run_xp: int = Field(default=20, ge=1)
+    budget_total_xp: int | None = Field(default=None, ge=1)
+    conditions: dict[str, Any] | None = None
+
+
+class AutomationRunOut(BaseModel):
+    id: str
+    job_id: str
+    run_number: int
+    trigger: str
+    status: str
+    task_id: str | None
+    xp_charged: int
+    xp_budget_per_run: int
+    error: str | None
+    started_at: datetime
+    finished_at: datetime | None
+
+
+class JobOut(BaseModel):
+    id: str
+    objective: str
+    schedule: str
+    next_run_at: datetime | None
+    last_run_at: datetime | None
+    last_run_status: str | None
+    status: str
+    budget_per_run_xp: int
+    budget_total_xp: int | None
+    total_spent_xp: int
+    run_count: int
+    consecutive_failures: int
+    auto_paused_reason: str | None
+    conditions: dict[str, Any] | None
+    created_at: datetime
+
+
+class NotificationsPageOut(BaseModel):
+    notifications: list[NotificationOut]
+    unread: int
+
+
+class NotificationOut(BaseModel):
+    id: str
+    kind: str
+    payload: dict[str, Any] | None
+    job_id: str | None
+    run_id: str | None
+    read_at: datetime | None
+    created_at: datetime

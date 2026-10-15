@@ -14,6 +14,8 @@
       <NuxtLink to="/billing">Billing</NuxtLink>
       <NuxtLink to="/xp">XP</NuxtLink>
       <NuxtLink to="/tasks">Tasks</NuxtLink>
+      <NuxtLink to="/automations">Automations</NuxtLink>
+      <NuxtLink to="/connections">Connect</NuxtLink>
       <NuxtLink to="/settings">Security</NuxtLink>
     </nav>
 

@@ -284,6 +284,14 @@ class Artifact(Base):
 
 
 class ScheduledJob(Base):
+    """Recurring automation (phase 9).
+
+    Budget discipline: every spawned run's task budget is capped at
+    ``budget_per_run_xp`` AND at whatever remains of ``budget_total_xp``
+    (when configured) — the ledger refuses settlement beyond a task's
+    budget, so these caps are enforced in backend code, not by the model.
+    """
+
     __tablename__ = "scheduled_jobs"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
@@ -296,6 +304,13 @@ class ScheduledJob(Base):
     next_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     last_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    # -- phase 9: budget totals + failure bookkeeping --------------------------
+    budget_total_xp: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    total_spent_xp: Mapped[int] = mapped_column(Integer, default=0)
+    run_count: Mapped[int] = mapped_column(Integer, default=0)
+    consecutive_failures: Mapped[int] = mapped_column(Integer, default=0)
+    last_run_status: Mapped[str | None] = mapped_column(String(48), nullable=True)
+    auto_paused_reason: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
 
 class ResearchSource(Base):
@@ -349,6 +364,119 @@ class AuditEvent(Base):
     )
 
 
+class ServiceCredential(Base):
+    """Encrypted-at-rest credential for a connected external service (phase 9).
+
+    One row per connection. The payload (e.g. SMTP host/port/password) is
+    Fernet-encrypted with the operator-configured master key; the plaintext
+    never enters logs, task events, or API responses. Revocation hard-deletes
+    the row, so a revoked connection cannot authenticate even if the API
+    layer were bypassed.
+    """
+
+    __tablename__ = "service_credentials"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    connection_id: Mapped[str] = mapped_column(
+        ForeignKey("connected_services.id"), unique=True, index=True
+    )
+    ciphertext: Mapped[str] = mapped_column(Text)
+    key_version: Mapped[int] = mapped_column(Integer, default=1)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class EmailDraft(Base):
+    """Email draft with preview-before-send semantics (phase 9).
+
+    ``digest`` is sha256 over the canonical {to, subject, body}; the
+    email.send approval binds to the tool action digest, which contains the
+    exact same content — the user approves what they previewed. Status moves
+    drafted -> sent | failed | unknown_outcome | refused; a sent draft can
+    never be sent again (repeat send requires a new draft + new approval).
+    """
+
+    __tablename__ = "email_drafts"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    task_id: Mapped[str | None] = mapped_column(
+        ForeignKey("tasks.id"), nullable=True, index=True
+    )
+    connection_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    to_address: Mapped[str] = mapped_column(String(320))
+    subject: Mapped[str] = mapped_column(String(512))
+    body: Mapped[str] = mapped_column(Text)
+    digest: Mapped[str] = mapped_column(String(64), index=True)
+    status: Mapped[str] = mapped_column(String(32), default="drafted")
+    # drafted | sent | failed | unknown_outcome | refused
+    provider_mode: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=utcnow, onupdate=utcnow
+    )
+
+
+class AutomationRun(Base):
+    """One execution attempt of a scheduled job (phase 9: run history).
+
+    Every attempt — success, failure, or skip — is recorded here with its
+    reason. Failures never silently repeat consequential actions: the next
+    sweep sees the failure count, and approval-blocked runs surface as
+    ``blocked_on_approval`` while pending, then ``skipped_approval_pending``
+    on subsequent sweeps (no approval spam, no hidden resend).
+    """
+
+    __tablename__ = "automation_runs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    job_id: Mapped[str] = mapped_column(ForeignKey("scheduled_jobs.id"), index=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    run_number: Mapped[int] = mapped_column(Integer)
+    trigger: Mapped[str] = mapped_column(String(16), default="scheduled")  # scheduled|manual
+    status: Mapped[str] = mapped_column(String(48))
+    # running | succeeded | failed | blocked_on_approval | skipped_budget |
+    # skipped_total_budget | skipped_cancelled
+    task_id: Mapped[str | None] = mapped_column(
+        ForeignKey("tasks.id"), nullable=True, index=True
+    )
+    xp_charged: Mapped[int] = mapped_column(Integer, default=0)
+    xp_budget_per_run: Mapped[int] = mapped_column(Integer, default=0)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("job_id", "run_number", name="uq_automation_run_number"),
+    )
+
+
+class Notification(Base):
+    """Condition-based notification for a user (phase 9).
+
+    Created by backend evaluation of scheduled-job conditions (run outcomes,
+    balance thresholds). Persisted and API-readable; Telegram relay is a
+    documented open item — pretending to push without a bot token would
+    fabricate delivery.
+    """
+
+    __tablename__ = "notifications"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    kind: Mapped[str] = mapped_column(String(64))
+    payload: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    job_id: Mapped[str | None] = mapped_column(
+        ForeignKey("scheduled_jobs.id"), nullable=True
+    )
+    run_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    read_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    relayed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+
+
 ALL_TABLES = [
     User,
     TelegramAccount,
@@ -367,5 +495,9 @@ ALL_TABLES = [
     Artifact,
     ScheduledJob,
     ResearchSource,
+    ServiceCredential,
+    EmailDraft,
+    AutomationRun,
+    Notification,
     AuditEvent,
 ]

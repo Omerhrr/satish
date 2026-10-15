@@ -13,7 +13,13 @@ sees typed, allowlisted tools — but the handlers now do the real work:
 - docs.generate_pdf cited report through the quality gates; refusing to
                     render uncited claims (DocumentQualityError)
 - docs.generate_csv / docs.generate_xlsx  cited comparison table exports
-- email/automation  unchanged stubs (their product surfaces arrive later)
+- email.draft       persists a previewable draft (content digest); never sends
+- email.send        executes ONLY post-approval, against a linked connection
+                    with the email:send scope, and only for an unsent draft
+                    matching the approved content; honest definite-vs-unknown
+                    outcome taxonomy (never silently retries)
+- automation.schedule creates a budget-capped scheduled job (validated
+                    schedule grammar, operator XP caps, whitelist conditions)
 
 Unchanged invariants: scope wall, budget gate, timeouts, audit records,
 and NO key material anywhere.
@@ -21,12 +27,15 @@ and NO key material anywhere.
 
 from __future__ import annotations
 
+import hashlib
+import json
 from datetime import UTC, datetime
 from typing import Any
 
 from app.services.task_events import append_event
 from commerce_adapter import commerce_facts
 from dsh_adapter.tools import ToolRegistry, ToolSpec
+from email_adapter import get_email_provider
 from research_adapter import (
     Fact,
     SourceRecord,
@@ -39,7 +48,15 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from xp_core.config import Settings
 from xp_core.logging import get_logger
-from xp_core.models.entities import Artifact, ResearchSource, Task
+from xp_core.models.entities import (
+    Artifact,
+    AuditEvent,
+    EmailDraft,
+    ResearchSource,
+    Task,
+)
+from xp_core.services import automation as automation_core
+from xp_core.services import vault as credential_vault
 from xp_core.services.documents import (
     DocumentQualityError,
     ReportClaim,
@@ -55,6 +72,21 @@ from xp_core.services.storage import StorageBackend
 log = get_logger(__name__)
 
 RESEARCH_CORPUS_FALLBACK: list[dict[str, Any]] = []
+
+
+def content_digest(to: str, subject: str, body: str) -> str:
+    """sha256 over the canonical draft content.
+
+    The email.send approval binds to the tool action digest, which wraps
+    THIS content — the user approves exactly what they previewed.
+    """
+    canonical = json.dumps(
+        {"to": to, "subject": subject, "body": body},
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(canonical.encode()).hexdigest()
+
 
 XLSX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
@@ -113,12 +145,16 @@ async def _upsert_source(
 ) -> tuple[ResearchSource, bool]:
     """(task, url)-unique upsert: refetching upgrades a row, never duplicates."""
     row = (
-        await session.execute(
-            select(ResearchSource).where(
-                ResearchSource.task_id == task.id, ResearchSource.url == url
+        (
+            await session.execute(
+                select(ResearchSource).where(
+                    ResearchSource.task_id == task.id, ResearchSource.url == url
+                )
             )
         )
-    ).scalars().first()
+        .scalars()
+        .first()
+    )
     created = row is None
     if row is None:
         row = ResearchSource(task_id=task.id, user_id=task.user_id, url=url)
@@ -140,12 +176,16 @@ async def _upsert_source(
 
 async def _records_from_rows(session: AsyncSession, task: Task) -> list[SourceRecord]:
     rows = (
-        await session.execute(
-            select(ResearchSource)
-            .where(ResearchSource.task_id == task.id)
-            .order_by(ResearchSource.created_at)
+        (
+            await session.execute(
+                select(ResearchSource)
+                .where(ResearchSource.task_id == task.id)
+                .order_by(ResearchSource.created_at)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     records: list[SourceRecord] = []
     for row in rows:
         records.append(
@@ -168,12 +208,16 @@ async def _citable_rows(session: AsyncSession, task: Task) -> list[ResearchSourc
     """Sources eligible for the report appendix/citations, in stable order:
     fetched-ok first (citation-bearing), then listed, then unreachable."""
     rows = (
-        await session.execute(
-            select(ResearchSource)
-            .where(ResearchSource.task_id == task.id)
-            .order_by(ResearchSource.created_at)
+        (
+            await session.execute(
+                select(ResearchSource)
+                .where(ResearchSource.task_id == task.id)
+                .order_by(ResearchSource.created_at)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     rank = {"ok": 0, "listed": 1, "error": 2, "unavailable": 3, "denied": 4}
     return sorted(rows, key=lambda r: (rank.get(r.status, 9), r.created_at))
 
@@ -335,7 +379,9 @@ def build_product_registry(
                 note="found by web.search; not yet fetched",
             )
             await session.flush()
-            listed.append({"source_id": row.id, "url": listing.url, "title": listing.title})
+            listed.append(
+                {"source_id": row.id, "url": listing.url, "title": listing.title}
+            )
         await session.commit()
         return {
             "status": "ok",
@@ -419,7 +465,9 @@ def build_product_registry(
             "disclosed in the report",
         }
 
-    async def research_compare(required_keys: list[str] | None = None) -> dict[str, Any]:
+    async def research_compare(
+        required_keys: list[str] | None = None,
+    ) -> dict[str, Any]:
         records = await _records_from_rows(session, task)
         comparison = compare_sources(records, required_keys)
         await append_event(
@@ -429,7 +477,8 @@ def build_product_registry(
             {
                 "subjects": len(comparison.rows),
                 "conflicts": [
-                    {"subject": c.subject, "detail": c.detail} for c in comparison.conflicts
+                    {"subject": c.subject, "detail": c.detail}
+                    for c in comparison.conflicts
                 ],
                 "gaps": comparison.gaps,
                 "disclosures": comparison.disclosures,
@@ -447,7 +496,9 @@ def build_product_registry(
             "disclosures": comparison.disclosures,
         }
 
-    async def docs_generate_pdf(title: str, sections: list[str] | None = None) -> dict[str, Any]:
+    async def docs_generate_pdf(
+        title: str, sections: list[str] | None = None
+    ) -> dict[str, Any]:
         spec, _records = await _build_report_spec(session, task, settings, title)
         try:
             data = render_report_pdf(spec)
@@ -525,16 +576,253 @@ def build_product_registry(
             "disclosure": "validated XLSX stored privately",
         }
 
-    # -- communication / automation: unchanged stubs until their phases -------
+    # -- communication (phase 9): draft -> preview -> approval -> send --------
 
     async def draft_email(to: str, subject: str, body: str) -> dict[str, Any]:
-        return {"status": "drafted", "to": to, "subject": subject, "body": body}
+        digest = content_digest(to, subject, body)
+        draft = EmailDraft(
+            user_id=task.user_id,
+            task_id=task.id,
+            to_address=to,
+            subject=subject,
+            body=body,
+            digest=digest,
+            status="drafted",
+        )
+        session.add(draft)
+        await session.flush()
+        await append_event(
+            session,
+            task.id,
+            "email.drafted",
+            {"draft_id": draft.id, "digest": digest, "to": to, "subject": subject},
+        )
+        await session.commit()
+        return {
+            "status": "drafted",
+            "draft_id": draft.id,
+            "digest": digest,
+            "disclosure": (
+                "stored for user preview; sending requires explicit approval "
+                "and a connected email service"
+            ),
+        }
 
     async def send_email(to: str, subject: str, body: str) -> dict[str, Any]:
-        return {"status": "stub_requires_approval", "to": to, "subject": subject}
+        # Runs ONLY after the approval gate: the runner checked the DB approval
+        # bound to THIS content's action digest before calling this handler.
+        digest = content_digest(to, subject, body)
+        draft = (
+            await session.execute(
+                select(EmailDraft)
+                .where(
+                    EmailDraft.user_id == task.user_id,
+                    EmailDraft.digest == digest,
+                    EmailDraft.status == "drafted",
+                )
+                .order_by(EmailDraft.created_at.desc())
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        if draft is None:
+            await append_event(
+                session,
+                task.id,
+                "email.send_refused",
+                {"reason": "no unsent draft matching the approved content"},
+            )
+            await session.commit()
+            return {
+                "status": "refused",
+                "reason": "no unsent draft matching the approved content; "
+                "a send always targets a previewed draft",
+            }
 
-    async def schedule_job(schedule: str, objective: str) -> dict[str, Any]:
-        return {"status": "stub", "schedule": schedule, "objective": objective}
+        connection = await credential_vault.find_active_connection(
+            session, task.user_id, "smtp", "email:send"
+        )
+        if connection is None:
+            # NOT consuming the draft: once a connection is linked, the same
+            # draft can still be sent (with a fresh approval).
+            await append_event(
+                session,
+                task.id,
+                "email.send_refused",
+                {"draft_id": draft.id, "reason": "no_connected_service"},
+            )
+            await session.commit()
+            return {
+                "status": "refused",
+                "reason": "no connected email service with the email:send scope; "
+                "link one in the Mini App first",
+            }
+
+        try:
+            credential = await credential_vault.load_credential(
+                session, connection, settings
+            )
+        except credential_vault.ConnectionError as exc:
+            await append_event(
+                session,
+                task.id,
+                "email.send_refused",
+                {"draft_id": draft.id, "reason": f"credential: {exc}"},
+            )
+            await session.commit()
+            return {"status": "refused", "reason": str(exc)}
+
+        provider = get_email_provider(settings)
+        outcome = await provider.send(
+            to=to, subject=subject, body=body, credential=credential
+        )
+        draft.connection_id = connection.id
+        draft.provider_mode = outcome.provider
+        if outcome.status == "sent":
+            draft.status = "sent"
+            draft.sent_at = datetime.now(UTC)
+            draft.error = None
+            event_type = "email.sent"
+        elif outcome.status == "unknown":
+            draft.status = "unknown_outcome"
+            draft.error = outcome.detail
+            event_type = "email.send_unknown"
+        else:  # refused: definite failure, safe to report
+            draft.status = "failed"
+            draft.error = outcome.detail
+            event_type = "email.failed"
+        await append_event(
+            session,
+            task.id,
+            event_type,
+            {
+                "draft_id": draft.id,
+                "provider": outcome.provider,
+                "message_id": outcome.message_id,
+                "detail": outcome.detail,
+                "disclosure": outcome.disclosure,
+            },
+        )
+        session.add(
+            AuditEvent(
+                actor_type="agent",
+                actor_id=task.user_id,
+                event_type=event_type,
+                resource_type="email_draft",
+                resource_id=draft.id,
+                metadata_redacted={
+                    "task_id": task.id,
+                    "provider": outcome.provider,
+                    "outcome": outcome.status,
+                },
+            )
+        )
+        await session.commit()
+        return {
+            "status": outcome.status,
+            "draft_id": draft.id,
+            "provider": outcome.provider,
+            "detail": outcome.detail,
+            "disclosure": outcome.disclosure,
+        }
+
+    # -- automation (phase 9) ----------------------------------------------------
+
+    async def schedule_job(
+        schedule: str,
+        objective: str,
+        budget_per_run_xp: int = 20,
+        budget_total_xp: int | None = None,
+        conditions: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        # Runs ONLY after the approval gate bound to these exact arguments.
+        existing = (
+            (
+                await session.execute(
+                    select(automation_core.ScheduledJob).where(
+                        automation_core.ScheduledJob.user_id == task.user_id,
+                        automation_core.ScheduledJob.status == "active",
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        for row in existing:
+            if (row.task_template or {}).get(
+                "objective", ""
+            ).strip() == objective.strip() and (
+                row.schedule == schedule.strip().lower()
+            ):
+                return {
+                    "status": "already_scheduled",
+                    "job_id": row.id,
+                    "next_run_at": row.next_run_at.isoformat()
+                    if row.next_run_at
+                    else None,
+                    "disclosure": "an identical active job already exists; nothing duplicated",
+                }
+        try:
+            job, disclosure = await automation_core.create_job(
+                session,
+                user_id=task.user_id,
+                objective=objective,
+                schedule=schedule,
+                budget_per_run_xp=budget_per_run_xp,
+                budget_total_xp=budget_total_xp,
+                conditions=conditions,
+                settings=settings,
+            )
+        except (
+            automation_core.ScheduleError,
+            automation_core.JobValidationError,
+        ) as exc:
+            await append_event(
+                session, task.id, "automation.schedule_refused", {"reason": str(exc)}
+            )
+            await session.commit()
+            return {"status": "refused", "reason": str(exc)}
+        await append_event(
+            session,
+            task.id,
+            "automation.scheduled",
+            {
+                "job_id": job.id,
+                "schedule": job.schedule,
+                "objective": objective,
+                "budget_per_run_xp": job.budget_per_run_xp,
+                "budget_total_xp": job.budget_total_xp,
+                "next_run_at": job.next_run_at.isoformat() if job.next_run_at else None,
+                "disclosure": disclosure,
+            },
+        )
+        session.add(
+            AuditEvent(
+                actor_type="agent",
+                actor_id=task.user_id,
+                event_type="job.created",
+                resource_type="scheduled_job",
+                resource_id=job.id,
+                metadata_redacted={
+                    "task_id": task.id,
+                    "schedule": job.schedule,
+                    "budget_per_run_xp": job.budget_per_run_xp,
+                },
+            )
+        )
+        await session.commit()
+        return {
+            "status": "scheduled",
+            "job_id": job.id,
+            "schedule": job.schedule,
+            "next_run_at": job.next_run_at.isoformat() if job.next_run_at else None,
+            "budget_per_run_xp": job.budget_per_run_xp,
+            "budget_total_xp": job.budget_total_xp,
+            "disclosure": (
+                "runs are budget-capped per run and in total; every attempt is "
+                "recorded; approval-required actions inside a run always wait "
+                "for the user"
+            ),
+        }
 
     registry.register(
         ToolSpec(
@@ -692,6 +980,29 @@ def build_product_registry(
                 "properties": {
                     "schedule": {"type": "string"},
                     "objective": {"type": "string"},
+                    "budget_per_run_xp": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "max XP charged per run (operator-capped)",
+                    },
+                    "budget_total_xp": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "optional lifetime XP cap; exhausted => auto-pause",
+                    },
+                    "conditions": {
+                        "type": "object",
+                        "properties": {
+                            "notify_on": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string",
+                                    "enum": ["run_succeeded", "run_failed"],
+                                },
+                            },
+                            "balance_below_xp": {"type": "integer", "minimum": 1},
+                        },
+                    },
                 },
                 "required": ["schedule", "objective"],
             },

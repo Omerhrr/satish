@@ -334,3 +334,77 @@ committed commerce evaluation set (`tests/data/commerce_eval_set.json` +
 `make commerce-eval`, 7 cases) is the repeatable regression harness. A live
 ad-library integration would require a permitted API partnership and is
 tracked as an open item, honestly out of reach for now.
+
+---
+
+## D16 — Email + automation: preview-before-send, digest-bound expiring approvals, encrypted credential vault, budget-laddered scheduler (2026-10-15, phase 9)
+
+**Context:** phase 9 asks for an external service connection framework, scoped
+credential storage, email draft/preview, explicit send approval, scheduled
+jobs, condition-based notifications, pause/resume/cancel/failure handling,
+and run history — under five acceptance bars: valid authorization + approved
+scope for every external action; approval bound to the exact action content
+AND expiring; user-revocable connections; recurring jobs enforcing per-run
+and total XP limits; and failed jobs never silently repeating consequential
+actions.
+
+**Decision:**
+1. **Connections + vault.** One `ConnectedService` row per link; exactly one
+   `ServiceCredential` row holding a Fernet ciphertext (key = sha256 of the
+   operator master key, which itself is never stored). The plaintext has ONE
+   decryption path (`vault.load_credential`) and never appears in logs,
+   events, audit metadata, or API responses. Revocation hard-deletes the
+   credential row — a revoked connection cannot authenticate even if other
+   layers were bypassed. Dev mode may use a documented fallback key that is
+   DISCLOSED on every surface; non-dev environments refuse to link without
+   an operator key (`XP_CONNECTIONS_CREDENTIAL_KEY`).
+2. **Email flow.** `email.draft` persists a draft with a content digest;
+   `email.send` executes only post-approval, only for an UNSNT draft whose
+   content matches the approved digest, and only against a linked
+   connection with the `email:send` scope. Providers implement an honest
+   taxonomy: `sent` / `refused` (definite, safe to report) / `unknown`
+   (transport failed mid-session — the server may have accepted the
+   message; the system records `unknown_outcome`, discloses it loudly, and
+   NEVER auto-retries — mirroring the phase-3 wallet broadcast taxonomy).
+   Default provider is canned with a no-network disclosure on every receipt;
+   the real SMTP path (stdlib smtplib, off-loop) was proven against a local
+   asyncio loopback server in tests.
+3. **Approval expiry.** Approvals now carry `expires_at` (TTL,
+   `XP_APPROVAL_TTL_MINUTES`, default 60). Reuse on resume only within TTL;
+   expired-pending cannot be approved (the decision endpoint refuses with
+   409 and marks it expired); approved-but-stale approvals are expired by
+   the runner and a fresh decision is requested. Content binding was
+   already digest-exact (D13); the time window completes the acceptance.
+4. **Scheduler.** A deterministic schedule grammar (`every <n><s|m|h|d>`
+   >= 60s, `daily HH:MM` UTC, `hourly`, `daily`) — full cron is a documented
+   non-goal for this phase. Each run's task budget is
+   `min(budget_per_run_xp, remaining_total)`; the ledger's cap refusal makes
+   the per-run limit hold end-to-end, and an affordability pre-check records
+   the skip cleanly without touching the ledger. Total budget exhausted ->
+   run skipped AND job auto-paused with a notification. Consecutive failures
+   (operator-configured ladder, default 3) auto-pause + notify. Every
+   attempt — success, failure, skip, block — is an `AutomationRun` row.
+5. **Consequential-action discipline.** A run whose spawned task awaits
+   approval blocks (`blocked_on_approval`); subsequent sweeps WAIT — no new
+   task, no new approval spam, no hidden resend. A denied approval fails the
+   task explicitly with full reservation release. A worker crash mid-run is
+   recovered by a staleness window (run marked failed, failure ladder
+   applies); fresher runs are waited on, never run concurrently.
+6. **Scope stacking.** `email:send` and `automation:write` join
+   USER_TASK_SCOPES (they were structurally unreachable stubs before), and
+   their tools still carry `requires_approval=True` — the scope wall and
+   the approval gate stack; untrusted content cannot bypass either.
+
+**Rejected alternatives:** storing credentials as environment variables per
+user (unscalable, unauditable); auto-retrying email on unknown outcomes
+(could double-send — the exact acceptance violation); full cron parsing
+(dep-heavy, easy to get DST/timezone wrong silently); silently ignoring
+unknown condition keys (typo -> job that never notifies looks healthy);
+resuming a denied-approval task (would re-request approval forever).
+
+**Consequences:** notifications are persisted + API-readable with Telegram
+relay as an open item (pretending to push without a bot token would
+fabricate delivery). Live SMTP delivery needs a real server + an operator
+master key; everything else is fully testable offline. The automation sweep
+runs in the worker cron (arq) and inline in dev; one broken job never kills
+a sweep (per-job error isolation with logged outcomes).

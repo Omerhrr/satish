@@ -8,6 +8,7 @@ from xp_core.config import get_settings
 from xp_core.logging import setup_logging
 
 from worker.jobs.agent import run_agent_task_job
+from worker.jobs.automation import run_scheduled_jobs_job
 from worker.jobs.pdf import generate_pdf_report
 from worker.jobs.receipt import generate_receipt_pdf
 
@@ -44,11 +45,18 @@ def _build_cron_jobs() -> tuple:
     interval = max(60, get_settings().reconcile_interval_seconds)
     # arq cron is minute-granular; approximate the interval in minutes.
     minutes = max(1, interval // 60)
+    # Automation sweep (phase 9): due scheduled jobs get one decision each.
+    sweep_minutes = max(1, get_settings().automation_sweep_interval_seconds // 60)
     return (
         cron(
             scheduled_reconciliation,
             minute=set(range(0, 60, minutes)) if minutes < 60 else None,
             run_at_startup=False,
+        ),
+        cron(
+            run_scheduled_jobs_job,
+            minute=set(range(0, 60, sweep_minutes)) if sweep_minutes < 60 else None,
+            run_at_startup=True,
         ),
     )
 
@@ -56,7 +64,12 @@ def _build_cron_jobs() -> tuple:
 class WorkerSettings:
     """arq configuration; functions are the allowlisted job surface."""
 
-    functions = (generate_pdf_report, generate_receipt_pdf, run_agent_task_job)
+    functions = (
+        generate_pdf_report,
+        generate_receipt_pdf,
+        run_agent_task_job,
+        run_scheduled_jobs_job,
+    )
     cron_jobs = _build_cron_jobs()
     on_startup = startup
     on_shutdown = shutdown

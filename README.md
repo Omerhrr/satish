@@ -107,6 +107,7 @@ make lint    # ruff
 - `docs/decisions.md` — decision log incl. what is deliberately NOT done yet
 - `docs/research-tools.md` — phase-7 research pipeline: permission wall, provenance, quality gates, evaluation set
 - `docs/commerce-intelligence.md` — phase-8 commerce intelligence: transparent scoring, supplier/vehicle research, ad-library honesty, landed-cost template, freshness/confidence
+- `docs/email-automation.md` — phase-9 email + automation: preview-before-send, digest-bound expiring approvals, credential vault, budget-laddered scheduler
 
 ## License & principles
 

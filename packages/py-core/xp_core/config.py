@@ -137,6 +137,34 @@ class Settings(BaseSettings):
     # (phase-8 acceptance bars). Relative to repo root.
     commerce_eval_set_path: str = "tests/data/commerce_eval_set.json"
 
+    # -- external connections (phase 9) ------------------------------------------
+    # Master key for the credential vault (Fernet over a sha256-derived key).
+    # NEVER logged, never returned by any API. In dev mode a documented
+    # fallback key keeps local development zero-config, and every response
+    # discloses that fallback; non-dev environments refuse to link connections
+    # until an operator key is configured.
+    connections_credential_key: str | None = None
+    # email.send delivery mode: "canned" (deterministic, no network — the
+    # receipt says so) or "smtp" (real delivery via the connection's stored
+    # credentials, with an honest definite-vs-unknown outcome taxonomy).
+    email_send_mode: str = "canned"
+
+    # -- approvals + automation (phase 9) ----------------------------------------
+    # Approval expiry: an approval decision binds to the action digest AND a
+    # TTL. Execution after expiry re-requests approval — no stale sends.
+    approval_ttl_minutes: int = 60
+    # Scheduler sweep cadence (worker cron). arq cron is minute-granular.
+    automation_sweep_interval_seconds: int = 60
+    # Consecutive failed runs before a job auto-pauses (failed jobs do not
+    # silently repeat consequential actions — they stop and notify).
+    automation_max_consecutive_failures: int = 3
+    # A run left "running" longer than this (worker crash) is marked failed on
+    # the next sweep; fresher ones are waited on, never run concurrently.
+    automation_run_stale_seconds: int = 3600
+    # Operator caps on per-job budgets (user input is clamped to these).
+    automation_max_budget_per_run_xp: int = 10_000
+    automation_max_budget_total_xp: int = 100_000
+
     # -- worker ----------------------------------------------------------------
     pdf_storage_dir: str = "./data/artifacts"
     reconcile_interval_seconds: int = 3600  # billing_flow #8

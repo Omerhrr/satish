@@ -59,7 +59,8 @@ async def cmd_start(message: Message) -> None:
         "Welcome to <b>XP</b> — your Bitcoin-native AI workforce.\n\n"
         "Self-custody first: your keys, your bitcoin. "
         "I help you run research, commerce intelligence, vehicle comparisons, "
-        "and document jobs paid in sats via XP credits.\n\n"
+        "document jobs, and email/automation workflows paid in sats via XP "
+        "credits.\n\n"
         f"{SECURITY_NOTE}\n\n"
         "Tap below to open the Mini App, or try /help.",
         reply_markup=mini_app_keyboard(settings),
@@ -81,7 +82,8 @@ async def cmd_help(message: Message) -> None:
         "/fund — buy XP credits with sats\n"
         "/research — start a research task\n"
         "/tasks — running and past tasks\n"
-        "/automations — scheduled jobs\n"
+        "/automations — scheduled jobs (Mini App: runs, budgets, notifications)\n"
+        "/connections — linked email service (Mini App)\n"
         "/settings — security and recovery\n\n"
         f"{SECURITY_NOTE}",
         parse_mode=ParseMode.HTML,

@@ -364,3 +364,91 @@ export interface IncreaseBudgetIn {
 export interface SettleTaskIn {
   actual_xp: number;
 }
+
+// -- phase 9: connections / email drafts / automation -----------------------------
+
+export interface ConnectionOut {
+  id: string;
+  provider: string;
+  scopes: string[];
+  status: string;
+  credential_reference: string | null;
+  created_at: string;
+  revoked_at: string | null;
+  disclosure: string | null;
+}
+
+export interface ConnectionProvidersOut {
+  providers: Record<
+    string,
+    {
+      label: string;
+      scopes: string[];
+      required_fields: string[];
+      optional_fields: string[];
+    }
+  >;
+  disclosure: string;
+}
+
+export interface EmailDraftOut {
+  id: string;
+  task_id: string | null;
+  connection_id: string | null;
+  to_address: string;
+  subject: string;
+  body: string;
+  digest: string;
+  status: string;
+  provider_mode: string | null;
+  error: string | null;
+  sent_at: string | null;
+  created_at: string;
+}
+
+export interface AutomationRunOut {
+  id: string;
+  job_id: string;
+  run_number: number;
+  trigger: string;
+  status: string;
+  task_id: string | null;
+  xp_charged: number;
+  xp_budget_per_run: number;
+  error: string | null;
+  started_at: string;
+  finished_at: string | null;
+}
+
+export interface JobOut {
+  id: string;
+  objective: string;
+  schedule: string;
+  next_run_at: string | null;
+  last_run_at: string | null;
+  last_run_status: string | null;
+  status: "active" | "paused" | "cancelled";
+  budget_per_run_xp: number;
+  budget_total_xp: number | null;
+  total_spent_xp: number;
+  run_count: number;
+  consecutive_failures: number;
+  auto_paused_reason: string | null;
+  conditions: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface NotificationOut {
+  id: string;
+  kind: string;
+  payload: Record<string, unknown> | null;
+  job_id: string | null;
+  run_id: string | null;
+  read_at: string | null;
+  created_at: string;
+}
+
+export interface NotificationsPageOut {
+  notifications: NotificationOut[];
+  unread: number;
+}
