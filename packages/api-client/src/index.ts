@@ -9,6 +9,7 @@
 
 import type {
   ArtifactOut,
+  ApprovalOut,
   SessionInfo,
   BalanceOut,
   CapabilitiesOut,
@@ -16,9 +17,16 @@ import type {
   DevGrantIn,
   HealthOut,
   LedgerPageOut,
+  PackOut,
+  PurchaseCreateIn,
+  PurchaseOut,
+  RateOut,
   SessionOut,
   TaskCreateIn,
+  TaskEstimateOut,
+  TaskEventPageOut,
   TaskOut,
+  TaskStepOut,
 } from "@xp/shared-types";
 
 export interface XpClientConfig {
@@ -39,6 +47,22 @@ export interface XpClient {
   listTasks: () => Promise<TaskOut[]>;
   createTask: (payload: TaskCreateIn) => Promise<TaskOut>;
   cancelTask: (taskId: string) => Promise<TaskOut>;
+  rate: () => Promise<RateOut>;
+  packs: () => Promise<PackOut[]>;
+  estimateTask: (objective: string) => Promise<TaskEstimateOut>;
+  createPurchase: (payload: PurchaseCreateIn) => Promise<PurchaseOut>;
+  listPurchases: () => Promise<PurchaseOut[]>;
+  getPurchase: (purchaseId: string) => Promise<PurchaseOut>;
+  receiptPdfUrl: (purchaseId: string) => string;
+  createReceiptArtifact: (purchaseId: string) => Promise<{ artifact_id: string; download_url: string }>;
+  settleDevInvoice: (paymentHash: string) => Promise<{ credited: boolean; status: string }>;
+  /** POST /run — the server resumes automatically from awaiting_approval. */
+  runTask: (taskId: string) => Promise<TaskOut>;
+  taskEvents: (taskId: string) => Promise<TaskEventPageOut>;
+  taskSteps: (taskId: string) => Promise<TaskStepOut[]>;
+  listApprovals: (taskId: string) => Promise<ApprovalOut[]>;
+  decideApproval: (taskId: string, approvalId: string, approve: boolean) => Promise<ApprovalOut>;
+  increaseBudget: (taskId: string, additionalXp: number) => Promise<TaskOut>;
   listArtifacts: () => Promise<ArtifactOut[]>;
   createDemoPdf: (payload: DemoPdfIn) => Promise<ArtifactOut>;
   artifactDownloadUrl: (artifact: ArtifactOut) => string;
@@ -111,6 +135,51 @@ export function createXpClient(config: XpClientConfig = {}): XpClient {
       request<TaskOut>("/api/v1/tasks", { method: "POST", body: JSON.stringify(payload) }),
     cancelTask: (taskId) =>
       request<TaskOut>(`/api/v1/tasks/${taskId}/cancel`, { method: "POST" }),
+    rate: () => request<RateOut>("/api/v1/xp/rate"),
+    packs: () => request<PackOut[]>("/api/v1/xp/packs"),
+    estimateTask: (objective) =>
+      request<TaskEstimateOut>("/api/v1/tasks/estimate", {
+        method: "POST",
+        body: JSON.stringify({ objective, budget_xp: 1 }),
+      }),
+    createPurchase: (payload) =>
+      request<PurchaseOut>("/api/v1/xp/purchases", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    listPurchases: () => request<PurchaseOut[]>("/api/v1/xp/purchases"),
+    getPurchase: (purchaseId) =>
+      request<PurchaseOut>(`/api/v1/xp/purchases/${purchaseId}`),
+    receiptPdfUrl: (purchaseId) =>
+      buildUrl(`/api/v1/xp/purchases/${purchaseId}/receipt.pdf`),
+    createReceiptArtifact: (purchaseId) =>
+      request<{ artifact_id: string; download_url: string }>(
+        `/api/v1/xp/purchases/${purchaseId}/receipt.pdf`,
+        { method: "POST" }
+      ),
+    settleDevInvoice: (paymentHash) =>
+      request<{ credited: boolean; status: string }>(
+        `/api/v1/lightning/invoices/${paymentHash}/settle-dev`,
+        { method: "POST" }
+      ),
+    runTask: (taskId) =>
+      request<TaskOut>(`/api/v1/tasks/${taskId}/run`, { method: "POST" }),
+    taskEvents: (taskId) =>
+      request<TaskEventPageOut>(`/api/v1/tasks/${taskId}/events`),
+    taskSteps: (taskId) =>
+      request<TaskStepOut[]>(`/api/v1/tasks/${taskId}/steps`),
+    listApprovals: (taskId) =>
+      request<ApprovalOut[]>(`/api/v1/tasks/${taskId}/approvals`),
+    decideApproval: (taskId, approvalId, approve) =>
+      request<ApprovalOut>(`/api/v1/tasks/${taskId}/approvals/${approvalId}/decision`, {
+        method: "POST",
+        body: JSON.stringify({ approve }),
+      }),
+    increaseBudget: (taskId, additionalXp) =>
+      request<TaskOut>(`/api/v1/tasks/${taskId}/increase-budget`, {
+        method: "POST",
+        body: JSON.stringify({ additional_xp: additionalXp }),
+      }),
     listArtifacts: () => request<ArtifactOut[]>("/api/v1/artifacts"),
     createDemoPdf: (payload) =>
       request<ArtifactOut>("/api/v1/artifacts/demo-pdf", {

@@ -217,6 +217,24 @@ class TaskStep(Base):
     __table_args__ = (UniqueConstraint("task_id", "step_index", name="uq_task_step_index"),)
 
 
+class TaskEvent(Base):
+    """Append-only task event stream (phase 6, deliverable: Task event stream
+    and progress updates). One row per lifecycle event: plan, step status,
+    approval requests/decisions, evaluation, completion. Survives worker
+    restarts; GET /tasks/{id}/events replays it in order."""
+
+    __tablename__ = "task_events"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    task_id: Mapped[str] = mapped_column(ForeignKey("tasks.id"), index=True)
+    seq: Mapped[int] = mapped_column(Integer)  # monotonic per task
+    event_type: Mapped[str] = mapped_column(String(64))
+    payload: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+
+    __table_args__ = (UniqueConstraint("task_id", "seq", name="uq_task_event_seq"),)
+
+
 class Approval(Base):
     __tablename__ = "approvals"
 
@@ -312,6 +330,7 @@ ALL_TABLES = [
     XpLedgerEntry,
     Task,
     TaskStep,
+    TaskEvent,
     Approval,
     ConnectedService,
     Artifact,

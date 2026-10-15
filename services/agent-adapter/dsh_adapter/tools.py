@@ -10,6 +10,7 @@ privilege escalation.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 from collections.abc import Awaitable, Callable
@@ -32,6 +33,14 @@ class ScopeDenied(ToolRegistryError):
 
 
 class InvalidArguments(ToolRegistryError):
+    pass
+
+
+class ToolTimeout(ToolRegistryError):
+    """Raised when a tool exceeds its spec timeout — deterministic backend
+    enforcement (phase-6 acceptance: budget limits and tool timeouts are
+    enforced by deterministic backend code, never by the model's goodwill)."""
+
     pass
 
 
@@ -102,7 +111,11 @@ class ToolRegistry:
     async def execute(
         self, name: str, arguments: dict[str, Any], scopes: set[str]
     ) -> dict[str, Any]:
-        """Execute an allowlisted tool within the granted scopes."""
+        """Execute an allowlisted tool within the granted scopes.
+
+        Enforcement happens HERE, in deterministic backend code: scope check,
+        schema check, then a hard asyncio timeout from the tool spec.
+        """
         spec = self.get(name)
         if not self.allowed(name, scopes):
             raise ScopeDenied(
@@ -115,7 +128,12 @@ class ToolRegistry:
             raise InvalidArguments(f"{name}: missing required arguments {missing}")
         if spec.handler is None:
             return {"status": "not_implemented", "tool": name}
-        return await spec.handler(**arguments)
+        try:
+            return await asyncio.wait_for(spec.handler(**arguments), timeout=spec.timeout_seconds)
+        except TimeoutError as exc:
+            raise ToolTimeout(
+                f"{name} exceeded its {spec.timeout_seconds}s timeout"
+            ) from exc
 
     def list_specs(self) -> list[ToolSpec]:
         return list(self._tools.values())

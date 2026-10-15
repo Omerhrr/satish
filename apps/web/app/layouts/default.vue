@@ -11,6 +11,7 @@
     <nav class="tabbar" aria-label="Primary">
       <NuxtLink to="/">Console</NuxtLink>
       <NuxtLink to="/wallet">Wallet</NuxtLink>
+      <NuxtLink to="/billing">Billing</NuxtLink>
       <NuxtLink to="/xp">XP</NuxtLink>
       <NuxtLink to="/tasks">Tasks</NuxtLink>
       <NuxtLink to="/settings">Security</NuxtLink>

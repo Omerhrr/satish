@@ -9,6 +9,7 @@ persistence callbacks, never in transient model context (dsh_integration).
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
@@ -61,17 +62,28 @@ class PlanRunner:
         registry: ToolRegistry,
         persistence: PersistenceHooks | None = None,
         max_steps: int = 12,
+        should_cancel: Callable[[], Awaitable[bool]] | None = None,
     ) -> None:
         self.client = client
         self.registry = registry
         self.persistence = persistence or NullPersistence()
         self.max_steps = max_steps
-        # Cancellation: cooperative flag checked between stages/steps
-        # (dsh_integration requirement #7). cancel() is safe from any task.
+        # Cancellation (1) cooperative in-process flag — cancel() from any
+        # task; (2) durable check — should_cancel() is awaited between steps
+        # so a cancel recorded in the DB stops a worker run mid-flight
+        # (phase-6 acceptance: task states persist across worker restarts).
         self._cancel_event = asyncio.Event()
+        self._should_cancel = should_cancel
         # Model usage ledger for this runner instance: one entry per model
         # call (dsh_integration requirement #8 — track cost where measurable).
         self.model_usage: list[dict[str, Any]] = []
+
+    async def _cancelled_durably(self) -> bool:
+        if self._cancel_event.is_set():
+            return True
+        if self._should_cancel is not None:
+            return bool(await self._should_cancel())
+        return False
 
     def cancel(self) -> None:
         self._cancel_event.set()
@@ -159,6 +171,14 @@ class PlanRunner:
         except ToolRegistryError as exc:
             await self.persistence.on_step(int(step.get("step", 0)), tool_name, "rejected", {"why": str(exc)})
             return {"status": "rejected", "reason": str(exc)}
+        # Scope wall FIRST: never request user approval for something the
+        # granted scopes would deny anyway, and never let an approval expand
+        # scopes (the scope set is server-side policy, not negotiable).
+        if not self.registry.allowed(tool_name, scopes):
+            await self.persistence.on_step(
+                int(step.get("step", 0)), tool_name, "denied", {"why": f"scope {spec.required_scope!r} not granted"}
+            )
+            return {"status": "denied", "reason": "scope not granted"}
         if spec.max_cost_xp > budget_remaining_xp:
             await self.persistence.on_step(int(step.get("step", 0)), tool_name, "rejected", {"why": "budget"})
             return {"status": "rejected", "reason": "insufficient budget"}
@@ -173,11 +193,14 @@ class PlanRunner:
         try:
             result = await self.registry.execute(tool_name, arguments, scopes)
         except ToolRegistryError as exc:
-            status = (
-                "invalid_arguments"
-                if type(exc).__name__ == "InvalidArguments"
-                else "denied"
-            )
+            from dsh_adapter.tools import InvalidArguments, ToolTimeout
+
+            if isinstance(exc, InvalidArguments):
+                status = "invalid_arguments"
+            elif isinstance(exc, ToolTimeout):
+                status = "timeout"
+            else:
+                status = "denied"
             await self.persistence.on_step(
                 int(step.get("step", 0)), tool_name, status, {"why": str(exc)}
             )
@@ -195,14 +218,23 @@ class PlanRunner:
         budget_xp: int,
         constraints: dict[str, Any] | None = None,
         untrusted_context: str | None = None,
+        skip_steps: set[int] | None = None,
     ) -> RunResult:
-        """Full loop with hard budget cap and step limit (bounded execution)."""
+        """Full loop with hard budget cap and step limit (bounded execution).
+
+        skip_steps: indexes already persisted as completed on a resume run —
+        durable-state resume after approval or worker restart.
+        """
         plan = await self.draft_plan(goal, constraints)
-        steps = plan.get("plan", [])[: self.max_steps]
+        steps = [
+            s
+            for s in plan.get("plan", [])[: self.max_steps]
+            if skip_steps is None or int(s.get("step", 0)) not in skip_steps
+        ]
         spent = 0
         run_steps: list[dict[str, Any]] = []
         for step in steps:
-            if self.cancelled:
+            if self.cancelled or await self._cancelled_durably():
                 await self.persistence.on_step(
                     int(step.get("step", 0)), step.get("tool"), "cancelled", {}
                 )

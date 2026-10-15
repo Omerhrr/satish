@@ -55,7 +55,7 @@ export interface SessionInfo {
 
 export interface BalanceOut {
   balance_xp: number;
-  sats_per_xp: number;
+  xp_per_sat: number;
   updated_at: string;
 }
 
@@ -202,4 +202,97 @@ export interface LightningCapabilitiesOut {
   };
   sats_to_xp: { xp_per_sat: number; can_change: boolean; note: string };
   custody_disclosure: string[];
+}
+
+// -- XP economy: purchases / receipts (phase 5) -------------------------------------
+
+export interface RateOut {
+  xp_per_sat: number;
+  can_change: boolean;
+  note: string;
+}
+
+export interface PackOut {
+  pack_id: string;
+  label: string;
+  amount_sats: number;
+  xp_amount: number;
+}
+
+export interface PurchaseCreateIn {
+  pack_id?: string | null;
+  amount_sats?: number | null;
+  description?: string;
+}
+
+export interface PurchaseOut {
+  id: string;
+  payment_hash: string | null;
+  amount_sats: number;
+  xp_amount: number;
+  status: "pending" | "settled" | "expired";
+  bolt11: string | null;
+  expires_at: string | null;
+  settled_at: string | null;
+  ledger_entry_id?: string | null;
+  balance_after?: number | null;
+  created_at: string;
+}
+
+export interface TaskEstimateOut {
+  estimated_xp_low: number;
+  estimated_xp_high: number;
+  basis: string;
+  variable_cost_activities: string[];
+}
+
+export interface ReconcileReportOut {
+  ok: boolean;
+  ran_at: string;
+  checked_users: number;
+  checked_settled_intents: number;
+  checked_purchase_entries: number;
+  expired_pending_flagged: number;
+  discrepancies: Array<Record<string, unknown>>;
+}
+
+// -- Agent runtime: events / approvals (phase 6) --------------------------------------
+
+export interface TaskEventOut {
+  seq: number;
+  event_type: string;
+  payload: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface TaskEventPageOut {
+  task_id: string;
+  status: string;
+  events: TaskEventOut[];
+}
+
+export interface TaskStepOut {
+  step_index: number;
+  tool_name: string | null;
+  status: string;
+  started_at: string | null;
+  completed_at: string | null;
+}
+
+export interface ApprovalOut {
+  id: string;
+  task_id: string | null;
+  action_type: string;
+  action_digest: string;
+  status: "pending" | "approved" | "denied" | "expired" | "revoked";
+  created_at: string;
+  expires_at: string | null;
+}
+
+export interface IncreaseBudgetIn {
+  additional_xp: number;
+}
+
+export interface SettleTaskIn {
+  actual_xp: number;
 }

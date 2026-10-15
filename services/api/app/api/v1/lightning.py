@@ -178,6 +178,44 @@ async def settle_invoice(
         raise _http_error(exc) from exc
 
 
+@router.post("/invoices/{payment_hash}/settle-dev")
+async def settle_invoice_dev(
+    payment_hash: str,
+    user: CurrentUser,
+    session: DbSession,
+    settings: SettingsDep,
+) -> dict:
+    """DEV_MODE-only auto-settle: the backend pulls the preimage from the
+    canned provider itself so the Mini App can exercise the full billing
+    flow without handling preimages. Refused outside dev/canned mode —
+    production settlement arrives exclusively from the node's stream."""
+    from lightning_adapter import CannedLightningProvider
+
+    if not settings.dev_mode:
+        raise HTTPException(status_code=403, detail="dev settle is disabled outside DEV_MODE")
+    provider = svc.get_provider(settings)
+    if not isinstance(provider, CannedLightningProvider):
+        raise HTTPException(
+            status_code=409,
+            detail="dev settle requires the canned provider; production settles via the node",
+        )
+    record = provider._invoices.get(payment_hash)  # white-box dev seam
+    if record is None:
+        raise HTTPException(status_code=404, detail="invoice not found")
+    try:
+        return await svc.settle(
+            session,
+            user=user,
+            settings=settings,
+            payment_hash=payment_hash,
+            preimage=record.invoice.preimage,
+        )
+    except (LightningProviderError, InvalidTransition, InvoiceExpired) as exc:
+        raise _http_error(exc) from exc
+    except svc.LightningServiceError as exc:
+        raise _http_error(exc) from exc
+
+
 # -- send -----------------------------------------------------------------------------
 
 

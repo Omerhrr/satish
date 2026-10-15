@@ -57,7 +57,7 @@ class SessionInfoOut(BaseModel):
 
 class BalanceOut(BaseModel):
     balance_xp: int
-    sats_per_xp: int
+    xp_per_sat: int  # the ONE canonical conversion (phase 5)
     updated_at: datetime
 
 
@@ -82,6 +82,77 @@ class DevGrantIn(BaseModel):
     reason: str = "dev seed grant"
 
 
+# -- purchases / receipts (phase 5) ------------------------------------------------
+
+
+class PackOut(BaseModel):
+    pack_id: str
+    label: str
+    amount_sats: int
+    xp_amount: int
+
+
+class RateOut(BaseModel):
+    xp_per_sat: int
+    can_change: bool
+    note: str
+
+
+class PurchaseCreateIn(BaseModel):
+    """Choose a published pack OR enter a custom sats amount."""
+
+    pack_id: str | None = Field(default=None, max_length=64)
+    amount_sats: int | None = Field(default=None, ge=100, le=100_000_000)
+    description: str = Field(default="XP purchase", max_length=500)
+
+
+class PurchaseOut(BaseModel):
+    """A purchase = receive-direction payment intent + XP credit view."""
+
+    id: str
+    payment_hash: str | None
+    amount_sats: int
+    xp_amount: int
+    status: str  # pending | settled | expired
+    bolt11: str | None
+    expires_at: datetime | None
+    settled_at: datetime | None
+    ledger_entry_id: str | None = None
+    balance_after: int | None = None
+    created_at: datetime
+
+
+class ReconcileReportOut(BaseModel):
+    ok: bool
+    ran_at: str
+    checked_users: int
+    checked_settled_intents: int
+    checked_purchase_entries: int
+    expired_pending_flagged: int
+    discrepancies: list[dict[str, Any]]
+
+
+class TaskEstimateOut(BaseModel):
+    estimated_xp_low: int
+    estimated_xp_high: int
+    basis: str
+    variable_cost_activities: list[str]
+
+
+class IncreaseBudgetIn(BaseModel):
+    additional_xp: int = Field(gt=0, le=100_000)
+
+
+class SettleTaskIn(BaseModel):
+    actual_xp: int = Field(ge=0)
+
+
+class ReconcileOut(BaseModel):
+    ok: bool
+    balance: int
+    sum_entries: int
+
+
 # -- tasks ------------------------------------------------------------------------
 
 
@@ -103,6 +174,40 @@ class TaskOut(BaseModel):
     started_at: datetime | None
     completed_at: datetime | None
     cancelled_at: datetime | None
+
+
+# -- task events / approvals (phase 6) ---------------------------------------------
+
+
+class TaskEventOut(BaseModel):
+    seq: int
+    event_type: str
+    payload: dict[str, Any]
+    created_at: datetime
+
+
+class TaskEventPageOut(BaseModel):
+    task_id: str
+    status: str
+    events: list[TaskEventOut]
+
+
+class ApprovalOut(BaseModel):
+    id: str
+    task_id: str | None
+    action_type: str
+    action_digest: str
+    status: str
+    created_at: datetime
+    expires_at: datetime | None
+
+
+class ApprovalDecisionIn(BaseModel):
+    approve: bool
+
+
+class PlanApprovalIn(BaseModel):
+    approve: bool = True
 
 
 # -- artifacts ---------------------------------------------------------------------

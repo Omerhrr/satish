@@ -7,7 +7,9 @@ from typing import Any
 from xp_core.config import get_settings
 from xp_core.logging import setup_logging
 
+from worker.jobs.agent import run_agent_task_job
 from worker.jobs.pdf import generate_pdf_report
+from worker.jobs.receipt import generate_receipt_pdf
 
 
 async def startup(ctx: dict[str, Any]) -> None:
@@ -20,10 +22,42 @@ async def shutdown(ctx: dict[str, Any]) -> None:
     pass
 
 
+async def scheduled_reconciliation(ctx: dict[str, Any]) -> dict[str, Any]:
+    """billing_flow #8: scheduled reconciliation flags discrepancies.
+
+    Runs on a fixed interval (XP_RECONCILE_INTERVAL_SECONDS, default 3600)
+    whenever the worker has a database; discrepancies are audited by
+    xp_core.jobs.reconciliation.reconcile_all itself.
+    """
+    from xp_core.db import get_session_factory
+    from xp_core.jobs.reconciliation import reconcile_all
+
+    factory = get_session_factory()
+    async with factory() as session:
+        return await reconcile_all(session)
+
+
+def _build_cron_jobs() -> tuple:
+    """Cron built lazily so import never requires settings resolution."""
+    from arq.cron import cron
+
+    interval = max(60, get_settings().reconcile_interval_seconds)
+    # arq cron is minute-granular; approximate the interval in minutes.
+    minutes = max(1, interval // 60)
+    return (
+        cron(
+            scheduled_reconciliation,
+            minute=set(range(0, 60, minutes)) if minutes < 60 else None,
+            run_at_startup=False,
+        ),
+    )
+
+
 class WorkerSettings:
     """arq configuration; functions are the allowlisted job surface."""
 
-    functions = (generate_pdf_report,)
+    functions = (generate_pdf_report, generate_receipt_pdf, run_agent_task_job)
+    cron_jobs = _build_cron_jobs()
     on_startup = startup
     on_shutdown = shutdown
     max_jobs = 4

@@ -213,3 +213,44 @@ authorization binds the digest of what was shown; wrong digest → 409.
 Mainnet stays refused at provider construction (same release gate as D10).
 The canned provider is disclosed verbatim in `/lightning/capabilities` —
 not pretending a real node exists when it does not.
+
+## D12 — One canonical conversion (`xp_per_sat`); receipts as derived views (2026-10-15, phase 5)
+
+**Context:** the scaffold carried two contradictory rates (`sats_per_xp=10`
+for display, `xp_per_sat=100` for actual crediting) — exactly the kind of
+drift the plan's pricing_requirements ("publish the conversion") exists to
+prevent. Separately, receipts could be modeled as a new table or as views.
+
+**Decision:** `xp_per_sat` is the single published conversion; credits are
+always `sats × xp_per_sat` computed at settle time. Receipts are derived
+views over `(payment_intent, xp_ledger_entry)` — no receipt table — and the
+PDF receipt renders from DB rows only. Reconciliation runs as a scheduled
+worker job plus a dev-seam endpoint, checking (a) balance == sum(entries)
+per user, (b) settled receive intents ↔ purchase entries 1:1, (c) expired
+pending liveness, and audits every flag.
+
+**Consequences:** display surfaces (bot, Mini App, shared types) changed
+wire shape (`BalanceOut.xp_per_sat`); the contract cannot drift again
+because there is nothing left to drift — one setting, one computation site.
+A receipt can never contradict the ledger because it is the ledger viewed,
+not a copy.
+
+## D13 — `task_events` as the 17th table; DB-checked approval and cancel (2026-10-15, phase 6)
+
+**Context:** the plan's 16-table model predates the "task event stream and
+progress updates" deliverable. The event stream could be squeezed into
+`task_steps` or `audit_events`, or its own table.
+
+**Decision:** add `task_events` (append-only, `(task_id, seq)` unique) as a
+documented deviation: steps are state (current step status), events are
+history (ordered, replayable, includes approvals/evaluation/outcomes) —
+different consumers, different retention. Approval decisions and
+cancellation are enforced DB-side: the runner re-reads committed state
+(`approvals.status` for the exact action digest; `tasks.status` between
+steps), so worker restarts and cross-process cancels are safe without
+in-memory coordination.
+
+**Consequences:** 17 tables now (migration `e5f6a7b8c9d0`); `audit_events`
+stays minimal (digest-level tool facts), `task_events` carries the replay
+stream with shape-level payloads (no raw tool output), keeping the stream
+inspectable without leaking untrusted content into every consumer.

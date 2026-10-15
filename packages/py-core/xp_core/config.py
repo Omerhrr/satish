@@ -57,8 +57,15 @@ class Settings(BaseSettings):
     # initData on every launch, so a short TTL costs nothing in UX.
     session_ttl_hours: int = 24
 
-    # -- pricing (published sats->XP conversion; pricing_requirements #1) -----
-    sats_per_xp: int = 10
+    # -- pricing (phase 5, finalized) ------------------------------------------
+    # ONE canonical conversion: XP credited per satoshi paid. Every surface
+    # derives its display from it (pricing_requirements #1: published, and
+    # "can change" — clients must re-check, never cache). The former
+    # sats_per_xp=10 setting contradicted xp_per_sat=100 and was removed.
+    xp_per_sat: int = 100
+    # Published XP pack table (billing_flow #1: "chooses an XP pack or enters
+    # an allowed amount"). Custom amounts within policy bounds also allowed.
+    xp_pack_sats: list[int] = [1_000, 5_000, 20_000]
 
     # -- agent / DSH ----------------------------------------------------------
     # Revision is pinned in services/agent-adapter/dsh_adapter/dsh_revision.json
@@ -94,10 +101,18 @@ class Settings(BaseSettings):
     lightning_fee_ppm: int = 1
     lightning_max_fee_msat: int = 10_000  # fee cap policy (payment authorization)
     lightning_min_inbound_msat: int = 1_000_000  # below this, receive is disclosed as constrained
-    xp_per_sat: int = 100  # provisional sats→XP conversion (published; phase 5 finalizes)
+
+    # -- agent runtime (phase 6) -------------------------------------------------
+    # Deterministic backend enforcement of plan bounds (dsh_integration #7):
+    # max plan steps, default tool timeout, and the maximum plan-estimate
+    # discount the worker may trust without re-checking the ledger cap.
+    agent_max_steps: int = 12
+    agent_default_tool_timeout_seconds: int = 30
+    agent_max_budget_xp: int = 100_000
 
     # -- worker ----------------------------------------------------------------
     pdf_storage_dir: str = "./data/artifacts"
+    reconcile_interval_seconds: int = 3600  # billing_flow #8
 
     @property
     def is_sqlite(self) -> bool:

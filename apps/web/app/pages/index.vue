@@ -38,7 +38,7 @@
     <!-- XP quick card -->
     <section class="card">
       <h2>⚡ XP credits</h2>
-      <p class="sub">Internal usage credits — not Bitcoin, not a token. Rate: {{ balance?.sats_per_xp ?? "…" }} sats/XP.</p>
+      <p class="sub">Internal usage credits — not Bitcoin, not a token. Rate: 1 sat = {{ balance?.xp_per_sat ?? "…" }} XP.</p>
       <div class="balance-big">{{ balance ? balance.balance_xp.toLocaleString() + " XP" : "…" }}</div>
       <div style="display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap">
         <button class="btn primary sensitive-action" :disabled="granting" @click="grant(1000)">

@@ -428,8 +428,9 @@ def capabilities(settings: Settings) -> dict:
         "sats_to_xp": {
             "xp_per_sat": settings.xp_per_sat,
             "can_change": True,
-            "note": "Provisional conversion; the published rate may change "
-            "before phase 5 finalizes it.",
+            "note": "Phase-5 finalized conversion: credits are computed as "
+            "sats * xp_per_sat at settle time; the published rate may still "
+            "change, so clients re-check /api/v1/xp/rate.",
         },
         "custody_disclosure": [
             "In dev/test the provider is CANNED — deterministic in-memory "

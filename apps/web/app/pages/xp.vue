@@ -9,7 +9,7 @@
     <section class="card">
       <div style="display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap">
         <div class="balance-big">{{ balance ? balance.balance_xp.toLocaleString() + " XP" : "…" }}</div>
-        <div class="dim small" v-if="balance">≈ {{ (balance.balance_xp * balance.sats_per_xp).toLocaleString() }} sats equivalent spend capacity · rate {{ balance.sats_per_xp }} sats/XP</div>
+        <div class="dim small" v-if="balance">≈ {{ Math.ceil(balance.balance_xp / balance.xp_per_sat).toLocaleString() }} sats equivalent spend capacity · rate 1 sat = {{ balance.xp_per_sat }} XP</div>
       </div>
       <div style="margin-top: 12px; display: flex; gap: 10px; flex-wrap: wrap">
         <button class="btn primary small" :disabled="granting" @click="grant(1000)">

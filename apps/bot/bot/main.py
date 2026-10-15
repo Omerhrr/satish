@@ -117,7 +117,7 @@ async def cmd_xp(message: Message) -> None:
         return
     await message.answer(
         f"⚡ XP balance: <b>{data['balance_xp']:,} XP</b>\n"
-        f"Rate: {data['sats_per_xp']} sats per XP\n\n"
+        f"Rate: 1 sat = {data['xp_per_sat']} XP\n\n"
         "XP is an internal usage credit — not Bitcoin, not a token.",
         parse_mode=ParseMode.HTML,
         reply_markup=mini_app_keyboard(get_settings()),

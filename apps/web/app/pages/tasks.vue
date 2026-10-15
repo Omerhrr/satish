@@ -59,7 +59,19 @@
               <td><span class="badge" :class="t.status">{{ t.status.replace("_", " ") }}</span></td>
               <td class="mono" style="text-align: right">{{ t.budget_xp.toLocaleString() }}</td>
               <td class="mono" style="text-align: right">{{ t.actual_xp.toLocaleString() }}</td>
-              <td>
+              <td style="white-space: nowrap">
+                <button
+                  v-if="['planned', 'awaiting_approval'].includes(t.status)"
+                  class="btn primary small"
+                  :disabled="running === t.id"
+                  @click="run(t.id)"
+                >
+                  <span v-if="running === t.id" class="spinner" />
+                  {{ t.status === "awaiting_approval" ? "Resume" : "Run" }}
+                </button>
+                <button v-if="['planned', 'running'].includes(t.status)" class="btn small" @click="showEvents(t.id)">
+                  Events
+                </button>
                 <button
                   v-if="!['completed', 'failed', 'cancelled'].includes(t.status)"
                   class="btn sensitive-action small ghost"
@@ -73,16 +85,43 @@
         </table>
       </div>
       <div class="notice small">
-        Execution through the DSH agent runtime (plan → approve → typed tools →
-        report) activates once the DSH integration spike pins an upstream
-        revision. Reservations and cancellations already settle correctly today.
+        Execution runs through the DSH agent runtime: plan → typed allowlisted
+        tools → evaluation → transparent report. Budget cap, tool timeouts, and
+        approvals are enforced by deterministic backend code; pending tool
+        approvals pause the run until you resume them here.
+      </div>
+    </section>
+
+    <section v-if="eventTask" class="card">
+      <h2>Event stream <span class="dim small">task {{ eventTask.slice(0, 8) }} · {{ eventStatus }}</span></h2>
+      <div class="table-wrap" style="margin-top: 10px">
+        <table class="ledger">
+          <thead>
+            <tr><th>#</th><th>Event</th><th>Detail</th></tr>
+          </thead>
+          <tbody>
+            <tr v-for="e in events" :key="e.seq">
+              <td class="mono small">{{ e.seq }}</td>
+              <td class="mono small">{{ e.event_type }}</td>
+              <td class="mono small dim" style="max-width: 480px; overflow-wrap: anywhere">{{ compact(e.payload) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div v-if="pendingApprovals.length" class="notice small">
+        <strong>{{ pendingApprovals.length }} approval(s) pending.</strong>
+        <div v-for="a in pendingApprovals" :key="a.id" style="margin-top: 8px">
+          {{ a.action_type }} · digest {{ a.action_digest.slice(0, 12) }}…
+          <button class="btn primary small" style="margin-left: 8px" @click="decide(a.id, true)">Approve</button>
+          <button class="btn sensitive-action small ghost" style="margin-left: 6px" @click="decide(a.id, false)">Deny</button>
+        </div>
       </div>
     </section>
   </div>
 </template>
 
 <script setup lang="ts">
-import type { TaskOut } from "@xp/shared-types";
+import type { ApprovalOut, TaskEventOut, TaskOut } from "@xp/shared-types";
 
 const api = useXpApi();
 const tasks = ref<TaskOut[]>([]);
@@ -91,11 +130,20 @@ const creating = ref(false);
 const createError = ref("");
 const objective = ref("");
 const budget = ref(100);
+const running = ref<string | null>(null);
+const eventTask = ref<string | null>(null);
+const eventStatus = ref("");
+const events = ref<TaskEventOut[]>([]);
+const pendingApprovals = ref<ApprovalOut[]>([]);
 
 function shortTime(iso: string) {
   return new Date(iso).toLocaleString(undefined, {
     month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
   });
+}
+
+function compact(payload: Record<string, unknown>): string {
+  return JSON.stringify(payload).slice(0, 220);
 }
 
 async function refresh() {
@@ -119,6 +167,38 @@ async function submit() {
   } finally {
     creating.value = false;
   }
+}
+
+async function run(id: string) {
+  running.value = id;
+  try {
+    await api.runTask(id);
+    await refresh();
+    if (eventTask.value === id) await loadEvents(id);
+  } catch (e) {
+    alert(String(e).replace("XP API ", ""));
+  } finally {
+    running.value = null;
+  }
+}
+
+async function loadEvents(id: string) {
+  const page = await api.taskEvents(id);
+  eventTask.value = page.task_id;
+  eventStatus.value = page.status;
+  events.value = page.events;
+  pendingApprovals.value = (await api.listApprovals(id)).filter((a) => a.status === "pending");
+}
+
+async function showEvents(id: string) {
+  await loadEvents(id);
+}
+
+async function decide(approvalId: string, approve: boolean) {
+  if (!eventTask.value) return;
+  await api.decideApproval(eventTask.value, approvalId, approve);
+  await loadEvents(eventTask.value);
+  await refresh();
 }
 
 async function cancel(id: string) {

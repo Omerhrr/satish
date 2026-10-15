@@ -54,3 +54,55 @@ async def enqueue_pdf_job(
     if inspect.iscoroutine(result):
         result = await result
     return f"inline:{artifact_id}"
+
+
+async def enqueue_receipt_pdf_job(*, artifact_id: str, purchase_id: str) -> str:
+    """Receipt rendering; same dual transport as the report job."""
+    settings = get_settings()
+    if settings.redis_url:
+        try:
+            from arq import create_pool
+            from arq.connections import RedisSettings
+
+            pool = await create_pool(RedisSettings.from_dsn(settings.redis_url))
+            job = await pool.enqueue_job(
+                "generate_receipt_pdf", artifact_id=artifact_id, purchase_id=purchase_id
+            )
+            await pool.close()
+            assert job is not None
+            return job.job_id
+        except Exception as exc:
+            log.error("arq_enqueue_failed_falling_back_inline", error=str(exc))
+
+    from worker.jobs.receipt import generate_receipt_pdf
+
+    result = generate_receipt_pdf({}, artifact_id=artifact_id, purchase_id=purchase_id)
+    if inspect.iscoroutine(result):
+        result = await result
+    return f"inline:{artifact_id}"
+
+
+async def enqueue_agent_task_job(*, task_id: str, resume: bool = False) -> str:
+    """Agent execution; same dual transport. Inline dev runs to completion."""
+    settings = get_settings()
+    if settings.redis_url:
+        try:
+            from arq import create_pool
+            from arq.connections import RedisSettings
+
+            pool = await create_pool(RedisSettings.from_dsn(settings.redis_url))
+            job = await pool.enqueue_job(
+                "run_agent_task_job", task_id=task_id, resume=resume
+            )
+            await pool.close()
+            assert job is not None
+            return job.job_id
+        except Exception as exc:
+            log.error("arq_enqueue_failed_falling_back_inline", error=str(exc))
+
+    from worker.jobs.agent import run_agent_task_job
+
+    result = run_agent_task_job({}, task_id=task_id, resume=resume)
+    if inspect.iscoroutine(result):
+        result = await result
+    return f"inline:{task_id}"

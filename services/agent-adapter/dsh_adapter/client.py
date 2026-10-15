@@ -223,8 +223,21 @@ class StubChatClient:
             "content": json.dumps(
                 {
                     "plan": [
-                        {"step": 1, "tool": "web.search", "why": "collect initial sources"},
-                        {"step": 2, "tool": "docs.generate_pdf", "why": "produce the report"},
+                        {
+                            "step": 1,
+                            "tool": "web.search",
+                            "why": "collect initial sources",
+                            "arguments": {"query": goal[:200] or "research", "limit": 5},
+                        },
+                        {
+                            "step": 2,
+                            "tool": "docs.generate_pdf",
+                            "why": "produce the report",
+                            "arguments": {
+                                "title": (goal[:120] or "Research report"),
+                                "sections": ["Summary", "Findings", "Sources"],
+                            },
+                        },
                     ],
                     "estimated_xp": 10,
                     "deliverable": f"Research report: {goal[:120]}",
