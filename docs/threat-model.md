@@ -73,17 +73,20 @@ independent review.
 | Credential vault (phase 9) | Vault key disclosure, decryption-path proliferation | Single decryption path re-verified; revocation hard-deletes; dev fallback key is disclosed on every response and refused outside dev. No change. |
 | Email send (phase 9) | Auto-retry fabricating delivery; resend of sent drafts; approval bypass | Outcome taxonomy (sent/refused/unknown) is final; sent drafts are terminal; send executes only post-approval with matching content digest. No change. |
 | Automation scheduler (phase 9) | Budget overrun, failure loops, crash-recovery double-run | Per-run cap enforced by the ledger itself; consecutive-failure ladder auto-pauses; stale-run recovery marks rather than repeats. No change. |
-| **API abuse (NEW, phase 10)** | Credential stuffing, scraping, cost-forcing via agent/money endpoints | **Mitigated**: token-bucket rate limiting per route class (auth 10/min, money 60/min, agent 30/min, reads 300/min) with 429 + Retry-After; subject = client IP + bearer fingerprint (no DB hit). In-memory buckets are per-process: multi-worker production must move to the Redis backend (KL-09). Monitoring surfaces deliberately unlimited. |
+| **API abuse (NEW, phase 10)** | Credential stuffing, scraping, cost-forcing via agent/money endpoints | **Mitigated**: token-bucket rate limiting per route class (auth 10/min, money 60/min, agent 30/min, reads 300/min) with 429 + Retry-After; subject = client IP + bearer fingerprint (no DB hit), upgraded to validation-joined per-user keys so token rotation cannot refresh buckets (D20). Monitoring surfaces deliberately unlimited. Backend is swappable: memory (per-process, default) or Redis (shared across workers via an atomic Lua token bucket; KL-09 closed). |
 | **Payment integrity ops (NEW)** | Silent drift between balance row and ledger; double-credited settlements discovered late | **Mitigated**: every reconciliation discrepancy now opens a persisted, deduplicated ReconciliationAlert (critical kinds never auto-resolve); operators ack/resolve via /ops with an audit trail. |
 | **Data retention (NEW)** | Indefinite PII/session/draft accumulation (privacy breach blast radius) | **Mitigated**: retention sweep deletes expired sessions, read/unread notifications past windows, finished automation runs, terminal email drafts. Ledger, task_events, audit_events, artifacts are structurally never swept (money + evidence trails). |
 | **Restore integrity (NEW)** | Backup that cannot actually restore; silent corruption | **Mitigated**: `make backup-drill` proves a full logical roundtrip with ledger re-reconciliation, 1:1 settlement check, and artifact digest verification on the restored copy. |
 
 ### Residual risks accepted for phase 10 (tracked in docs/known-limitations.md)
 
-- Rate limiting is per-process in-memory; a multi-worker deployment without
-  the Redis backend under-limits by a factor of worker count (KL-09).
-- The subject fingerprint uses the presented (unvalidated) bearer; a client
-  rotating fake bearers gets fresh buckets at the same cost as IP rotation
-  behind proxies (KL-09).
+- Multi-worker rate limiting is solved in code (Redis backend, D20), but a
+  Redis outage fails OPEN: requests pass unthrottled while the degraded state
+  is counted on /ops/observability and logged - an operator watching the
+  observability surface sees it, nothing silently pretends to limit.
+- A bearer's very first request after process start (or identity-cache
+  eviction) is keyed on the presented-credential fingerprint; the per-user
+  join takes effect from the second request of that token onward (cold join
+  is a one-request seam, never a permanent bypass).
 - The backup drill exercises the logical roundtrip on SQLite; Postgres
   pg_dump/pg_restore + SCB recovery need a live operator host (KL-04/KL-05).

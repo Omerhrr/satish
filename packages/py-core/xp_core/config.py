@@ -179,11 +179,14 @@ class Settings(BaseSettings):
     reconcile_interval_seconds: int = 3600  # billing_flow #8
 
     # abuse controls
-    # In-memory token buckets per (route class, subject); limits are code-pinned
+    # Token buckets per (route class, subject); limits are code-pinned
     # in xp_core.services.ratelimit.RULES (auth tightest, money tight, reads
-    # loose). Kill switch for operators; the Redis-backed multi-process backend
-    # is the documented upgrade path (docs/security-review.md).
+    # loose). Kill switch for operators. backend=memory is per-process;
+    # backend=redis shares buckets across workers through an atomic Lua
+    # token bucket and requires redis_url (refuses to construct without it),
+    # failing OPEN with a disclosed degraded state when Redis is unreachable.
     rate_limit_enabled: bool = True
+    rate_limit_backend: Literal["memory", "redis"] = "memory"
     rate_limit_bucket_ttl_seconds: int = 3600  # idle bucket eviction
     rate_limit_max_buckets: int = 10_000
 

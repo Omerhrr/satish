@@ -14,7 +14,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, Request, status
 from sqlalchemy import func, select
 from xp_core.config import get_settings
 from xp_core.models.entities import ReconciliationAlert
@@ -147,11 +147,12 @@ async def resolve_alert(
 
 
 @router.get("/observability", response_model=ObservabilityOut)
-async def observability(session: DbSession) -> ObservabilityOut:
+async def observability(session: DbSession, request: Request) -> ObservabilityOut:
     """Ops summary: alert counts + policy echo. Counts only, never content."""
     _require_dev()
     settings = get_settings()
     counts = await _counts(session)
+    limiter = getattr(request.app.state, "rate_limiter", None)
     return ObservabilityOut(
         env=settings.env,
         reconcile_interval_seconds=settings.reconcile_interval_seconds,
@@ -159,6 +160,8 @@ async def observability(session: DbSession) -> ObservabilityOut:
         alerts_open_warning=counts["open_warning"],
         alerts_resolved_total=counts["resolved_total"],
         rate_limit_enabled=settings.rate_limit_enabled,
+        rate_limit_backend=settings.rate_limit_backend,
+        rate_limit_degraded_checks=getattr(limiter, "degraded_checks", 0),
         retention_policy={
             "sessions_days": settings.retention_sessions_days,
             "notifications_read_days": settings.retention_notifications_read_days,

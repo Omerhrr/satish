@@ -450,6 +450,8 @@ class ObservabilityOut(BaseModel):
     alerts_open_warning: int
     alerts_resolved_total: int
     rate_limit_enabled: bool
+    rate_limit_backend: str
+    rate_limit_degraded_checks: int
     retention_policy: dict[str, int]
 
 

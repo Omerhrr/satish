@@ -548,3 +548,65 @@ user action - the two are now documented as distinct).
 their data and leave, and leaving provably cannot corrupt the ledger.
 Residual: closure with a balance needs operator contact (honest, disclosed
 in the refusal reasons).
+
+## D20 - Rate-limit backend swap + validation-joined keys: shared buckets across workers, rotation-proof subjects (2026-10-16, KL-09)
+
+Phase 10 shipped honest, code-pinned token buckets, but with two disclosed
+residuals: buckets lived per API process (a multi-worker deployment
+under-limits by the worker count) and the subject was keyed on the PRESENTED
+bearer fingerprint, so a client rotating fake or fresh tokens could refresh
+its bucket at zero cost. Both were tracked as KL-09 and named as the abuse
+surface to close before any multi-worker production claim.
+
+**Context:**
+- The limiter deliberately avoids a database hit in the hot path; keying on
+  the authenticated user naively would mean validating the bearer inside the
+  middleware, duplicating the auth dependency's work per request.
+- Multi-worker enforcement needs state that outlives one process; the
+  in-memory buckets cannot provide it by construction.
+- An abuse limiter must never become an availability problem: deciding what
+  happens when the shared store is down is part of the design, not an
+  afterthought.
+
+**Decision:**
+- *One interface, two backends, a refusing factory.* `RateLimiter` (memory,
+  default) and `RedisRateLimiter` (shared) expose the same `check`
+  contract; `build_rate_limiter(settings)` selects by
+  `XP_RATE_LIMIT_BACKEND`. `backend=redis` without `redis_url` refuses to
+  construct so a requested shared backend is never silently downgraded to
+  per-process memory.
+- *The Redis bucket is one atomic Lua script* (pinned as TOKEN_BUCKET_LUA):
+  read tokens+timestamp, refill by elapsed time (negative drift clamped so
+  skewed clocks can only slow a refill, never move tokens backward), decide,
+  write back, refresh the idle TTL. One round trip, no read-modify-write
+  races between workers. The committed FakeRedis test double mirrors this
+  script line for line and asserts it executes the pinned script.
+- *Validation-joined subjects close the rotation hole without a second DB
+  hit.* The auth dependency already validates every bearer; it now feeds
+  each successful validation into a process-local, TTL- and size-bounded
+  `IdentityCache` (bearer fingerprint -> `user:<id>`). Subject derivation
+  prefers the joined user, so every valid token of one user drains ONE
+  bucket regardless of rotation. A bearer never seen valid (forged, cold)
+  falls back to the ip:fingerprint subject - a one-request seam, disclosed,
+  never a permanent bypass.
+- *Degraded means fail OPEN with disclosure, never a fabricated decision.*
+  On any Redis error the limiter allows the request, marks the result
+  degraded, counts it, and rate-limits the warning log; the middleware
+  reports `X-RateLimit-Remaining: unknown` instead of an invented count and
+  /ops/observability carries the backend name plus the degraded counter.
+  Fail-open was chosen over fail-closed because a limiter outage must not
+  take money and agent surfaces down with it; the honest counter is the
+  operator's signal to act.
+
+**Alternatives rejected:** fail-closed on backend error (the limiter would
+DoS its own API); fixed-window INCR counters (changes semantics from the
+documented token bucket); validating bearers inside the middleware (a second
+DB hit per request and a duplicated auth path); a shared bucket keyed only
+on IP (breaks concurrent legitimate sessions behind one NAT).
+
+**Consequences:** the multi-worker abuse claim no longer depends on an
+undeployed upgrade path - the backend is in the tree, configurable, and
+tested offline. Residuals: live multi-worker evidence awaits an operator
+host with a real Redis; a Redis outage degrades to fail-open (disclosed,
+counted, never silent); the identity join warms on the first validated
+request of each token.

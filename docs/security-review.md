@@ -47,11 +47,11 @@ plainly.
 
 | ID | Sev | Finding | Status |
 | --- | --- | --- | --- |
-| F-01 | high→fixed | Rate limiting absent entirely (pre-phase-10): auth/money/agent endpoints had no abuse ceiling | **Fixed** in phase 10 (middleware + tests); residual per-process scope as KL-09 |
+| F-01 | high→fixed | Rate limiting absent entirely (pre-phase-10): auth/money/agent endpoints had no abuse ceiling | **Fixed** in phase 10 (middleware + tests); per-process scope residual **closed** with the Redis backend (D20, KL-09) |
 | F-02 | medium | Payment discrepancies were audit-log-only - an operator watching logs could miss drift | **Fixed**: persisted dedupe alert queue + ack/resolve lifecycle + observability counts |
 | F-03 | medium | `/ops/*` gated by DEV_MODE flag only; no operator identity model | **Accepted for now** (KL-11); must be closed before any non-dev deployment |
 | F-04 | medium | No automated dependency/vulnerability gate | **Mitigated**: `make audit` inventory + hard-spec gates committed; live CVE scanning (pip-audit/trivy) documented as operator CI step - scanner absence is disclosed, never faked |
-| F-05 | low | Bearer-fingerprint rate-limit subject allows bucket refresh via token rotation | Accepted (cost equals IP rotation); Redis + validation-joined keys is the real fix (KL-09) |
+| F-05 | low→fixed | Bearer-fingerprint rate-limit subject allows bucket refresh via token rotation | **Fixed** (D20): validated bearers join per-user limiter keys via the identity cache; rotation of one user's tokens drains one bucket. Cold-join first request accepted (see threat-model residual) |
 | F-06 | low | Retention windows are settings, not code-constants - a misconfiguration could over-delete | Mitigated: PRESERVED_SURFACES is structural (money/audit never swept regardless of settings); window tests pin behavior |
 | F-07 | low | Backup drill covers SQLite logical roundtrip only | Accepted (KL-04/KL-05); drill prints its own scope notes so nobody mistakes it for a Postgres/SCB proof |
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from xp_core.config import get_settings
 from xp_core.db import get_session
@@ -16,6 +16,7 @@ SettingsDep = Annotated[object, Depends(get_settings)]
 
 async def current_user(
     session: Annotated[AsyncSession, Depends(get_session)],
+    request: Request,
     authorization: Annotated[str | None, Header()] = None,
 ) -> User:
     """Resolve the caller.
@@ -28,6 +29,12 @@ async def current_user(
         token = authorization.split(" ", 1)[1].strip()
         user = await resolve_user_from_token(session, token)
         if user is not None:
+            # Validation-joined rate-limit keys (KL-09): every successfully
+            # validated bearer feeds the limiter's identity cache so ALL valid
+            # tokens of one user share ONE bucket, regardless of rotation.
+            cache = getattr(request.app.state, "identity_cache", None)
+            if cache is not None:
+                cache.remember(token, user.id)
             # Persist the throttled last_used_at heartbeat (independent of
             # whatever the endpoint itself commits later).
             await session.commit()

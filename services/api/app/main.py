@@ -14,7 +14,8 @@ from fastapi.responses import JSONResponse
 from xp_core.config import get_settings
 from xp_core.logging import request_id_var, setup_logging
 from xp_core.services.ratelimit import (
-    RateLimiter,
+    IdentityCache,
+    build_rate_limiter,
     classify_path,
     log_trip,
     subject_for,
@@ -66,12 +67,14 @@ def create_app() -> FastAPI:
         response.headers[settings.request_id_header] = rid
         return response
 
-    # abuse controls (phase 10): token buckets per route class
-    limiter = RateLimiter(
-        bucket_ttl_seconds=settings.rate_limit_bucket_ttl_seconds,
-        max_buckets=settings.rate_limit_max_buckets,
+    # abuse controls (phase 10, backend configurable since KL-09 closure):
+    # token buckets per route class; redis shares them across workers.
+    # Middleware reads app.state (not this closure) so the backend instance
+    # stays swappable in one place.
+    app.state.rate_limiter = build_rate_limiter(settings)
+    app.state.identity_cache = IdentityCache(
+        ttl_seconds=settings.rate_limit_bucket_ttl_seconds
     )
-    app.state.rate_limiter = limiter
 
     @app.middleware("http")
     async def rate_limit(
@@ -85,10 +88,10 @@ def create_app() -> FastAPI:
         bearer = request.headers.get("authorization", "")
         bearer = bearer[7:] if bearer.lower().startswith("bearer ") else None
         client_ip = request.client.host if request.client else "unknown"
-        result = limiter.check(route_class, subject_for(client_ip, bearer))
+        subject = subject_for(client_ip, bearer, request.app.state.identity_cache)
+        result = request.app.state.rate_limiter.check(route_class, subject)
         if not result.allowed:
-            log_trip(route_class, subject_for(client_ip, bearer), request.url.path,
-                     result.retry_after_seconds)
+            log_trip(route_class, subject, request.url.path, result.retry_after_seconds)
             return JSONResponse(
                 status_code=429,
                 content={
@@ -103,7 +106,10 @@ def create_app() -> FastAPI:
             )
         response = await call_next(request)
         response.headers["X-RateLimit-Limit"] = str(result.limit)
-        response.headers["X-RateLimit-Remaining"] = str(result.remaining)
+        # A degraded backend cannot honestly report a remaining count.
+        response.headers["X-RateLimit-Remaining"] = (
+            "unknown" if result.degraded else str(result.remaining)
+        )
         return response
 
     @app.get("/healthz", tags=["health"])
@@ -120,6 +126,7 @@ def create_app() -> FastAPI:
             dev_mode=settings.dev_mode,
             sqlite=settings.is_sqlite,
             redis=bool(settings.redis_url),
+            rate_limit_backend=settings.rate_limit_backend,
         )
 
     return app
