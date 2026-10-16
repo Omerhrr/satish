@@ -18,7 +18,7 @@ that records every attempt including the ones that did nothing.
 | Lifecycle | `POST /jobs/{id}/pause\|resume\|cancel` | resume recomputes `next_run_at`; cancel is terminal |
 | Run history | `GET /jobs/{id}/runs` | every attempt with status, XP, error |
 | Manual run | `POST /jobs/{id}/run` | SAME `process_job` code path as the sweep - never a bypass |
-| Notifications | `GET /notifications`, `POST /notifications/{id}/read` | persisted; Telegram relay is an open item |
+| Notifications | `GET /notifications`, `POST /notifications/{id}/read` | persisted + relayed to Telegram by the worker (KL-06); `relay_status` discloses the one push decision |
 | Agent tools | `email.draft`, `email.send`, `automation.schedule` | scope wall + approval gate stack (`email:send`, `automation:write` in USER_TASK_SCOPES) |
 
 ## Trust flow for email
@@ -100,12 +100,35 @@ run_due_jobs (worker cron, XP_AUTOMATION_SWEEP_INTERVAL_SECONDS)
 | `XP_AUTOMATION_MAX_CONSECUTIVE_FAILURES` | `3` | auto-pause ladder |
 | `XP_AUTOMATION_MAX_BUDGET_PER_RUN_XP` | `10000` | operator cap |
 | `XP_AUTOMATION_MAX_BUDGET_TOTAL_XP` | `100000` | operator cap |
+| `XP_TELEGRAM_RELAY_MODE` | `canned` | `canned` \| `bot_api` (bot_api requires `XP_TELEGRAM_BOT_TOKEN`) |
+| `XP_TELEGRAM_RELAY_LOOKBACK_HOURS` | `24` | unread notifications older than this are skipped as stale |
+| `XP_RELAY_SWEEP_INTERVAL_SECONDS` | `60` | worker relay cadence |
+
+## Notification relay (KL-06)
+
+A worker cron sweep gives every notification EXACTLY ONE push decision,
+recorded in `relay_status` + `relay_detail` + `relayed_at`:
+
+- `sent` - the provider accepted the message (Bot API returned `ok: true`);
+- `refused` - Telegram definitively refused (blocked bot, chat not found,
+  bad token). Refusals are terminal; retrying one would only spam;
+- `unknown` - timeout, transport error, or 5xx: the send MIGHT have
+  completed. The row records the never-auto-retry disclosure; nothing is
+  silently re-sent;
+- `skipped` - the relay deliberately did not attempt: read in-app before
+  the push, no linked Telegram account, or past the 24h lookback window.
+
+`XP_TELEGRAM_RELAY_MODE=canned` (default) proves the full path offline;
+every canned receipt states plainly that nothing was transmitted.
+`bot_api` is the same code path with the real Bot API behind it, and it
+refuses to construct without a configured bot token - the system never
+silently downgrades a requested real send to canned.
 
 ## Honest open items
 
-- Telegram relay for notifications: persisted + API-readable now; the bot
-  push lands with bot-token availability. The API never claims a push
-  happened when it did not.
+- Live relay delivery needs a real bot token plus a real chat (the bot_api
+  provider path is transport-tested offline); canned mode proves the sweep
+  and disclosure path deterministically.
 - Live SMTP delivery needs a real server and an operator master key; the
   provider path is proven offline against a loopback server.
 - Full cron expressions (5-field, timezone-aware) are deliberately not

@@ -455,3 +455,50 @@ surface; restoring a backup is a verified procedure, not a hope. The full
 honest gap list (multi-process rate limits, Postgres/SCB restore
 rehearsal, operator identity for /ops) lives in
 docs/known-limitations.md KL-04/KL-05/KL-09/KL-11.
+
+## D18 - Notification relay: one push decision per notification, honest sent/refused/unknown/skipped taxonomy (2026-10-16, KL-06)
+
+**Context:** phase 9 left the Telegram notification relay open (D16) -
+notifications were persisted and API-readable but never pushed, and
+pretending to push without a bot token would fabricate delivery. Closing
+the loop means the worker now sends to Telegram, which re-introduces the
+exact uncertainty the email adapter (phase 9) already solved for SMTP:
+after a send attempt, did the message actually arrive?
+
+**Decision:**
+- *Exactly one relay decision per notification.* A worker cron sweep
+  (`xp_core.services.relay`) terminates every never-relayed notification
+  in one of four states recorded in `relay_status` + `relay_detail` +
+  `relayed_at`: `sent`, `refused`, `unknown`, or `skipped`. Nothing is
+  ever attempted twice; a second sweep over the same rows is a no-op.
+- *Refusals are terminal, not retried.* Telegram refuses definitively with
+  a 4xx (blocked bot, chat not found, bad token). Retrying a refusal only
+  spams the chat and burns rate limits - the refusal detail is recorded
+  instead.
+- *Unknown outcomes are never silently retried.* Timeout, transport error,
+  or 5xx means the send MIGHT have completed; the row records the
+  never-auto-retry disclosure, mirroring the email taxonomy and the
+  phase-3 wallet broadcast rule.
+- *Skips are decisions too.* Read in-app before the push (pushing would be
+  noise), no linked Telegram account, or past the 24h lookback window
+  (backlog flood guard) each record `skipped` with the reason.
+- *Twin providers, one code path.* `CannedTelegramRelayProvider`
+  (deterministic, no network, receipt states nothing was transmitted) and
+  `BotApiTelegramRelayProvider` (real sendMessage, transport-injectable for
+  offline tests) share one interface selected by
+  `XP_TELEGRAM_RELAY_MODE=canned|bot_api`; `bot_api` refuses to construct
+  without a token - no silent downgrade of a requested real send.
+- *The API discloses the decision.* `NotificationOut.relay_status` is
+  user-visible; the Mini App can show exactly what happened to each push.
+
+**Alternatives rejected:** retry queues with backoff (turns unknown into
+possible double-send); pushing read notifications (spam after the user
+already saw it); unbounded backlog push when a token first arrives (flood);
+embedding the provider in xp_core (inverts the dependency direction the
+email adapter established - worker wires provider into the core service).
+
+**Consequences:** automation is now felt, not just trusted - condition
+notifications arrive in the user's chat with a per-notification audit
+trail. The sweep is deterministic and fully testable offline; live-mode
+evidence (real token + chat) remains an operator step, tracked in
+docs/known-limitations.md KL-06 as closed-with-residual.

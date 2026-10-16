@@ -25,7 +25,7 @@ help:
 
 install:
 	uv pip install --python $(PY) -e packages/py-core -e services/api -e services/worker \
-	        -e services/agent-adapter -e services/wallet-adapter -e services/lightning-adapter -e services/research-adapter -e services/commerce-adapter -e services/email-adapter -e apps/bot
+	        -e services/agent-adapter -e services/wallet-adapter -e services/lightning-adapter -e services/research-adapter -e services/commerce-adapter -e services/email-adapter -e services/telegram-adapter -e apps/bot
 	bun install
 
 migrate:

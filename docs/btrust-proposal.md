@@ -96,9 +96,8 @@ layer, not just in prose.
   `SECURITY.md` (responsible disclosure, 90-day window).
 - **What funding would accelerate**: the pending live proofs (DeepSeek key,
   lnd drill host, Postgres restore rehearsal), the Redis-backed multi-worker
-  rate-limit backend, the operator identity layer for `/ops`, the
-  independent security review, and the Telegram notification relay - each
-  already scoped in `docs/roadmap.md`.
+  rate-limit backend, the operator identity layer for `/ops`, and the
+  independent security review - each already scoped in `docs/roadmap.md`.
 
 ## 6. Why this is evaluable without custody
 

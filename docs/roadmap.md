@@ -15,7 +15,7 @@ see `docs/known-limitations.md` for the instrument that closes each gap.
 | 6 | DeepSeek Harness integration | **Implemented** | Durable agent runtime: task_events, DB-checked approvals, scope wall, budget-aware dispatch, resume. Live model runs pending key (KL-01) |
 | 7 | Research & deliverable tools | **Implemented** | SSRF wall, provenance table, cross-source comparison, quality gates, PDF/CSV/XLSX artifacts, committed eval set (`make research-eval`) |
 | 8 | Commerce intelligence | **Implemented** | Structural-only scoring with echoed weights, typed facts (no fabricated costs), supplier/listing comparison, committed eval set (`make commerce-eval`). Live ad-library connector open (KL-08) |
-| 9 | Email & automation workflows | **Implemented** | Fernet credential vault, preview-before-send, digest+TTL approvals, budget-laddered scheduler, notification queue. Telegram relay open (KL-06) |
+| 9 | Email & automation workflows | **Implemented** | Fernet credential vault, preview-before-send, digest+TTL approvals, budget-laddered scheduler, notification queue + Telegram relay (KL-06 closed: one-decision push, honest sent/refused/unknown/skipped taxonomy) |
 | 10 | Security, reliability, ops readiness | **Implemented** | Rate limiting, reconciliation alerts (23rd table), retention sweep + policy, backup/restore drill, dependency/container audit, IR runbooks, security review + limitations register. Postgres/SCB restore rehearsal + multi-process rate limits open (KL-04/05/09) |
 | 11 | Open-source release & Btrust package | **Implemented** | This release package: demo (`make demo`), walkthrough, disclosure policy, contributing guide, roadmap, Btrust proposal, limitations register |
 
@@ -27,7 +27,6 @@ see `docs/known-limitations.md` for the instrument that closes each gap.
   healthy host; document evidence in the drill doc.
 - **KL-04**: rehearse pg_dump/pg_restore + verification gates against a real
   Postgres instance.
-- **KL-06**: Telegram relay for notifications (bot token configured path).
 - **KL-09**: Redis-backed rate-limit bucket backend for multi-worker
   deployments; validation-joined per-user subjects.
 - **KL-10**: self-serve account closure/export with ledger-aware erasure.

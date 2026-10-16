@@ -29,9 +29,11 @@ cron daily at 03:17 UTC; settings `XP_RETENTION_*`).
   full data erasure is a manual, human-coordinated process that must
   explicitly reconcile the immutable ledger before anonymizing identity
   rows (KL-10).
-- The Telegram relay for notifications is still an open item; retention
-  windows above were chosen so nothing unread expires before delivery could
-  plausibly happen.
+- The Telegram relay is implemented (KL-06 closed): every notification gets
+  exactly ONE push decision, so retention windows above were chosen so
+  nothing unread expires before delivery could plausibly happen (the 24h
+  relay lookback is comfortably inside the 90-day unread window); unknown
+  and refused outcomes are terminal rows, never silent loops.
 - Backups inherit retention: a restore (R5) resurrects data deleted after
   the backup was taken. Backup snapshots are outside the sweep's reach by
   design - restore verification, not retention, governs them.

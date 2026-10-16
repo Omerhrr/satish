@@ -11,6 +11,7 @@ from worker.jobs.agent import run_agent_task_job
 from worker.jobs.automation import run_scheduled_jobs_job
 from worker.jobs.pdf import generate_pdf_report
 from worker.jobs.receipt import generate_receipt_pdf
+from worker.jobs.relay import relay_notifications_job
 from worker.jobs.retention import run_retention_sweep_job
 
 
@@ -48,6 +49,8 @@ def _build_cron_jobs() -> tuple:
     minutes = max(1, interval // 60)
     # Automation sweep (phase 9): due scheduled jobs get one decision each.
     sweep_minutes = max(1, get_settings().automation_sweep_interval_seconds // 60)
+    # Notification relay (phase 9, KL-06): one push decision per notification.
+    relay_minutes = max(1, get_settings().relay_sweep_interval_seconds // 60)
     return (
         cron(
             scheduled_reconciliation,
@@ -57,6 +60,11 @@ def _build_cron_jobs() -> tuple:
         cron(
             run_scheduled_jobs_job,
             minute=set(range(0, 60, sweep_minutes)) if sweep_minutes < 60 else None,
+            run_at_startup=True,
+        ),
+        cron(
+            relay_notifications_job,
+            minute=set(range(0, 60, relay_minutes)) if relay_minutes < 60 else None,
             run_at_startup=True,
         ),
         # Retention sweep (phase 10): privacy windows, daily at 03:17 UTC.
@@ -72,6 +80,7 @@ class WorkerSettings:
         generate_receipt_pdf,
         run_agent_task_job,
         run_scheduled_jobs_job,
+        relay_notifications_job,
         run_retention_sweep_job,
     )
     cron_jobs = _build_cron_jobs()

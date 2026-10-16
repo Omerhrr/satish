@@ -445,6 +445,7 @@ export interface NotificationOut {
   job_id: string | null;
   run_id: string | null;
   read_at: string | null;
+  relay_status: string | null;
   created_at: string;
 }
 

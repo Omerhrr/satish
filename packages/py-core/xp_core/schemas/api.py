@@ -406,6 +406,7 @@ class NotificationOut(BaseModel):
     job_id: str | None
     run_id: str | None
     read_at: datetime | None
+    relay_status: str | None = None
     created_at: datetime
 
 

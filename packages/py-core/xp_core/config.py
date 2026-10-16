@@ -51,6 +51,12 @@ class Settings(BaseSettings):
     telegram_bot_token: str | None = None
     telegram_init_data_max_age_seconds: int = 86400
     mini_app_url: str = "https://t.me/XPDevBot/app"
+    # Notification relay (phase 9, KL-06): "canned" records a deterministic
+    # local receipt and states that nothing was transmitted; "bot_api" sends
+    # for real and refuses to construct without a bot token.
+    telegram_relay_mode: str = "canned"
+    # Unread notifications older than this are skipped as stale, never pushed.
+    telegram_relay_lookback_hours: int = 24
 
     # sessions
     # Short-lived bearer sessions (trust boundary control: "Short-lived
@@ -156,6 +162,8 @@ class Settings(BaseSettings):
     approval_ttl_minutes: int = 60
     # Scheduler sweep cadence (worker cron). arq cron is minute-granular.
     automation_sweep_interval_seconds: int = 60
+    # Notification relay sweep cadence (worker cron, KL-06).
+    relay_sweep_interval_seconds: int = 60
     # Consecutive failed runs before a job auto-pauses (failed jobs do not
     # silently repeat consequential actions - they stop and notify).
     automation_max_consecutive_failures: int = 3

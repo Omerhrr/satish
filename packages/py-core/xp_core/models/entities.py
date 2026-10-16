@@ -490,9 +490,10 @@ class Notification(Base):
     """Condition-based notification for a user (phase 9).
 
     Created by backend evaluation of scheduled-job conditions (run outcomes,
-    balance thresholds). Persisted and API-readable; Telegram relay is a
-    documented open item - pretending to push without a bot token would
-    fabricate delivery.
+    balance thresholds). Persisted and API-readable. The relay fields record
+    exactly ONE push decision per notification (phase 9, KL-06):
+    ``relay_status`` is sent | refused | unknown | skipped, set together with
+    ``relayed_at``; unknown outcomes are never retried automatically.
     """
 
     __tablename__ = "notifications"
@@ -507,6 +508,8 @@ class Notification(Base):
     run_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     read_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     relayed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    relay_status: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    relay_detail: Mapped[str | None] = mapped_column(String(512), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
 
 

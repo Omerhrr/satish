@@ -1,8 +1,9 @@
 """Condition-based notifications (phase 9): list + mark read.
 
 Persisted by backend condition evaluation (xp_core.services.automation).
-Telegram relay is a documented open item - the API never pretends a push
-happened when it did not.
+The Telegram relay (xp_core.services.relay + telegram-adapter) records its
+one push decision per notification in relay_status; the API discloses it
+but never pretends a push happened when it did not.
 """
 
 from __future__ import annotations
@@ -27,6 +28,7 @@ def _out(row: Notification) -> NotificationOut:
         job_id=row.job_id,
         run_id=row.run_id,
         read_at=row.read_at,
+        relay_status=row.relay_status,
         created_at=row.created_at,
     )
 

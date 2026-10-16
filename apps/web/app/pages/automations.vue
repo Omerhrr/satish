@@ -70,8 +70,8 @@
       <h2>Notifications</h2>
       <p class="small dim">
         Condition-based alerts from your jobs (run outcomes, balance thresholds).
-        Persisted here; Telegram relay is a planned addition - this page is the
-        delivery surface for now.
+        Each is pushed to Telegram once - relay status shows exactly what
+        happened (sent, refused, unknown, or skipped).
       </p>
       <p v-if="!notifications.length" class="small dim">Nothing yet.</p>
       <div v-for="n in notifications" :key="n.id" class="row-list">
@@ -79,6 +79,7 @@
           <div class="small">
             <b>{{ n.kind }}</b>
             <span v-if="!n.read_at" class="badge">unread</span>
+            <span v-if="n.relay_status" class="badge">relay: {{ n.relay_status }}</span>
           </div>
           <div class="small dim">{{ fmt(n.created_at) }} · {{ JSON.stringify(n.payload) }}</div>
         </div>
