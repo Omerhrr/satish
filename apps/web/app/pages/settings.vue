@@ -92,6 +92,36 @@
     </section>
 
     <section class="card">
+      <h2>Your data</h2>
+      <p class="small dim">
+        Export downloads everything this system stores about your account as
+        one JSON document - session token hashes and connected-service
+        credentials are never included, and the document itself says so.
+      </p>
+      <button class="btn" :disabled="exporting" @click="exportData">
+        <span v-if="exporting" class="spinner" /> Download my data (JSON)
+      </button>
+      <span class="small dim" style="margin-left: 10px">{{ exportNote }}</span>
+    </section>
+
+    <section class="card">
+      <h2>Close account</h2>
+      <p class="small dim">
+        Permanent and ledger-aware: closure refuses while anything is in
+        flight (running tasks, pending approvals, open payments, nonzero XP
+        balance), requires clean reconciliation, then erases your content,
+        deletes your Telegram linkage, and keeps only the anonymous
+        money/evidence trail. Your bitcoin stays yours - your recovery
+        phrase is untouched and remains the only control over your funds.
+        This cannot be undone.
+      </p>
+      <button class="btn sensitive-action" :disabled="closing" @click="closeAccount">
+        <span v-if="closing" class="spinner" /> ⚠️ Close my account permanently
+      </button>
+      <p v-if="closureNote" class="small" style="margin-top: 8px">{{ closureNote }}</p>
+    </section>
+
+    <section class="card">
       <h2>Environment</h2>
       <p class="small dim">
         Current build: phase 10 operational readiness · DEV_MODE grants are
@@ -110,6 +140,10 @@ const sessions = ref<SessionInfo[]>([]);
 const sessionsError = ref("");
 const loggingOut = ref(false);
 const revokingId = ref<string | null>(null);
+const exporting = ref(false);
+const exportNote = ref("");
+const closing = ref(false);
+const closureNote = ref("");
 
 const ttlNote = "24h";
 const noSessionsNote =
@@ -166,6 +200,53 @@ async function revoke(sessionId: string) {
     note(String(err instanceof Error ? err.message : err));
   } finally {
     revokingId.value = null;
+  }
+}
+
+async function exportData() {
+  exporting.value = true;
+  exportNote.value = "";
+  try {
+    const res = await api.exportAccount();
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `xp-account-export-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    exportNote.value = "download started";
+  } catch (err) {
+    exportNote.value = String(err instanceof Error ? err.message : err);
+  } finally {
+    exporting.value = false;
+  }
+}
+
+async function closeAccount() {
+  if (
+    !window.confirm(
+      "Close your account permanently? Your content is erased, your Telegram linkage is deleted, and this cannot be undone."
+    )
+  )
+    return;
+  const typed = window.prompt('This is permanent. Type CLOSE to confirm.');
+  if (typed !== "CLOSE") {
+    closureNote.value = "confirmation did not match - nothing happened";
+    return;
+  }
+  closing.value = true;
+  closureNote.value = "";
+  try {
+    const result = await api.closeAccount("CLOSE");
+    closureNote.value = `account closed at ${result.closed_at}. Your funds remain under your recovery phrase.`;
+    for (const store of [window.localStorage, window.sessionStorage]) {
+      store.removeItem("xp_session_token");
+    }
+  } catch (err) {
+    closureNote.value = String(err instanceof Error ? err.message : err);
+  } finally {
+    closing.value = false;
   }
 }
 

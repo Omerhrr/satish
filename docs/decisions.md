@@ -502,3 +502,49 @@ notifications arrive in the user's chat with a per-notification audit
 trail. The sweep is deterministic and fully testable offline; live-mode
 evidence (real token + chat) remains an operator step, tracked in
 docs/known-limitations.md KL-06 as closed-with-residual.
+
+## D19 - Self-serve closure: refuse-while-in-flight, reconcile-then-anonymize, never a fabricated forfeit (2026-10-16, KL-10)
+
+**Context:** the privacy policy documented account closure as a manual,
+human-coordinated process because the money trail is immutable: ledger
+entries, payment intents, task events, and audit events cannot be deleted,
+so "delete my account" can never mean a clean wipe. Self-serving it without
+guardrails would either orphan the evidence trail or invite users to close
+with money in motion.
+
+**Decision:**
+- *Export is a superset download with disclosed holes.* One JSON document
+  covers every owned surface; session token hashes and Fernet credential
+  ciphertexts are never exported and the document says so itself.
+- *Closure refuses with precise reasons while anything is in flight:*
+  running tasks, pending approvals, open payment intents, nonzero XP
+  balance. A nonzero balance blocks closure outright - there is NO
+  fabricated "forfeit" ledger entry, because writing a fake economic event
+  to keep the invariant would be the exact fabrication the ledger exists
+  to prevent. Balance reaches zero through real events or operator help.
+- *Reconciliation gate before erasure:* `reconcile_all` must report clean
+  (balance == sum of ledger entries) or closure refuses - the documented
+  "reconcile the immutable ledger before anonymizing identity rows" rule,
+  now enforced in code.
+- *Erasure levels are explicit:* user content and auth surfaces are hard
+  deleted (including artifact files on disk and wallet server state);
+  identity is unlinked (telegram rows deleted, display name dropped,
+  status=closed); content-bearing fields of structural rows are scrubbed
+  in place (task objectives, job templates) so append-only evidence stays
+  resolvable; the money/evidence trail is retained untouched.
+- *Typed confirmation on the wire* (`confirm: "CLOSE"` as a Literal) and a
+  two-step confirm in the Mini App; closure erases sessions, so the bearer
+  token cannot outlive the account.
+
+**Alternatives rejected:** a forfeit/adjustment ledger entry to zero the
+balance automatically (fabricates an economic event); deleting the user row
+(breaks every FK into the retained evidence trail); deleting tasks and jobs
+rows wholesale (orphans task_events/automation evidence and ledger
+references); keeping PRESERVED_SURFACES semantics for closure (that
+instrument constrains the automatic sweep, not an explicit authenticated
+user action - the two are now documented as distinct).
+
+**Consequences:** the Btrust privacy story is complete - users can take
+their data and leave, and leaving provably cannot corrupt the ledger.
+Residual: closure with a balance needs operator contact (honest, disclosed
+in the refusal reasons).

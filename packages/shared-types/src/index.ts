@@ -453,3 +453,12 @@ export interface NotificationsPageOut {
   notifications: NotificationOut[];
   unread: number;
 }
+
+export interface AccountClosureOut {
+  status: string;
+  closed_at: string;
+  erased: Record<string, number>;
+  anonymized: Record<string, number>;
+  retained: string[];
+  disclosures: string[];
+}

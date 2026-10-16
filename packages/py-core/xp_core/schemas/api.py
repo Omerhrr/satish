@@ -451,3 +451,19 @@ class ObservabilityOut(BaseModel):
     alerts_resolved_total: int
     rate_limit_enabled: bool
     retention_policy: dict[str, int]
+
+
+# account export + closure (KL-10)
+
+
+class AccountClosureIn(BaseModel):
+    confirm: Literal["CLOSE"]
+
+
+class AccountClosureOut(BaseModel):
+    status: str
+    closed_at: str
+    erased: dict[str, int]
+    anonymized: dict[str, int]
+    retained: list[str]
+    disclosures: list[str]

@@ -8,6 +8,7 @@
  */
 
 import type {
+  AccountClosureOut,
   ArtifactOut,
   ApprovalOut,
   AutomationRunOut,
@@ -102,6 +103,8 @@ export interface XpClient {
   jobRuns: (jobId: string) => Promise<AutomationRunOut[]>;
   listNotifications: () => Promise<NotificationsPageOut>;
   markNotificationRead: (notificationId: string) => Promise<NotificationOut>;
+  exportAccount: () => Promise<Response>;
+  closeAccount: (confirm: "CLOSE") => Promise<AccountClosureOut>;
 }
 
 export function createXpClient(config: XpClientConfig = {}): XpClient {
@@ -137,14 +140,29 @@ export function createXpClient(config: XpClientConfig = {}): XpClient {
     if (!res.ok) {
       let detail = res.statusText;
       try {
-        const body = (await res.json()) as { detail?: string };
-        if (body?.detail) detail = body.detail;
+        const body = (await res.json()) as { detail?: unknown };
+        if (typeof body?.detail === "string") {
+          detail = body.detail;
+        } else if (body?.detail && typeof body.detail === "object") {
+          const reasons = (body.detail as { reasons?: string[] }).reasons;
+          if (Array.isArray(reasons)) detail = reasons.join("; ");
+          else detail = JSON.stringify(body.detail);
+        }
       } catch {
         /* keep statusText */
       }
       throw new Error(`XP API ${res.status}: ${detail}`);
     }
     return (await res.json()) as T;
+  }
+
+  async function requestRaw(path: string): Promise<Response> {
+    const headers: Record<string, string> = {};
+    const token = config.getToken?.();
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const res = await doFetch(buildUrl(path), { headers });
+    if (!res.ok) throw new Error(`XP API ${res.status}: ${res.statusText}`);
+    return res;
   }
 
   return {
@@ -256,6 +274,12 @@ export function createXpClient(config: XpClientConfig = {}): XpClient {
     markNotificationRead: (notificationId) =>
       request<NotificationOut>(`/api/v1/notifications/${notificationId}/read`, {
         method: "POST",
+      }),
+    exportAccount: () => requestRaw("/api/v1/account/export"),
+    closeAccount: (confirm) =>
+      request<AccountClosureOut>("/api/v1/account/closure", {
+        method: "POST",
+        body: JSON.stringify({ confirm }),
       }),
   };
 }

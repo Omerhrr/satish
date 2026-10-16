@@ -14,7 +14,8 @@ python3 -m venv .venv && .venv/bin/pip install -U pip
 uv pip install --python .venv/bin/python -e packages/py-core -e services/api \
   -e services/worker -e services/agent-adapter -e services/wallet-adapter \
   -e services/lightning-adapter -e services/research-adapter \
-  -e services/commerce-adapter -e services/email-adapter -e apps/bot
+  -e services/commerce-adapter -e services/email-adapter \
+  -e services/telegram-adapter -e apps/bot
 bun install
 make migrate && make demo   # proves your env end-to-end
 ```
@@ -56,10 +57,11 @@ make migrate && make demo   # proves your env end-to-end
 
 | Area | Path | Owner |
 | --- | --- | --- |
-| Ledger / economy | `packages/py-core/xp_core/{models,services/jobs}`, `services/api` xp/tasks | @Omerhrr |
+| Ledger / economy | `packages/py-core/xp_core/{models,services,jobs}`, `services/api` xp/tasks/account | @Omerhrr |
 | Wallet / Lightning | `services/wallet-adapter`, `services/lightning-adapter` | @Omerhrr |
 | Agent / DSH | `services/agent-adapter`, `services/worker` agent jobs | @Omerhrr |
 | API surface | `services/api/app` | @Omerhrr |
+| Email / Telegram adapters | `services/email-adapter`, `services/telegram-adapter` | @Omerhrr |
 | Mini App | `apps/web` | @Omerhrr |
 | Docs / threat model | `docs/` | @Omerhrr |
 
