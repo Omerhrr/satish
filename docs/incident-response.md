@@ -140,7 +140,11 @@ tested, not hot-patched.
 
 ## Ops access reality (honest disclosure)
 
-`/ops/*` endpoints are DEV_MODE-gated in this build. Production operation
-requires putting an operator access control (VPN, mTLS, or an admin
-authenticator) in front of them before disabling that gate - see
-docs/security-review.md F-03.
+`/ops/*` endpoints require a real operator credential since the KL-11
+closure: set `XP_OPS_OPERATOR_TOKEN` and present it on every ops request
+(`X-Operator-Token` header or an Authorization bearer). The credential is
+constant-time compared, never logged, and every grant plus every denial is
+written to audit_events. Without a configured credential the surfaces refuse
+with 503 outside DEV_MODE - they stay dark rather than open. The credential
+is a shared static secret: rotate it like any secret; VPN/mTLS or
+per-operator identities remain the next hardening step for larger teams.

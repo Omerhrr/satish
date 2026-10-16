@@ -26,6 +26,12 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     dev_mode: bool = True  # relaxes auth for local/sandbox development only
 
+    # Operator credential for /ops/* (KL-11). Constant-time compared, never
+    # logged, never echoed back. When set it is REQUIRED for every ops
+    # request in every environment; when unset, ops surfaces run only in
+    # DEV_MODE and refuse (503) anywhere else instead of opening unauthenticated.
+    ops_operator_token: str | None = None
+
     # HTTP
     api_host: str = "0.0.0.0"
     api_port: int = 8001

@@ -610,3 +610,60 @@ tested offline. Residuals: live multi-worker evidence awaits an operator
 host with a real Redis; a Redis outage degrades to fail-open (disclosed,
 counted, never silent); the identity join warms on the first validated
 request of each token.
+
+## D21 - Operator identity for /ops: a configured credential, dark-without-it, audited at every door (2026-10-16, KL-11)
+
+Phase 10 gated `/ops/*` on DEV_MODE only - the honest phase-10 scope, but it
+meant production operator access depended entirely on the operator putting
+something (VPN, mTLS, an admin authenticator) in front of the API, and
+nothing in the code helped or verified that. F-03 named it a must-close
+before any non-dev deployment; KL-11 tracked it.
+
+**Context:**
+- The ops surfaces expose money-integrity state (reconciliation alert queue,
+  observability counts). Serving them unauthenticated in production would
+  leak operational posture; refusing them outright in production left
+  operators with no in-product path at all.
+- There is no operator user model (operators are not accounts in the users
+  table, and the user auth wall must not grow an admin role lightly - a
+  compromised admin user row would sit inside the same credential-stuffing
+  blast radius as every other user).
+
+**Decision:**
+- *A configured credential, required everywhere it exists.* Setting
+  `XP_OPS_OPERATOR_TOKEN` makes the credential REQUIRED for every ops
+  request in every environment, dev included - an operator who sets a token
+  wants it enforced, so dev never becomes the quiet bypass. Comparison is
+  constant-time (`hmac.compare_digest`); the credential is accepted via
+  `X-Operator-Token` or a standard Authorization bearer, never logged, never
+  echoed.
+- *Without a credential the surfaces stay DARK, not open.* No credential +
+  non-dev refuses 503 with an honest detail; a missing operator setup can
+  never silently degrade into public access. No credential + DEV_MODE keeps
+  the unchanged local convenience (that is what DEV_MODE is for).
+- *Every door is audited.* Grant and denial each write an audit_events row
+  (`ops.access_granted` / `ops.access_denied`) carrying method, path,
+  header source, denial reason, and a fingerprint of the presented
+  credential for retry correlation - never the credential itself. Denials
+  are attempted-access evidence, not noise to suppress.
+- *The credential authorizes ops, nothing more.* It is not a user session:
+  user endpoints reject it, and the fabrication walls (`/xp/dev/grant`,
+  manual reconcile) stay dev-only with an operator credential presented.
+  Operators run the integrity queue; they cannot mint balances.
+- *Router-level dependency* (`require_operator` on the /ops router) so a
+  future ops endpoint cannot forget the gate - the gate is the router's,
+  not each handler's discipline.
+
+**Alternatives rejected:** reusing user sessions with an admin flag (puts
+the most powerful capability inside the largest credential-stuffing surface);
+fail-open to DEV_MODE behavior when no credential is set (that is exactly
+the silent-public-access failure F-03 warned about); per-request JWT ops
+tokens (no issuer infrastructure exists to rotate/verify them - a static
+high-entropy credential with audit + rotation guidance is the honest
+provable step).
+
+**Consequences:** /ops is deployable behind a configured secret today, and
+unusable-by-construction without one. Residual: the credential is a shared
+static secret (no per-operator identities, no VPN/mTLS integration) - the
+next hardening step for larger teams; manual reconcile and dev grants stay
+dev-only by design.

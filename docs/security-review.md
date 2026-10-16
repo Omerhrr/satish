@@ -49,7 +49,7 @@ plainly.
 | --- | --- | --- | --- |
 | F-01 | high→fixed | Rate limiting absent entirely (pre-phase-10): auth/money/agent endpoints had no abuse ceiling | **Fixed** in phase 10 (middleware + tests); per-process scope residual **closed** with the Redis backend (D20, KL-09) |
 | F-02 | medium | Payment discrepancies were audit-log-only - an operator watching logs could miss drift | **Fixed**: persisted dedupe alert queue + ack/resolve lifecycle + observability counts |
-| F-03 | medium | `/ops/*` gated by DEV_MODE flag only; no operator identity model | **Accepted for now** (KL-11); must be closed before any non-dev deployment |
+| F-03 | medium | `/ops/*` gated by DEV_MODE flag only; no operator identity model | **Fixed** (D21, KL-11): configured operator credential required everywhere, constant-time compared, grant/denial audited; unconfigured + non-dev refuses 503 (dark) instead of opening |
 | F-04 | medium | No automated dependency/vulnerability gate | **Mitigated**: `make audit` inventory + hard-spec gates committed; live CVE scanning (pip-audit/trivy) documented as operator CI step - scanner absence is disclosed, never faked |
 | F-05 | low→fixed | Bearer-fingerprint rate-limit subject allows bucket refresh via token rotation | **Fixed** (D20): validated bearers join per-user limiter keys via the identity cache; rotation of one user's tokens drains one bucket. Cold-join first request accepted (see threat-model residual) |
 | F-06 | low | Retention windows are settings, not code-constants - a misconfiguration could over-delete | Mitigated: PRESERVED_SURFACES is structural (money/audit never swept regardless of settings); window tests pin behavior |

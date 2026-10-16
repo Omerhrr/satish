@@ -1,12 +1,12 @@
 """Ops router (phase 10): reconciliation alerts + observability summary.
 
-System seam, DEV_MODE-gated like /xp/reconcile: in production these read/
-write ops queues run behind the operator's own access control (documented in
-docs/incident-response.md); exposing them publicly would leak money-integrity
-state, so this build refuses outside DEV_MODE.
-
-Nothing here mutates balances - alerts are a queue over the ledger, the
-ledger stays authoritative.
+System seam with real access control (KL-11 closure): a configured operator
+credential (XP_OPS_OPERATOR_TOKEN) is required for every request in every
+environment, constant-time compared, grant and denial audited; without a
+configured credential the surfaces run only in DEV_MODE and refuse (503)
+anywhere else - a missing operator setup can never silently become public
+access. Nothing here mutates balances - alerts are a queue over the ledger,
+the ledger stays authoritative.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import func, select
 from xp_core.config import get_settings
 from xp_core.models.entities import ReconciliationAlert
@@ -25,17 +25,9 @@ from xp_core.schemas.api import (
     ReconciliationAlertsPageOut,
 )
 
-from app.deps import DbSession
+from app.deps import DbSession, require_operator
 
-router = APIRouter(prefix="/ops", tags=["ops"])
-
-
-def _require_dev() -> None:
-    if not get_settings().dev_mode:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="ops surfaces are operator-only; disabled outside DEV_MODE in this build",
-        )
+router = APIRouter(prefix="/ops", tags=["ops"], dependencies=[Depends(require_operator)])
 
 
 def _view(a: ReconciliationAlert) -> ReconciliationAlertOut:
@@ -81,7 +73,6 @@ async def list_alerts(
     limit: int = Query(default=100, ge=1, le=500),
 ) -> ReconciliationAlertsPageOut:
     """Operator queue of payment/ledger discrepancy alerts (phase 10)."""
-    _require_dev()
     base = select(ReconciliationAlert)
     if not include_resolved:
         base = base.where(ReconciliationAlert.status.in_(["open", "acknowledged"]))
@@ -105,7 +96,6 @@ async def list_alerts(
 @router.post("/reconciliation/alerts/{alert_id}/ack", response_model=AlertAckOut)
 async def ack_alert(alert_id: str, session: DbSession) -> AlertAckOut:
     """Acknowledge an alert: an operator has seen it (investigation started)."""
-    _require_dev()
     alert = (
         await session.execute(select(ReconciliationAlert).where(ReconciliationAlert.id == alert_id))
     ).scalar_one_or_none()
@@ -132,7 +122,6 @@ async def resolve_alert(
     mismatch that "disappears" is itself evidence) - this endpoint is the
     ONLY path to resolved for them.
     """
-    _require_dev()
     alert = (
         await session.execute(select(ReconciliationAlert).where(ReconciliationAlert.id == alert_id))
     ).scalar_one_or_none()
@@ -149,7 +138,6 @@ async def resolve_alert(
 @router.get("/observability", response_model=ObservabilityOut)
 async def observability(session: DbSession, request: Request) -> ObservabilityOut:
     """Ops summary: alert counts + policy echo. Counts only, never content."""
-    _require_dev()
     settings = get_settings()
     counts = await _counts(session)
     limiter = getattr(request.app.state, "rate_limiter", None)
