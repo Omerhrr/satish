@@ -3,7 +3,7 @@ VENV := .venv
 PY := $(VENV)/bin/python
 API_URL := sqlite+aiosqlite:////$(CURDIR)/data/xp-dev.db
 
-.PHONY: help install migrate run-api run-worker run-bot run-web test lint dsh-verify research-eval commerce-eval wallet-regtest lightning-drill backup-drill audit compose-up compose-down
+.PHONY: help install migrate run-api run-worker run-bot run-web test lint dsh-verify research-eval commerce-eval wallet-regtest lightning-drill backup-drill audit demo compose-up compose-down
 
 help:
 	@echo "install      - install python (uv) + node (bun) dependencies"
@@ -17,6 +17,7 @@ help:
 	@echo "lightning-drill - two-node lnd regtest drill (invoice/payment/recovery; needs healthy zmq)"
 	@echo "backup-drill - backup/restore roundtrip drill with ledger re-verification (phase 10)"
 	@echo "audit        - dependency + container audit gates (phase 10)"
+	@echo "demo         - reproducible end-to-end golden-path demo (phase 11)"
 	@echo "run-bot      - Telegram bot (needs XP_TELEGRAM_BOT_TOKEN)"
 	@echo "run-web      - Nuxt Mini App on :3000"
 	@echo "test / lint  - pytest / ruff"
@@ -68,6 +69,9 @@ backup-drill:
 
 audit:
 	$(PY) scripts/dependency_audit.py
+
+demo:
+	$(PY) scripts/demo_e2e.py
 
 compose-up:
 	docker compose -f infra/docker-compose.yml up -d

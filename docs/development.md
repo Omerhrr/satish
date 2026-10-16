@@ -20,6 +20,7 @@ make run-api      # http://127.0.0.1:8001
 make run-web      # http://127.0.0.1:3000
 make audit        # dependency + container audit gates (phase 10)
 make backup-drill # backup/restore roundtrip drill (phase 10)
+make demo         # reproducible end-to-end golden-path demo (phase 11)
 ```
 
 Local dev requires no production secrets: DEV_MODE issues a dev user session,
