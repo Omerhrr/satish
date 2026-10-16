@@ -12,6 +12,10 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 os.environ.setdefault("XP_DATABASE_URL", "sqlite+aiosqlite:///:memory:")
 os.environ.setdefault("XP_DEV_MODE", "true")
 os.environ.setdefault("XP_ARTIFACT_DIR", "./data/test-artifacts")
+# Rate-limit buckets live on the shared app singleton; disabled by default so
+# one test's requests cannot drain another's budget. test_phase10_ops.py
+# enables the limiter explicitly around its own cases.
+os.environ.setdefault("XP_RATE_LIMIT_ENABLED", "false")
 
 from xp_core.config import get_settings
 from xp_core.db import Base, set_session_factory

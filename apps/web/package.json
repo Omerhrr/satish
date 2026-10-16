@@ -11,8 +11,8 @@
     "typecheck": "nuxt typecheck"
   },
   "dependencies": {
-    "@xp/api-client": "*",
-    "@xp/shared-types": "*"
+    "@xp/api-client": "workspace:*",
+    "@xp/shared-types": "workspace:*"
   },
   "devDependencies": {
     "nuxt": "^4.2.2",

@@ -344,6 +344,40 @@ class ResearchSource(Base):
     __table_args__ = (UniqueConstraint("task_id", "url", name="uq_research_source_task_url"),)
 
 
+class ReconciliationAlert(Base):
+    """Operator-facing payment/ledger discrepancy alert (phase 10).
+
+    Written by xp_core.jobs.reconciliation when a sweep finds a mismatch.
+    One open alert per (kind, subject) — repeat sightings bump last_seen_at
+    instead of stacking duplicates, so the queue measures distinct problems,
+    not sweep frequency. Acknowledgement and resolution are explicit operator
+    actions; nothing here mutates balances (the ledger stays authoritative).
+    """
+
+    __tablename__ = "reconciliation_alerts"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    # balance_mismatch | settlement_1to1 | expired_pending
+    kind: Mapped[str] = mapped_column(String(48), index=True)
+    # critical (money-integrity) | warning (housekeeping)
+    severity: Mapped[str] = mapped_column(String(16), default="warning")
+    # user_id / intent_id / entry id the alert is about
+    subject: Mapped[str] = mapped_column(String(72), index=True)
+    expected: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    observed: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    detail: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    # open | acknowledged | resolved
+    status: Mapped[str] = mapped_column(String(24), default="open", index=True)
+    first_seen_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    resolved_note: Mapped[str | None] = mapped_column(String(280), nullable=True)
+    # Dedupe of live alerts is application-level (one open row per
+    # kind+subject); resolved rows deliberately remain as history, so no
+    # hard unique constraint across all statuses.
+
+
 class AuditEvent(Base):
     """Security and business event trail. Never store secrets in metadata."""
 
@@ -499,5 +533,6 @@ ALL_TABLES = [
     EmailDraft,
     AutomationRun,
     Notification,
+    ReconciliationAlert,
     AuditEvent,
 ]

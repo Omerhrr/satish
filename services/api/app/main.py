@@ -10,8 +10,15 @@ from collections.abc import Awaitable, Callable
 import structlog
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from xp_core.config import get_settings
 from xp_core.logging import request_id_var, setup_logging
+from xp_core.services.ratelimit import (
+    RateLimiter,
+    classify_path,
+    log_trip,
+    subject_for,
+)
 
 from app.api.v1.router import api_router
 
@@ -57,6 +64,46 @@ def create_app() -> FastAPI:
         request_id_var.set(rid)
         response = await call_next(request)
         response.headers[settings.request_id_header] = rid
+        return response
+
+    # -- abuse controls (phase 10): token buckets per route class -------------
+    limiter = RateLimiter(
+        bucket_ttl_seconds=settings.rate_limit_bucket_ttl_seconds,
+        max_buckets=settings.rate_limit_max_buckets,
+    )
+    app.state.rate_limiter = limiter
+
+    @app.middleware("http")
+    async def rate_limit(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        if not settings.rate_limit_enabled:
+            return await call_next(request)
+        route_class = classify_path(request.method, request.url.path)
+        if not route_class:
+            return await call_next(request)  # monitoring surfaces, unlimited
+        bearer = request.headers.get("authorization", "")
+        bearer = bearer[7:] if bearer.lower().startswith("bearer ") else None
+        client_ip = request.client.host if request.client else "unknown"
+        result = limiter.check(route_class, subject_for(client_ip, bearer))
+        if not result.allowed:
+            log_trip(route_class, subject_for(client_ip, bearer), request.url.path,
+                     result.retry_after_seconds)
+            return JSONResponse(
+                status_code=429,
+                content={
+                    "detail": "rate limit exceeded for this surface; retry later",
+                    "route_class": result.route_class,
+                },
+                headers={
+                    "Retry-After": str(result.retry_after_seconds),
+                    "X-RateLimit-Limit": str(result.limit),
+                    "X-RateLimit-Remaining": "0",
+                },
+            )
+        response = await call_next(request)
+        response.headers["X-RateLimit-Limit"] = str(result.limit)
+        response.headers["X-RateLimit-Remaining"] = str(result.remaining)
         return response
 
     @app.get("/healthz", tags=["health"])

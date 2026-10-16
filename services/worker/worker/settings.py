@@ -11,6 +11,7 @@ from worker.jobs.agent import run_agent_task_job
 from worker.jobs.automation import run_scheduled_jobs_job
 from worker.jobs.pdf import generate_pdf_report
 from worker.jobs.receipt import generate_receipt_pdf
+from worker.jobs.retention import run_retention_sweep_job
 
 
 async def startup(ctx: dict[str, Any]) -> None:
@@ -58,6 +59,8 @@ def _build_cron_jobs() -> tuple:
             minute=set(range(0, 60, sweep_minutes)) if sweep_minutes < 60 else None,
             run_at_startup=True,
         ),
+        # Retention sweep (phase 10): privacy windows, daily at 03:17 UTC.
+        cron(run_retention_sweep_job, minute=17, hour=3, run_at_startup=False),
     )
 
 
@@ -69,6 +72,7 @@ class WorkerSettings:
         generate_receipt_pdf,
         run_agent_task_job,
         run_scheduled_jobs_job,
+        run_retention_sweep_job,
     )
     cron_jobs = _build_cron_jobs()
     on_startup = startup

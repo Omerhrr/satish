@@ -75,10 +75,27 @@
     </section>
 
     <section class="card">
+      <h2>Custody, data &amp; retention (phase 10)</h2>
+      <p class="small dim">
+        <strong>Custody:</strong> you hold your keys — wallets are
+        self-custodial, the server stores public descriptors only, and the
+        agent can never sign or ask for seeds. <strong>Your XP ledger is
+        append-only</strong> and is never auto-deleted; the same applies to
+        payment records, task evidence, and the audit trail.
+        <strong>What does expire:</strong> revoked/expired login sessions
+        (7 days), read notifications (30 days; unread 90), finished
+        automation runs (180 days), sent email drafts (30 days). Deliverables
+        (PDFs, research artifacts) are kept until you delete them. Full
+        policy: privacy &amp; retention docs; known limitations are published
+        in the project's limitations register.
+      </p>
+    </section>
+
+    <section class="card">
       <h2>Environment</h2>
       <p class="small dim">
-        Current build: phase 2 hardening · DEV_MODE grants are enabled · no
-        production secrets exist in this environment.
+        Current build: phase 10 operational readiness · DEV_MODE grants are
+        enabled · no production secrets exist in this environment.
       </p>
     </section>
   </div>

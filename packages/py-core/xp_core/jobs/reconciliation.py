@@ -25,8 +25,15 @@ from typing import Any
 
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
+from xp_core.db import utcnow
 from xp_core.logging import get_logger
-from xp_core.models.entities import AuditEvent, PaymentIntent, XpAccount, XpLedgerEntry
+from xp_core.models.entities import (
+    AuditEvent,
+    PaymentIntent,
+    ReconciliationAlert,
+    XpAccount,
+    XpLedgerEntry,
+)
 
 log = get_logger(__name__)
 
@@ -169,6 +176,8 @@ async def reconcile_all(session: AsyncSession) -> dict[str, Any]:
             )
         )
     ).scalars().all()
+    expired_subjects: set[str] = set()
+    expired_details: list[dict[str, Any]] = []
     for intent in pending:
         expires = intent.expires_at
         if expires is None:
@@ -177,6 +186,98 @@ async def reconcile_all(session: AsyncSession) -> dict[str, Any]:
             expires = expires.astimezone(UTC).replace(tzinfo=None)
         if now.replace(tzinfo=None) >= expires:
             report["expired_pending_flagged"] += 1
+            expired_subjects.add(intent.id)
+            expired_details.append(
+                {
+                    "kind": "expired_pending",
+                    "payment_intent_id": intent.id,
+                    "user_id": intent.user_id,
+                    "expires_at": intent.expires_at.isoformat() if intent.expires_at else None,
+                    "expected": "settled or expired before sweep",
+                    "observed": "pending past expiry",
+                }
+            )
+
+    # -- alert persistence (phase 10: payment reconciliation alerts) ----------
+    # Every discrepancy becomes/updates an operator-facing alert row.
+    #   critical kinds  -> money integrity; NEVER auto-resolved (a mismatch
+    #                      that "goes away" is itself evidence worth keeping).
+    #   warning kinds   -> housekeeping; auto-resolve when the underlying
+    #                      condition stops being observed.
+    # Dedupe: one live (open|acknowledged) alert per (kind, subject); repeat
+    # sightings bump last_seen_at and refresh the detail instead of stacking.
+    CRITICAL_KINDS = {
+        "balance_mismatch",
+        "missing_account_row",
+        "settled_intent_without_purchase_entry",
+        "purchase_credited_more_than_once",
+        "purchase_entry_without_settled_intent",
+    }
+
+    def _subject(d: dict[str, Any]) -> str:
+        return str(
+            d.get("user_id")
+            or d.get("payment_intent_id")
+            or d.get("ledger_entry_id")
+            or "unknown"
+        )
+
+    live = (
+        await session.execute(
+            select(ReconciliationAlert).where(
+                ReconciliationAlert.status.in_(["open", "acknowledged"])
+            )
+        )
+    ).scalars().all()
+    live_index = {(a.kind, a.subject): a for a in live}
+
+    opened = updated = 0
+    for d in [*discrepancies, *expired_details]:
+        kind = d["kind"]
+        subject = _subject(d)
+        severity = "critical" if kind in CRITICAL_KINDS else "warning"
+        # Ledger is authoritative: expected = what entries sum to,
+        # observed = what the account row claims.
+        expected = d.get("expected") or (
+            str(d["sum_entries"])
+            if kind == "balance_mismatch" and "sum_entries" in d
+            else None
+        )
+        observed = d.get("observed") or (
+            str(d["balance"]) if kind == "balance_mismatch" and "balance" in d else None
+        )
+        existing = live_index.get((kind, subject))
+        if existing is not None:
+            existing.last_seen_at = utcnow()
+            existing.expected = expected
+            existing.observed = observed
+            existing.detail = d
+            updated += 1
+        else:
+            session.add(
+                ReconciliationAlert(
+                    kind=kind,
+                    severity=severity,
+                    subject=subject,
+                    expected=expected,
+                    observed=observed,
+                    detail=d,
+                    status="open",
+                )
+            )
+            opened += 1
+
+    # Housekeeping warnings auto-resolve when no longer observed; critical
+    # alerts stay live until an operator resolves them explicitly.
+    auto_resolved = 0
+    for a in live:
+        if a.status == "resolved":
+            continue
+        if a.kind == "expired_pending" and a.subject not in expired_subjects:
+            a.status = "resolved"
+            a.resolved_at = utcnow()
+            a.resolved_note = "auto-resolved: pending intent no longer expired at sweep time"
+            auto_resolved += 1
 
     if discrepancies:
         report["ok"] = False
@@ -190,13 +291,19 @@ async def reconcile_all(session: AsyncSession) -> dict[str, Any]:
                     metadata_redacted={"kind": d["kind"], "detail": d},
                 )
             )
-        await session.flush()
+    report["alerts_opened"] = opened
+    report["alerts_updated"] = updated
+    report["alerts_auto_resolved"] = auto_resolved
+    await session.flush()
     await session.commit()
     log.info(
         "xp_reconciliation_complete",
         ok=report["ok"],
         users=report["checked_users"],
         discrepancies=len(discrepancies),
+        alerts_opened=opened,
+        alerts_updated=updated,
+        alerts_auto_resolved=auto_resolved,
     )
     return report
 

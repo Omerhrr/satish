@@ -407,3 +407,46 @@ class NotificationOut(BaseModel):
     run_id: str | None
     read_at: datetime | None
     created_at: datetime
+
+
+# -- ops (phase 10: reconciliation alerts, observability) ----------------------
+
+
+class ReconciliationAlertOut(BaseModel):
+    id: str
+    kind: str
+    severity: str
+    subject: str
+    expected: str | None
+    observed: str | None
+    detail: dict[str, Any] | None
+    status: str
+    first_seen_at: datetime
+    last_seen_at: datetime
+    acknowledged_at: datetime | None
+    resolved_at: datetime | None
+    resolved_note: str | None
+
+
+class ReconciliationAlertsPageOut(BaseModel):
+    alerts: list[ReconciliationAlertOut]
+    open_critical: int
+    open_warning: int
+
+
+class AlertAckOut(BaseModel):
+    id: str
+    status: str
+    acknowledged_at: datetime | None
+
+
+class ObservabilityOut(BaseModel):
+    """Ops-facing system summary (phase 10). Counts, never row content."""
+
+    env: str
+    reconcile_interval_seconds: int
+    alerts_open_critical: int
+    alerts_open_warning: int
+    alerts_resolved_total: int
+    rate_limit_enabled: bool
+    retention_policy: dict[str, int]

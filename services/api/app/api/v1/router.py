@@ -13,6 +13,7 @@ from app.api.v1 import (
     health,
     lightning,
     notifications,
+    ops,
     tasks,
     wallets,
     xp,
@@ -30,3 +31,4 @@ api_router.include_router(connections.router)
 api_router.include_router(drafts.router)
 api_router.include_router(automation.router)
 api_router.include_router(notifications.router)
+api_router.include_router(ops.router)

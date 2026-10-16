@@ -54,3 +54,36 @@ deliverables), DSH upstream revision pinning.
 - Lightning: channel-state backup + recovery documented before public beta;
   never claim a seed phrase alone restores channels.
 - No mainnet until every gate above passes independent review.
+
+## Phase-10 threat-model review (2026-10-16)
+
+A structured re-review of every trust boundary after phases 7-9 added
+research fetching, commerce scoring, external connections, email sending,
+and an automation scheduler. Each new surface was reviewed against the
+original STRIDE-per-boundary table; verdicts and deltas below. This review
+is INTERNAL — see docs/security-review.md for the honest status of
+independent review.
+
+### New surfaces reviewed
+
+| Surface | Threats considered | Verdict / delta |
+| --- | --- | --- |
+| Research fetch (phase 7) | SSRF via redirects, private-IP probing, oversized responses, non-HTML smuggling | Existing FetchPolicy wall re-verified: scheme allowlist, port 80/443 only, per-hop + per-resolved-IP checks, size/content-type caps. No change. |
+| Commerce scoring (phase 8) | Manipulated verdicts via operator weights; untrusted listings presented as facts | Weights are operator-config and echoed in every verdict; defects fall back WITH disclosure; listing prices are typed estimates everywhere. No change. |
+| Credential vault (phase 9) | Vault key disclosure, decryption-path proliferation | Single decryption path re-verified; revocation hard-deletes; dev fallback key is disclosed on every response and refused outside dev. No change. |
+| Email send (phase 9) | Auto-retry fabricating delivery; resend of sent drafts; approval bypass | Outcome taxonomy (sent/refused/unknown) is final; sent drafts are terminal; send executes only post-approval with matching content digest. No change. |
+| Automation scheduler (phase 9) | Budget overrun, failure loops, crash-recovery double-run | Per-run cap enforced by the ledger itself; consecutive-failure ladder auto-pauses; stale-run recovery marks rather than repeats. No change. |
+| **API abuse (NEW, phase 10)** | Credential stuffing, scraping, cost-forcing via agent/money endpoints | **Mitigated**: token-bucket rate limiting per route class (auth 10/min, money 60/min, agent 30/min, reads 300/min) with 429 + Retry-After; subject = client IP + bearer fingerprint (no DB hit). In-memory buckets are per-process: multi-worker production must move to the Redis backend (KL-09). Monitoring surfaces deliberately unlimited. |
+| **Payment integrity ops (NEW)** | Silent drift between balance row and ledger; double-credited settlements discovered late | **Mitigated**: every reconciliation discrepancy now opens a persisted, deduplicated ReconciliationAlert (critical kinds never auto-resolve); operators ack/resolve via /ops with an audit trail. |
+| **Data retention (NEW)** | Indefinite PII/session/draft accumulation (privacy breach blast radius) | **Mitigated**: retention sweep deletes expired sessions, read/unread notifications past windows, finished automation runs, terminal email drafts. Ledger, task_events, audit_events, artifacts are structurally never swept (money + evidence trails). |
+| **Restore integrity (NEW)** | Backup that cannot actually restore; silent corruption | **Mitigated**: `make backup-drill` proves a full logical roundtrip with ledger re-reconciliation, 1:1 settlement check, and artifact digest verification on the restored copy. |
+
+### Residual risks accepted for phase 10 (tracked in docs/known-limitations.md)
+
+- Rate limiting is per-process in-memory; a multi-worker deployment without
+  the Redis backend under-limits by a factor of worker count (KL-09).
+- The subject fingerprint uses the presented (unvalidated) bearer; a client
+  rotating fake bearers gets fresh buckets at the same cost as IP rotation
+  behind proxies (KL-09).
+- The backup drill exercises the logical roundtrip on SQLite; Postgres
+  pg_dump/pg_restore + SCB recovery need a live operator host (KL-04/KL-05).

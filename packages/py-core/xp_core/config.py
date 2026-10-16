@@ -169,6 +169,25 @@ class Settings(BaseSettings):
     pdf_storage_dir: str = "./data/artifacts"
     reconcile_interval_seconds: int = 3600  # billing_flow #8
 
+    # -- abuse controls (phase 10) ------------------------------------------------
+    # In-memory token buckets per (route class, subject); limits are code-pinned
+    # in xp_core.services.ratelimit.RULES (auth tightest, money tight, reads
+    # loose). Kill switch for operators; the Redis-backed multi-process backend
+    # is the documented upgrade path (docs/security-review.md).
+    rate_limit_enabled: bool = True
+    rate_limit_bucket_ttl_seconds: int = 3600  # idle bucket eviction
+    rate_limit_max_buckets: int = 10_000
+
+    # -- privacy / retention (phase 10) --------------------------------------------
+    # Days after which the retention sweep deletes expired data classes.
+    # Money-trail and audit surfaces are never swept (see
+    # xp_core/jobs/retention.py PRESERVED_SURFACES and docs/privacy-retention.md).
+    retention_sessions_days: int = 7
+    retention_notifications_read_days: int = 30
+    retention_notifications_unread_days: int = 90
+    retention_automation_runs_days: int = 180
+    retention_email_drafts_sent_days: int = 30
+
     @property
     def is_sqlite(self) -> bool:
         return self.database_url.startswith("sqlite")

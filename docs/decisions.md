@@ -408,3 +408,50 @@ fabricate delivery). Live SMTP delivery needs a real server + an operator
 master key; everything else is fully testable offline. The automation sweep
 runs in the worker cron (arq) and inline in dev; one broken job never kills
 a sweep (per-job error isolation with logged outcomes).
+
+## D17 — Operations readiness: alerts as a first-class table, code-pinned rate classes, drills as committed code (2026-10-16, phase 10)
+
+**Context:** phase 10 demands abuse controls, payment reconciliation
+alerts, backup/restore drills, retention policy, and observability. The
+economy already had a read-only reconciliation sweep that audited
+discrepancies into the audit log.
+
+**Decision:**
+- *Reconciliation alerts* become the 23rd table
+  (`reconciliation_alerts`) with an operator lifecycle (open →
+  acknowledged → resolved). Dedupe is application-level (one live row per
+  kind+subject; repeats bump `last_seen_at`), because resolved history
+  must survive for forensics. Critical (money-integrity) kinds are never
+  auto-resolved — a mismatch that stops being observable is evidence, not
+  resolution. Only housekeeping warnings (expired-pending) auto-resolve.
+- *Rate limiting* is an in-process token bucket over five code-pinned
+  route classes (auth/money/agent/read/write), keyed by client IP + bearer
+  fingerprint without a DB hit; monitoring surfaces are structurally
+  exempt; `XP_RATE_LIMIT_ENABLED` is the kill switch. The Redis backend
+  (same interface) is the documented multi-worker upgrade path, not a
+  phase-10 dependency.
+- *Retention* is one deterministic sweep with per-window settings and a
+  structural PRESERVED_SURFACES list — the money trail and evidence trails
+  (ledger, intents, task_events, audit_events) cannot be swept even by
+  misconfiguration.
+- *Drills and audits are committed code* (`scripts/backup_drill.py`,
+  `scripts/dependency_audit.py`, make targets), not wiki instructions: the
+  drill re-runs reconciliation on the restored copy, and the audit gate
+  fails the build on unpinnable dependencies/images while honestly
+  disclosing that live CVE scanners are not bundled.
+- *Ops surfaces* (`/ops/*`) are DEV_MODE-gated system seams, consistent
+  with `/xp/reconcile`; production requires real operator access control
+  first (KL-11).
+
+**Alternatives rejected:** auto-resolving critical alerts (hides
+intermittent corruption); per-endpoint rate-limit decorators (scattered,
+easy to forget on new endpoints); retention by hard-coded days (operators
+lose privacy-tuning ability); a wiki runbook for backup/restore (drifts
+from code, unverifiable).
+
+**Consequences:** operators can now *detect, queue, and acknowledge*
+payment discrepancies rather than grep logs; abuse has a ceiling per
+surface; restoring a backup is a verified procedure, not a hope. The full
+honest gap list (multi-process rate limits, Postgres/SCB restore
+rehearsal, operator identity for /ops) lives in
+docs/known-limitations.md KL-04/KL-05/KL-09/KL-11.

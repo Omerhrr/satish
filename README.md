@@ -116,3 +116,25 @@ self-custody must be real and testable; Telegram is an interface, not a key
 vault; the AI agent never receives seed phrases or unrestricted signing
 authority; Bitcoin and XP are separate ledgers; every financial transition is
 auditable and idempotent.
+
+## Operations (phase 10)
+
+```bash
+make audit          # dependency + container inventory, hard-pin gates
+make backup-drill   # backup/restore roundtrip with ledger re-verification
+make test           # full suite incl. rate-limit/alert/retention/drill tests
+```
+
+- **Reconciliation alerts**: every settlement-integrity or balance drift
+  finding opens a persisted, deduplicated alert — operator queue at
+  `GET /api/v1/ops/reconciliation/alerts` (DEV_MODE-gated), ack/resolve
+  lifecycle included; critical alerts never auto-resolve.
+- **Abuse controls**: route-class token buckets (auth 10/min, money 60/min,
+  agent 30/min, reads 300/min) with 429 + `Retry-After`; kill switch
+  `XP_RATE_LIMIT_ENABLED=false`.
+- **Privacy/retention**: `docs/privacy-retention.md`; the daily worker
+  sweep deletes only within documented windows and can never touch the
+  ledger, payment intents, task events, or audit trail.
+- **Honest ops register**: `docs/known-limitations.md` (KL-01…KL-15) and
+  the internal-but-not-independent `docs/security-review.md`; incident
+  runbooks in `docs/incident-response.md` (R1–R6).

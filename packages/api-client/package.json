@@ -9,6 +9,6 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@xp/shared-types": "*"
+    "@xp/shared-types": "workspace:*"
   }
 }
