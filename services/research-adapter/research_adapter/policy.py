@@ -48,7 +48,7 @@ class FetchPolicy:
     allowed_content_prefixes: tuple[str, ...] = DOCUMENT_CONTENT_PREFIXES
 
     def check_url(self, url: str) -> PermissionVerdict:
-        """Syntactic checks — no network, no DNS. Cheap and always first."""
+        """Syntactic checks - no network, no DNS. Cheap and always first."""
         try:
             parsed = urlparse(url)
         except ValueError as exc:
@@ -79,7 +79,7 @@ class FetchPolicy:
     def check_resolved(self, host: str, addresses: list[str]) -> PermissionVerdict:
         """DNS-layer check: EVERY address the host resolves to must be global.
 
-        One private address is enough to deny — this is what makes rebinding
+        One private address is enough to deny - this is what makes rebinding
         a non-starter (an attacker cannot smuggle a private target past a
         public first answer).
         """

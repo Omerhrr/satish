@@ -1,4 +1,4 @@
-"""Telegram command router — all 14 commands from user_experiences.
+"""Telegram command router - all 14 commands from user_experiences.
 
 Run: python -m bot.main
 Requires XP_TELEGRAM_BOT_TOKEN; every security-sensitive command deep-links
@@ -25,7 +25,7 @@ log = get_logger(__name__)
 router = Router(name="commands")
 
 SECURITY_NOTE = (
-    "⚠️ I will never ask for your seed phrase or private keys — "
+    "⚠️ I will never ask for your seed phrase or private keys - "
     "anyone who does is trying to steal your bitcoin."
 )
 
@@ -56,7 +56,7 @@ async def _api_get(path: str) -> dict | None:
 async def cmd_start(message: Message) -> None:
     settings = get_settings()
     await message.answer(
-        "Welcome to <b>XP</b> — your Bitcoin-native AI workforce.\n\n"
+        "Welcome to <b>XP</b> - your Bitcoin-native AI workforce.\n\n"
         "Self-custody first: your keys, your bitcoin. "
         "I help you run research, commerce intelligence, vehicle comparisons, "
         "document jobs, and email/automation workflows paid in sats via XP "
@@ -72,19 +72,19 @@ async def cmd_start(message: Message) -> None:
 async def cmd_help(message: Message) -> None:
     await message.answer(
         "<b>Commands</b>\n"
-        "/wallet — wallet overview (Mini App)\n"
-        "/receive — receive bitcoin\n"
-        "/send — send bitcoin (Mini App confirmation)\n"
-        "/addresses — address book\n"
-        "/history — transaction history\n"
-        "/balance — on-chain balance\n"
-        "/xp — XP balance and usage receipts\n"
-        "/fund — buy XP credits with sats\n"
-        "/research — start a research task\n"
-        "/tasks — running and past tasks\n"
-        "/automations — scheduled jobs (Mini App: runs, budgets, notifications)\n"
-        "/connections — linked email service (Mini App)\n"
-        "/settings — security and recovery\n\n"
+        "/wallet - wallet overview (Mini App)\n"
+        "/receive - receive bitcoin\n"
+        "/send - send bitcoin (Mini App confirmation)\n"
+        "/addresses - address book\n"
+        "/history - transaction history\n"
+        "/balance - on-chain balance\n"
+        "/xp - XP balance and usage receipts\n"
+        "/fund - buy XP credits with sats\n"
+        "/research - start a research task\n"
+        "/tasks - running and past tasks\n"
+        "/automations - scheduled jobs (Mini App: runs, budgets, notifications)\n"
+        "/connections - linked email service (Mini App)\n"
+        "/settings - security and recovery\n\n"
         f"{SECURITY_NOTE}",
         parse_mode=ParseMode.HTML,
     )
@@ -102,10 +102,10 @@ async def cmd_to_mini_app(message: Message) -> None:
 async def cmd_balance(message: Message) -> None:
     data = await _api_get("/health")
     if data is None:
-        await message.answer("API is unreachable right now — try again shortly.")
+        await message.answer("API is unreachable right now - try again shortly.")
         return
     await message.answer(
-        "Balances live in the Mini App wallet view — on-chain (phase 3) and "
+        "Balances live in the Mini App wallet view - on-chain (phase 3) and "
         "Lightning invoices/payments (phase 4) are wired end-to-end there.",
         reply_markup=mini_app_keyboard(get_settings()),
     )
@@ -115,12 +115,12 @@ async def cmd_balance(message: Message) -> None:
 async def cmd_xp(message: Message) -> None:
     data = await _api_get("/xp/balance")
     if data is None:
-        await message.answer("XP service is unreachable — try again shortly.")
+        await message.answer("XP service is unreachable - try again shortly.")
         return
     await message.answer(
         f"⚡ XP balance: <b>{data['balance_xp']:,} XP</b>\n"
         f"Rate: 1 sat = {data['xp_per_sat']} XP\n\n"
-        "XP is an internal usage credit — not Bitcoin, not a token.",
+        "XP is an internal usage credit - not Bitcoin, not a token.",
         parse_mode=ParseMode.HTML,
         reply_markup=mini_app_keyboard(get_settings()),
     )
@@ -131,7 +131,7 @@ async def cmd_fund(message: Message) -> None:
     await message.answer(
         "XP purchases flow through the Mini App: choose a pack, review the "
         "sats cost, pay from your wallet, and the credit lands once payment "
-        "settles — credited exactly once.",
+        "settles - credited exactly once.",
         reply_markup=mini_app_keyboard(get_settings()),
     )
 
@@ -139,7 +139,7 @@ async def cmd_fund(message: Message) -> None:
 @router.message(Command("research"))
 async def cmd_research(message: Message) -> None:
     await message.answer(
-        "Describe your objective and constraints in the Mini App task form — "
+        "Describe your objective and constraints in the Mini App task form - "
         "product sourcing, supplier comparison, vehicle auction research, or "
         "general research. The agent proposes a plan with an XP estimate; you "
         "approve the budget before anything runs.",
@@ -166,7 +166,7 @@ async def cmd_automations(message: Message) -> None:
 
 @router.message(F.text.startswith("/"))
 async def unknown_command(message: Message) -> None:
-    await message.answer("Unknown command — try /help.")
+    await message.answer("Unknown command - try /help.")
 
 
 async def main() -> None:

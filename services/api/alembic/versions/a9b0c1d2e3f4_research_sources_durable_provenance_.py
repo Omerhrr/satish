@@ -1,4 +1,4 @@
-"""research_sources — durable provenance for research tasks (phase 7)
+"""research_sources - durable provenance for research tasks (phase 7)
 
 Revision ID: a9b0c1d2e3f4
 Revises: e5f6a7b8c9d0

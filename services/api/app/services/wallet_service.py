@@ -5,7 +5,7 @@ signing wallet only during unlock TTL). This layer owns:
 - provider construction from settings (lazy, single instance),
 - the user-facing Wallet/WalletAddress/WalletTransaction rows,
 - ownership enforcement (every wallet_id access is checked against user_id),
-- alias resolution for the address book (aliases are labels ONLY — the
+- alias resolution for the address book (aliases are labels ONLY - the
   authorization digest binds the resolved address, so re-labeling can never
   redirect a signed transaction).
 """

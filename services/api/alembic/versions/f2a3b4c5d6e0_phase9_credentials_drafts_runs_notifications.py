@@ -18,7 +18,7 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    # -- scheduled_jobs: budget totals + failure bookkeeping (phase 9) --------
+    # scheduled_jobs: budget totals + failure bookkeeping (phase 9)
     op.add_column(
         "scheduled_jobs", sa.Column("budget_total_xp", sa.Integer(), nullable=True)
     )
@@ -41,7 +41,7 @@ def upgrade() -> None:
         "scheduled_jobs", sa.Column("auto_paused_reason", sa.String(length=128), nullable=True)
     )
 
-    # -- service_credentials: encrypted-at-rest credential per connection -----
+    # service_credentials: encrypted-at-rest credential per connection
     op.create_table(
         "service_credentials",
         sa.Column("id", sa.String(length=36), nullable=False),
@@ -62,7 +62,7 @@ def upgrade() -> None:
         "ix_service_credentials_connection_id", "service_credentials", ["connection_id"]
     )
 
-    # -- email_drafts: preview-before-send email flow --------------------------
+    # email_drafts: preview-before-send email flow
     op.create_table(
         "email_drafts",
         sa.Column("id", sa.String(length=36), nullable=False),
@@ -97,7 +97,7 @@ def upgrade() -> None:
     op.create_index("ix_email_drafts_task_id", "email_drafts", ["task_id"])
     op.create_index("ix_email_drafts_digest", "email_drafts", ["digest"])
 
-    # -- automation_runs: one row per execution attempt ------------------------
+    # automation_runs: one row per execution attempt
     op.create_table(
         "automation_runs",
         sa.Column("id", sa.String(length=36), nullable=False),
@@ -133,7 +133,7 @@ def upgrade() -> None:
     op.create_index("ix_automation_runs_user_id", "automation_runs", ["user_id"])
     op.create_index("ix_automation_runs_task_id", "automation_runs", ["task_id"])
 
-    # -- notifications: condition-based, persisted, API-readable ---------------
+    # notifications: condition-based, persisted, API-readable
     op.create_table(
         "notifications",
         sa.Column("id", sa.String(length=36), nullable=False),

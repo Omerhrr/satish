@@ -3,7 +3,7 @@
 Purpose (decision D11): make every invoice/payment lifecycle, idempotency
 and acceptance criterion testable offline while the real node drill is
 blocked by a sandbox defect. This provider is DISCLOSED AS CANNED wherever
-it is surfaced (``/lightning/capabilities`` states it verbatim) — it never
+it is surfaced (``/lightning/capabilities`` states it verbatim) - it never
 pretends a real node exists.
 
 Semantics mirrored from lnd v0.21.4-beta:
@@ -54,15 +54,15 @@ class PreimageMismatch(LightningProviderError):
 
 
 class PaymentRejected(LightningProviderError):
-    """Definite failure — the payment will never succeed."""
+    """Definite failure - the payment will never succeed."""
 
 
 class NodeUnavailable(LightningProviderError):
-    """Node outage — the outcome of the operation is UNKNOWN."""
+    """Node outage - the outcome of the operation is UNKNOWN."""
 
 
 class PaymentUncertain(LightningProviderError):
-    """Submitted but no terminal outcome observed — do not silently retry."""
+    """Submitted but no terminal outcome observed - do not silently retry."""
 
 
 class AuthorizationMismatch(LightningProviderError):
@@ -135,7 +135,7 @@ class _PaymentRecord:
 
 
 def _canned_bolt11(payment_hash: str, amount_msat: int, expiry: int) -> str:
-    """Deterministic canned encoding — NOT a routed invoice.
+    """Deterministic canned encoding - NOT a routed invoice.
 
     Disclosed as canned everywhere; the shape (prefix, amount, hash suffix)
     mirrors what the Mini App parses for display.
@@ -186,7 +186,7 @@ class CannedLightningProvider:
         ]
         self._scb_channels: list[dict] = []
 
-    # -- receive ---------------------------------------------------------------
+    # receive
 
     async def create_invoice(
         self, *, amount_msat: int, description: str, expiry_seconds: int
@@ -258,7 +258,7 @@ class CannedLightningProvider:
             record.status = next_invoice_state(record.status, "expired")
         return record.status
 
-    # -- send ------------------------------------------------------------------
+    # send
 
     def _estimate_fee_msat(self, amount_msat: int) -> int:
         return self.base_fee_msat + (amount_msat * self.fee_ppm) // 1_000_000
@@ -372,7 +372,7 @@ class CannedLightningProvider:
             preimage=rec.preimage,
         )
 
-    # -- node surface ------------------------------------------------------------
+    # node surface
 
     async def health(self) -> dict:
         return {
@@ -397,7 +397,7 @@ class CannedLightningProvider:
             for c in self._channels
         ]
 
-    # -- recovery (SCB) ----------------------------------------------------------
+    # recovery (SCB)
 
     async def export_scb(self) -> tuple[bytes, str]:
         """Export a Static Channel Backup blob + its checksum."""
@@ -410,7 +410,7 @@ class CannedLightningProvider:
     async def restore_scb(self, blob: bytes, checksum: str) -> int:
         """Restore from an SCB blob; validates the checksum before applying."""
         if not hmac.compare_digest(hashlib.sha256(blob).hexdigest(), checksum):
-            raise LightningProviderError("SCB checksum mismatch — blob corrupted")
+            raise LightningProviderError("SCB checksum mismatch - blob corrupted")
         if not blob.startswith(SCB_MAGIC):
             raise LightningProviderError("not an XP SCB blob")
         data = json.loads(blob[len(SCB_MAGIC):].decode())

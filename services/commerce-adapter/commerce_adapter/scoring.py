@@ -7,14 +7,14 @@ Design contract:
   retrieval record (how many permitted sources carry the product, how far
   their asking prices spread, how fresh they are, how complete the
   attributes are). There is NO demand factor, NO ad-performance factor, and
-  NO availability factor — the platform cannot measure those from snapshot
+  NO availability factor - the platform cannot measure those from snapshot
   pages, and inventing them is the exact failure acceptance #3 forbids.
 - VISIBLE. Every output carries the factor table: raw signal, normalized
   value, weight, inclusion decision and reason. The weight configuration is
   echoed verbatim into the output and the report.
 - CONFIGURABLE. Weights come from settings (operator-controlled JSON);
   unknown factor names are refused, and an unparseable configuration falls
-  back to the documented defaults WITH a disclosure — never silently.
+  back to the documented defaults WITH a disclosure - never silently.
 - DETERMINISTIC. Same records + same config -> same score, always.
 
 Normalization maps each raw signal to 0..1 with a documented formula; the
@@ -34,7 +34,7 @@ from research_adapter.provenance import Fact, SourceRecord
 from commerce_adapter.classify import AVAILABILITY_KEYS, PERFORMANCE_KEYS
 from commerce_adapter.freshness import FRESHNESS_SCORE, freshness_label
 
-# Documented defaults — also the fallback when the configured JSON is invalid.
+# Documented defaults - also the fallback when the configured JSON is invalid.
 DEFAULT_FACTORS: dict[str, float] = {
     "distinct_sources": 2.0,
     "supplier_count": 1.5,
@@ -59,8 +59,8 @@ NO_DEMAND_DISCLOSURE = (
 def parse_scoring_config(raw: str | None) -> tuple[dict[str, float], bool, str]:
     """Parse the configured weights JSON.
 
-    Returns (factors, used_defaults, note). ANY defect — unparseable JSON,
-    non-object shape, unknown factor names, bad weight types — falls back to
+    Returns (factors, used_defaults, note). ANY defect - unparseable JSON,
+    non-object shape, unknown factor names, bad weight types - falls back to
     the documented defaults (or the last-known-good subset) and surfaces a
     note that callers MUST carry into the score output. A broken operator
     configuration degrades to the documented behavior LOUDLY; it never
@@ -195,7 +195,7 @@ def _factor_verdicts(
     verdicts: list[FactorVerdict] = []
     disclosures: list[str] = []
 
-    # -- distinct_sources ----------------------------------------------------
+    # distinct_sources
     w = weights.get("distinct_sources")
     if w is not None:
         count = len(sources)
@@ -211,7 +211,7 @@ def _factor_verdicts(
             )
         )
 
-    # -- supplier_count --------------------------------------------------------
+    # supplier_count
     w = weights.get("supplier_count")
     if w is not None:
         count = sum(
@@ -229,7 +229,7 @@ def _factor_verdicts(
             )
         )
 
-    # -- price_spread ----------------------------------------------------------
+    # price_spread
     w = weights.get("price_spread")
     if w is not None:
         prices: list[float] = []
@@ -287,7 +287,7 @@ def _factor_verdicts(
         if verdict is not None:
             verdicts.append(verdict)
 
-    # -- freshness ---------------------------------------------------------------
+    # freshness
     w = weights.get("freshness")
     if w is not None:
         if not sources:
@@ -314,7 +314,7 @@ def _factor_verdicts(
                 )
             )
 
-    # -- attribute_completeness ----------------------------------------------------
+    # attribute_completeness
     w = weights.get("attribute_completeness")
     if w is not None:
         if not required_keys:

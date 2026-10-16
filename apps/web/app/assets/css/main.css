@@ -1,4 +1,4 @@
-/* XP Mini App design system — dark, bitcoin-orange, mobile-first. */
+/* XP Mini App design system - dark, bitcoin-orange, mobile-first. */
 
 :root {
   --bg: #0b0e11;
@@ -46,7 +46,7 @@ a {
   text-decoration: none;
 }
 
-/* -- layout -------------------------------------------------------------- */
+/* layout */
 .page-wrap {
   min-height: 100vh;
   display: flex;
@@ -146,7 +146,7 @@ main.page {
   background: var(--bg);
 }
 
-/* -- primitives ------------------------------------------------------------ */
+/* primitives */
 .card {
   background: var(--bg-elev);
   border: 1px solid var(--border);
@@ -212,7 +212,7 @@ main.page {
 .dot.not_configured { background: var(--orange); box-shadow: 0 0 8px rgba(247,147,26,.5); }
 .dot.error { background: var(--red); }
 
-/* -- buttons ---------------------------------------------------------------- */
+/* buttons */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -262,7 +262,7 @@ main.page {
 @media (max-width: 560px) { .session-row { flex-direction: column; align-items: stretch; } }
 .btn.small { min-height: 34px; padding: 5px 12px; font-size: 13px; }
 
-/* -- forms -------------------------------------------------------------------- */
+/* forms */
 label.field {
   display: block;
   color: var(--text-dim);
@@ -292,7 +292,7 @@ label.field textarea:focus {
   box-shadow: 0 0 0 3px rgba(247, 147, 26, 0.15);
 }
 
-/* -- table ------------------------------------------------------------------- */
+/* table */
 .table-wrap {
   overflow-x: auto;
   border: 1px solid var(--border);
@@ -333,7 +333,7 @@ table.ledger tr:hover td { background: rgba(255, 255, 255, 0.025); }
 .amount-pos { color: var(--green); font-family: var(--mono); font-weight: 700; }
 .amount-neg { color: var(--red); font-family: var(--mono); font-weight: 700; }
 
-/* -- badges --------------------------------------------------------------------- */
+/* badges */
 .badge {
   display: inline-block;
   padding: 2px 9px;

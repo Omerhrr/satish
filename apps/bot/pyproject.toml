@@ -1,7 +1,7 @@
 [project]
 name = "xp-bot"
 version = "0.1.0"
-description = "XP Telegram bot (apps/bot) — aiogram 3 command router"
+description = "XP Telegram bot (apps/bot) - aiogram 3 command router"
 requires-python = ">=3.11"
 dependencies = [
     "xp-core",

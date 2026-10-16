@@ -1,13 +1,13 @@
 # Research and deliverable tools (phase 7)
 
 The agent's research pipeline: search → permitted fetch → extraction →
-provenance → cross-source comparison → cited, validated artifacts — with
+provenance → cross-source comparison → cited, validated artifacts - with
 quality gates enforced by deterministic backend code.
 
 ## Architecture
 
 ```
-services/research-adapter/research_adapter/   (adapter boundary — no DB)
+services/research-adapter/research_adapter/   (adapter boundary - no DB)
   policy.py      FetchPolicy: the permission wall for page retrieval
   providers.py   SearchProvider / FetchProvider: canned + http transports
   extract.py     stdlib HTML→text/facts extraction (deterministic)
@@ -43,7 +43,7 @@ and is treated as untrusted data end to end.
 `FetchPolicy` denies, in order: non-http(s) schemes, userinfo URLs,
 non-80/443 ports, localhost/`*.local`/`*.internal` names, non-global
 IP-literals; then, after DNS resolution, EVERY address must be globally
-routable (one private answer denies the whole host — rebinding fails
+routable (one private answer denies the whole host - rebinding fails
 closed); each redirect hop re-passes the full wall; bodies are capped
 (256 KB default) and only `text/*` / `application/json` are accepted.
 Retrieved content is wrapped as untrusted downstream (phase-6 contract).
@@ -55,10 +55,10 @@ Retrieved content is wrapped as untrusted downstream (phase-6 contract).
 downgrades a successful fetch). Statuses: `listed | ok | unavailable |
 denied | error`. Facts carry `kind`:
 
-- `observed` — stated by the fetched page
-- `estimate` — price-ish keys from a listing snapshot, with a staleness
+- `observed` - stated by the fetched page
+- `estimate` - price-ish keys from a listing snapshot, with a staleness
   note ("retrieved at T, not a live quote")
-- `assumption` — reserved for model-supplied context (not produced by tools)
+- `assumption` - reserved for model-supplied context (not produced by tools)
 
 ## Report quality checks (backend-enforced)
 
@@ -67,7 +67,7 @@ citation points at an unknown source, source indices duplicate, or claims
 exist with an empty source list. `docs.generate_pdf` returns a structured
 `quality_gate_failed` result instead of an artifact. Generated files are
 validated (`%PDF-` + `%%EOF`, CSV width/parse round-trip, XLSX zip +
-workbook.xml) BEFORE storage, and storage is private-by-default —
+workbook.xml) BEFORE storage, and storage is private-by-default -
 downloads go through the owner-checked
 `GET /api/v1/artifacts/{id}/download` only.
 
@@ -99,10 +99,10 @@ pipeline regression fails CI-style before anything ships.
 ## Honest status / open items
 
 - **Search is canned-only.** A live search adapter needs a search API key
-  (Brave/Bing/etc.) — none is configured, and canned output is labeled as
+  (Brave/Bing/etc.) - none is configured, and canned output is labeled as
   such on every response rather than pretending to be live web.
 - **Live fetch** (`XP_RESEARCH_FETCH_MODE=http`) is fully implemented and
   unit-tested via MockTransport; egress from this sandbox may be limited.
 - Reports reflect retrieval-time snapshots; the structural gates verify
-  citations and disclosure, not factual truth — sources remain the user's
+  citations and disclosure, not factual truth - sources remain the user's
   responsibility to review (stated in every report's Limitations box).

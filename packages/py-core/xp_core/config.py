@@ -21,55 +21,56 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # -- environment ---------------------------------------------------------
+    # environment
     env: Literal["dev", "regtest", "testnet", "staging", "prod"] = "dev"
     log_level: str = "INFO"
     dev_mode: bool = True  # relaxes auth for local/sandbox development only
 
-    # -- HTTP ----------------------------------------------------------------
+    # HTTP
     api_host: str = "0.0.0.0"
     api_port: int = 8001
     cors_origins: list[str] = ["*"]  # tighten per-environment before testnet+
     request_id_header: str = "X-Request-ID"
 
-    # -- persistence ---------------------------------------------------------
+    # persistence
     # Postgres in shared environments; SQLite keeps local dev zero-dependency.
     database_url: str = "sqlite+aiosqlite:///./data/xp-dev.db"
     db_echo: bool = False
 
-    # -- queue (Redis-backed; PostgreSQL-backed queue is the documented
-    #    alternative pending the operational prototype) -----------------------
+    # queue
+    # Redis-backed; a PostgreSQL-backed queue is the documented alternative
+    # pending the operational prototype.
     redis_url: str | None = None  # None => inline dev execution of worker jobs
 
-    # -- artifacts / object storage ------------------------------------------
+    # artifacts / object storage
     # Local filesystem now; S3-compatible backend later, private by default.
     artifact_dir: str = "./data/artifacts"
     artifact_url_ttl_seconds: int = 600
 
-    # -- Telegram ------------------------------------------------------------
+    # Telegram
     telegram_bot_token: str | None = None
     telegram_init_data_max_age_seconds: int = 86400
     mini_app_url: str = "https://t.me/XPDevBot/app"
 
-    # -- sessions (phase-2 hardening) ------------------------------------------
+    # sessions
     # Short-lived bearer sessions (trust boundary control: "Short-lived
     # sessions and authorization checks"). The Mini App re-exchanges fresh
     # initData on every launch, so a short TTL costs nothing in UX.
     session_ttl_hours: int = 24
 
-    # -- pricing (phase 5, finalized) ------------------------------------------
+    # pricing
     # ONE canonical conversion: XP credited per satoshi paid. Every surface
-    # derives its display from it (pricing_requirements #1: published, and
-    # "can change" — clients must re-check, never cache). The former
-    # sats_per_xp=10 setting contradicted xp_per_sat=100 and was removed.
+    # derives its display from it (published, and "can change" - clients must
+    # re-check, never cache). The former sats_per_xp=10 setting contradicted
+    # xp_per_sat=100 and was removed.
     xp_per_sat: int = 100
     # Published XP pack table (billing_flow #1: "chooses an XP pack or enters
     # an allowed amount"). Custom amounts within policy bounds also allowed.
     xp_pack_sats: list[int] = [1_000, 5_000, 20_000]
 
-    # -- agent / DSH ----------------------------------------------------------
-    # Revision is pinned in services/agent-adapter/dsh_adapter/dsh_revision.json
-    # (phase-0 spike); dsh_revision below is only an informational label.
+    # agent / DSH
+    # Revision is pinned in services/agent-adapter/dsh_adapter/dsh_revision.json;
+    # dsh_revision below is only an informational label.
     dsh_revision: str = "dsh-pin-2026-10-15-flash-v4-1"
     deepseek_api_key: str | None = None
     deepseek_base_url: str | None = None  # None => pinned base_url
@@ -77,7 +78,7 @@ class Settings(BaseSettings):
     # alias here fails loudly at client construction (see revision.py).
     deepseek_model: str | None = None
 
-    # -- wallet (phase-3 on-chain self-custody) -------------------------------
+    # wallet
     # BDK-based provider (decision D10). The persisted wallet state uses PUBLIC
     # descriptors only; signing happens in an in-memory private wallet built at
     # unlock from the user's recovery phrase (never written to disk or DB).
@@ -90,7 +91,7 @@ class Settings(BaseSettings):
     wallet_max_fee_rate_sat_vb: int = 50  # fee cap policy (transaction_policy)
     wallet_default_word_count: int = 24  # 12 or 24 BIP39 words on creation
 
-    # -- lightning (phase 4) ----------------------------------------------------
+    # lightning
     lightning_mode: str = "canned"  # canned | lnd (lnd v0.21.4-beta via gRPC)
     lightning_network: str = "regtest"  # mainnet refused at provider construction
     lnd_rpc_host: str | None = None  # e.g. 127.0.0.1:10109
@@ -102,7 +103,7 @@ class Settings(BaseSettings):
     lightning_max_fee_msat: int = 10_000  # fee cap policy (payment authorization)
     lightning_min_inbound_msat: int = 1_000_000  # below this, receive is disclosed as constrained
 
-    # -- agent runtime (phase 6) -------------------------------------------------
+    # agent runtime
     # Deterministic backend enforcement of plan bounds (dsh_integration #7):
     # max plan steps, default tool timeout, and the maximum plan-estimate
     # discount the worker may trust without re-checking the ledger cap.
@@ -110,8 +111,8 @@ class Settings(BaseSettings):
     agent_default_tool_timeout_seconds: int = 30
     agent_max_budget_xp: int = 100_000
 
-    # -- research tools (phase 7) ------------------------------------------------
-    # search: canned only (a live provider needs a search API key — none is
+    # research tools
+    # search: canned only (a live provider needs a search API key - none is
     # configured, and pretending otherwise would fabricate results).
     research_search_mode: str = "canned"
     # fetch: canned (offline eval corpus) or http (real retrieval behind the
@@ -124,11 +125,11 @@ class Settings(BaseSettings):
     # evaluation set (phase-7 acceptance #5). Relative to repo root.
     research_eval_set_path: str = "tests/data/research_eval_set.json"
 
-    # -- commerce intelligence (phase 8) ---------------------------------------
+    # commerce intelligence
     # Scoring factor weights as a JSON object; factor names are fixed (see
     # commerce_adapter.scoring.DEFAULT_FACTORS) and weights are operator-
     # configurable. Any defect falls back to the documented defaults WITH a
-    # disclosure in the score output — never silently.
+    # disclosure in the score output - never silently.
     commerce_scoring_factors: str = (
         '{"distinct_sources": 2.0, "supplier_count": 1.5, "price_spread": 1.5, '
         '"freshness": 1.0, "attribute_completeness": 1.0}'
@@ -137,26 +138,26 @@ class Settings(BaseSettings):
     # (phase-8 acceptance bars). Relative to repo root.
     commerce_eval_set_path: str = "tests/data/commerce_eval_set.json"
 
-    # -- external connections (phase 9) ------------------------------------------
+    # external connections
     # Master key for the credential vault (Fernet over a sha256-derived key).
     # NEVER logged, never returned by any API. In dev mode a documented
     # fallback key keeps local development zero-config, and every response
     # discloses that fallback; non-dev environments refuse to link connections
     # until an operator key is configured.
     connections_credential_key: str | None = None
-    # email.send delivery mode: "canned" (deterministic, no network — the
+    # email.send delivery mode: "canned" (deterministic, no network - the
     # receipt says so) or "smtp" (real delivery via the connection's stored
     # credentials, with an honest definite-vs-unknown outcome taxonomy).
     email_send_mode: str = "canned"
 
-    # -- approvals + automation (phase 9) ----------------------------------------
+    # approvals + automation
     # Approval expiry: an approval decision binds to the action digest AND a
-    # TTL. Execution after expiry re-requests approval — no stale sends.
+    # TTL. Execution after expiry re-requests approval - no stale sends.
     approval_ttl_minutes: int = 60
     # Scheduler sweep cadence (worker cron). arq cron is minute-granular.
     automation_sweep_interval_seconds: int = 60
     # Consecutive failed runs before a job auto-pauses (failed jobs do not
-    # silently repeat consequential actions — they stop and notify).
+    # silently repeat consequential actions - they stop and notify).
     automation_max_consecutive_failures: int = 3
     # A run left "running" longer than this (worker crash) is marked failed on
     # the next sweep; fresher ones are waited on, never run concurrently.
@@ -165,11 +166,11 @@ class Settings(BaseSettings):
     automation_max_budget_per_run_xp: int = 10_000
     automation_max_budget_total_xp: int = 100_000
 
-    # -- worker ----------------------------------------------------------------
+    # worker
     pdf_storage_dir: str = "./data/artifacts"
     reconcile_interval_seconds: int = 3600  # billing_flow #8
 
-    # -- abuse controls (phase 10) ------------------------------------------------
+    # abuse controls
     # In-memory token buckets per (route class, subject); limits are code-pinned
     # in xp_core.services.ratelimit.RULES (auth tightest, money tight, reads
     # loose). Kill switch for operators; the Redis-backed multi-process backend
@@ -178,7 +179,7 @@ class Settings(BaseSettings):
     rate_limit_bucket_ttl_seconds: int = 3600  # idle bucket eviction
     rate_limit_max_buckets: int = 10_000
 
-    # -- privacy / retention (phase 10) --------------------------------------------
+    # privacy / retention
     # Days after which the retention sweep deletes expired data classes.
     # Money-trail and audit surfaces are never swept (see
     # xp_core/jobs/retention.py PRESERVED_SURFACES and docs/privacy-retention.md).

@@ -2,8 +2,8 @@
 
 The committed JSON set (default ``tests/data/research_eval_set.json``) holds
 a fixed corpus of offline pages and a list of evaluation cases. The runner
-executes the full research workflow over each case — search, permitted
-fetch, fact classification, cross-source comparison, report build — and
+executes the full research workflow over each case - search, permitted
+fetch, fact classification, cross-source comparison, report build - and
 checks the phase-7 quality bars deterministically:
 
 - every claim in the generated report is cited
@@ -108,7 +108,7 @@ async def _records_for_case(
 
 
 def _build_spec(name: str, records: list[SourceRecord], goal: str) -> ReportSpec:
-    """Adapter-level report builder — mirrors the API builder's contract:
+    """Adapter-level report builder - mirrors the API builder's contract:
     claims only from fetched-ok facts, every claim cited, unreachable and
     listed-only sources disclosed."""
     sources: list[ReportSource] = []
@@ -137,7 +137,7 @@ def _build_spec(name: str, records: list[SourceRecord], goal: str) -> ReportSpec
 
     comparison = compare_sources(records)
     unavailable = [
-        f"S{index_of[r.source_id]} {r.url} — {r.status}: {r.note or 'no reason recorded'}"
+        f"S{index_of[r.source_id]} {r.url} - {r.status}: {r.note or 'no reason recorded'}"
         for r in records
         if r.status in {"unavailable", "denied", "error"}
     ]
@@ -146,7 +146,7 @@ def _build_spec(name: str, records: list[SourceRecord], goal: str) -> ReportSpec
     )
     limitations = [
         "claims reflect what the fetched pages said at retrieval time",
-        "structural quality gates only — sources remain the user's responsibility to review",
+        "structural quality gates only - sources remain the user's responsibility to review",
     ]
     if estimate_keys:
         limitations.append(
@@ -154,7 +154,7 @@ def _build_spec(name: str, records: list[SourceRecord], goal: str) -> ReportSpec
             "not live quotes"
         )
     if not records:
-        limitations.append("no sources were collected — disclosures only, no findings")
+        limitations.append("no sources were collected - disclosures only, no findings")
     return ReportSpec(
         title=f"Evaluation report: {name}",
         goal=goal,

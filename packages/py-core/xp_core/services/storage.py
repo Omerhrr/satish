@@ -1,4 +1,4 @@
-"""Artifact storage backends — local filesystem now, S3-compatible later.
+"""Artifact storage backends - local filesystem now, S3-compatible later.
 
 Objects are private by default; delivery happens through an authorized API
 route, never a public bucket path (architecture: Artifact Storage).

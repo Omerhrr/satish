@@ -63,7 +63,7 @@ export interface XpClient {
   receiptPdfUrl: (purchaseId: string) => string;
   createReceiptArtifact: (purchaseId: string) => Promise<{ artifact_id: string; download_url: string }>;
   settleDevInvoice: (paymentHash: string) => Promise<{ credited: boolean; status: string }>;
-  /** POST /run — the server resumes automatically from awaiting_approval. */
+  /** POST /run - the server resumes automatically from awaiting_approval. */
   runTask: (taskId: string) => Promise<TaskOut>;
   taskEvents: (taskId: string) => Promise<TaskEventPageOut>;
   taskSteps: (taskId: string) => Promise<TaskStepOut[]>;
@@ -76,7 +76,7 @@ export interface XpClient {
   logout: () => Promise<{ status: string; revoked: boolean }>;
   listSessions: () => Promise<SessionInfo[]>;
   revokeSession: (sessionId: string) => Promise<{ status: string; session_id: string }>;
-  // -- phase 9: connections / drafts / automation / notifications ------------
+  // phase 9: connections / drafts / automation / notifications
   connectionProviders: () => Promise<ConnectionProvidersOut>;
   listConnections: () => Promise<ConnectionOut[]>;
   linkConnection: (payload: {
@@ -229,7 +229,7 @@ export function createXpClient(config: XpClientConfig = {}): XpClient {
       request<{ status: string; session_id: string }>(`/api/v1/auth/sessions/${sessionId}`, {
         method: "DELETE",
       }),
-    // -- phase 9 ---------------------------------------------------------------
+    // phase 9
     connectionProviders: () => request<ConnectionProvidersOut>("/api/v1/connections/providers"),
     listConnections: () => request<ConnectionOut[]>("/api/v1/connections"),
     linkConnection: (payload) =>

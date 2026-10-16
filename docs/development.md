@@ -4,7 +4,7 @@
 
 - Python 3.11+ (3.12 recommended), [uv](https://docs.astral.sh/uv/) for fast installs
 - Node 20+ / Bun 1.1+ for the Nuxt workspace
-- Docker (optional — only for Postgres/Redis infrastructure)
+- Docker (optional - only for Postgres/Redis infrastructure)
 
 ## First run (zero infrastructure)
 
@@ -59,8 +59,8 @@ revision creates all 16 tables of the plan's data model.
 |---|---|---|
 | FastAPI | `make run-api` | 8001 |
 | Nuxt Mini App | `make run-web` | 3000 |
-| arq worker | `make run-worker` | — |
-| Telegram bot | `make run-bot` | — (needs token) |
+| arq worker | `make run-worker` | - |
+| Telegram bot | `make run-bot` | - (needs token) |
 
 Frontend → API transport: `packages/api-client` supports direct mode
 (`NUXT_PUBLIC_API_BASE=http://127.0.0.1:8001`) and same-origin gateway mode
@@ -70,10 +70,10 @@ is how the sandbox preview works behind a single exposed port.
 ## Data model notes
 
 - UTC timestamps everywhere; user-local rendering happens in the UI.
-- Integer satoshis and integer XP — never floats for financial accounting.
+- Integer satoshis and integer XP - never floats for financial accounting.
 - `xp_ledger_entries` is append-only; `xp_accounts.balance` always equals
   `SUM(entries)` per user (enforced by tests).
-- Wallet tables hold **metadata only** — no seed or private-key columns exist
+- Wallet tables hold **metadata only** - no seed or private-key columns exist
   by design.
 
 ## Troubleshooting

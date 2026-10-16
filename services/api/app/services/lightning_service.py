@@ -57,7 +57,7 @@ def reset_provider() -> None:
         _provider = None
 
 
-# -- errors the router maps to HTTP -----------------------------------------------
+# errors the router maps to HTTP
 
 
 class LightningServiceError(Exception):
@@ -68,7 +68,7 @@ class AuthorizationMismatch(LightningServiceError):
     pass
 
 
-# -- receive (invoice) --------------------------------------------------------------
+# receive (invoice)
 
 
 async def create_receive_intent(
@@ -85,7 +85,7 @@ async def create_receive_intent(
     provider = get_provider(settings)
     amount_msat = amount_sats * 1000
     xp_amount = amount_sats * settings.xp_per_sat
-    # Idempotency: one open invoice per (user, amount, description) intent —
+    # Idempotency: one open invoice per (user, amount, description) intent -
     # a client retry creates a NEW intent (new idempotency key), never a
     # duplicate ledger effect, because credit is keyed on intent id.
     invoice = await provider.create_invoice(
@@ -143,7 +143,7 @@ async def settle(
 ) -> dict:
     """Apply a settlement through the double gate.
 
-    1. provider verification — the preimage must hash to the payment_hash
+    1. provider verification - the preimage must hash to the payment_hash
        (the real node's stream supplies it; this dev seam accepts the
        client's claim and verifies it cryptographically);
     2. CAS row transition pending -> settled (rowcount gate);
@@ -177,7 +177,7 @@ async def settle(
             "payment_hash": payment_hash,
             "status": row.status,
             "credited": False,
-            "note": "settlement replay — this invoice was already credited",
+            "note": "settlement replay - this invoice was already credited",
         }
 
     # CAS transition: exactly one concurrent callback wins the row.
@@ -198,7 +198,7 @@ async def settle(
             "payment_hash": payment_hash,
             "status": row.status,
             "credited": False,
-            "note": "settlement replay — this invoice was already credited",
+            "note": "settlement replay - this invoice was already credited",
         }
 
     outcome: LedgerResult = await ledger.credit_purchase(
@@ -218,7 +218,7 @@ async def settle(
         "balance_after": outcome.balance_after,
         "note": None
         if not outcome.idempotent_replay
-        else "ledger replay detected — credited exactly once",
+        else "ledger replay detected - credited exactly once",
     }
 
 
@@ -236,7 +236,7 @@ async def get_invoice_state(
     return row
 
 
-# -- send (payment) ----------------------------------------------------------------
+# send (payment)
 
 
 async def prepare_send_intent(
@@ -384,7 +384,7 @@ async def submit_send_intent(
     }
 
 
-# -- node surface ---------------------------------------------------------------------
+# node surface
 
 
 async def health(settings: Settings) -> dict:
@@ -433,7 +433,7 @@ def capabilities(settings: Settings) -> dict:
             "change, so clients re-check /api/v1/xp/rate.",
         },
         "custody_disclosure": [
-            "In dev/test the provider is CANNED — deterministic in-memory "
+            "In dev/test the provider is CANNED - deterministic in-memory "
             "semantics with no node attached; nothing here moves real funds.",
             "In lnd mode the node is self-hosted; channel backups (SCB) are "
             "required for recovery and the seed must be backed up with them.",

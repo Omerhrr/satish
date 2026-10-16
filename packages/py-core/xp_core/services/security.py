@@ -2,7 +2,7 @@
 
 The Mini App sends Telegram initData; the SERVER validates it (architecture
 security_notes: reject forged or stale authentication payloads). Seed phrases
-or private keys are never requested here — Telegram is an interface, not a
+or private keys are never requested here - Telegram is an interface, not a
 key vault.
 
 Phase-2 hardening: short-lived sessions, server-side revocation (logout,
@@ -173,7 +173,7 @@ async def resolve_user_from_token(session: AsyncSession, token: str) -> User | N
     ).scalar_one_or_none()
 
 
-# -- session lifecycle (phase 2: "Session lifecycle and logout") ---------------
+# session lifecycle
 
 
 async def revoke_session_by_token(session: AsyncSession, token: str) -> bool:
@@ -191,7 +191,7 @@ async def revoke_session_by_token(session: AsyncSession, token: str) -> bool:
 async def revoke_session_by_id(
     session: AsyncSession, user_id: str, session_id: str
 ) -> bool:
-    """Revoke one of the caller's own sessions by id — ownership enforced."""
+    """Revoke one of the caller's own sessions by id - ownership enforced."""
     row = (
         await session.execute(
             select(Session).where(Session.id == session_id, Session.user_id == user_id)

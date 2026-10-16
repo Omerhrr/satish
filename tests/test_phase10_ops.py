@@ -58,7 +58,7 @@ async def client(session, dev_user, monkeypatch):
     app.state.rate_limiter._buckets.clear()
 
 
-# -- rate limiting: unit level ---------------------------------------------------------
+# rate limiting: unit level
 
 
 def test_classify_path_maps_surfaces_to_classes():
@@ -100,7 +100,7 @@ def test_buckets_are_isolated_per_subject():
     assert limiter.check(RouteClass.WRITE, a).allowed  # per-class buckets
 
 
-# -- rate limiting: HTTP level -----------------------------------------------------------
+# rate limiting: HTTP level
 
 
 async def test_auth_surface_trips_to_429_with_honest_headers(client):
@@ -135,7 +135,7 @@ async def test_rate_limit_kill_switch(monkeypatch, client):
         assert "X-RateLimit-Limit" not in resp.headers
 
 
-# -- reconciliation alerts -----------------------------------------------------------------
+# reconciliation alerts
 
 
 async def test_balance_drift_opens_critical_alert_and_dedupes(session, dev_user):
@@ -267,7 +267,7 @@ async def test_404_and_409_on_bad_lifecycle_transitions(client, session):
     assert missing.status_code == 404
 
 
-# -- privacy / retention ---------------------------------------------------------------------
+# privacy / retention
 
 
 def _old(days: int) -> datetime:
@@ -322,7 +322,7 @@ async def test_retention_sweep_deletes_only_within_windows(session, dev_user):
                           status="succeeded", finished_at=_old(1)),
         ]
     )
-    # drafts: terminal old (sweep), drafted old (keep — pending user decision)
+    # drafts: terminal old (sweep), drafted old (keep - pending user decision)
     session.add_all(
         [
             EmailDraft(id="d-sent", user_id=dev_user.id, to_address="a@b.c",
@@ -365,7 +365,7 @@ async def test_retention_sweep_deletes_only_within_windows(session, dev_user):
     assert proof["audit_events"] >= 1  # audit trail untouched
 
 
-# -- drills and audits --------------------------------------------------------------------------
+# drills and audits
 
 
 async def test_backup_restore_drill_roundtrip(session):

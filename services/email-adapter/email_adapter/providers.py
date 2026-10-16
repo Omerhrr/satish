@@ -1,14 +1,14 @@
 """Email adapter (phase 9): draft -> preview -> approval -> send.
 
 Two providers with the SAME interface:
-- ``CannedEmailProvider``  — deterministic, no network; every receipt states
+- ``CannedEmailProvider``  - deterministic, no network; every receipt states
   plainly that nothing was transmitted. Default dev mode.
-- ``SmtpEmailProvider``    — real delivery via stdlib smtplib executed off
+- ``SmtpEmailProvider``    - real delivery via stdlib smtplib executed off
   the event loop. Its outcome taxonomy is honest about uncertainty:
   * definite refusal (auth rejected, recipient refused, DATA rejected)
-    -> ``refused`` — safe to report "failed, safe to retry";
+    -> ``refused`` - safe to report "failed, safe to retry";
   * transport failure (timeout, connection dropped, unknown state)
-    -> ``unknown`` — the send MIGHT have happened; the system records
+    -> ``unknown`` - the send MIGHT have happened; the system records
     ``unknown_outcome`` and never retries silently.
 
 This mirrors the phase-3 wallet broadcast taxonomy: uncertain outcomes are
@@ -173,7 +173,7 @@ class SmtpEmailProvider(EmailProvider):
                 ),
                 disclosure=(
                     "UNKNOWN outcome: the send may have completed; the system will NOT "
-                    "retry automatically — resend requires a new draft and a new approval"
+                    "retry automatically - resend requires a new draft and a new approval"
                 ),
             )
         return SendOutcome(
@@ -187,7 +187,7 @@ class SmtpEmailProvider(EmailProvider):
 
 def get_email_provider(settings) -> EmailProvider:
     """Published mode switch. Unknown modes fall back to canned WITH callers
-    required to disclose — silently pretending to be real is forbidden."""
+    required to disclose - silently pretending to be real is forbidden."""
     mode = (settings.email_send_mode or "canned").lower()
     if mode == "smtp":
         return SmtpEmailProvider()

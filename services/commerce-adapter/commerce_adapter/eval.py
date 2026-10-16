@@ -3,14 +3,14 @@
 The committed JSON set (default ``tests/data/commerce_eval_set.json``) holds
 a fixed corpus of offline commerce fixtures (suppliers, market listings, an
 official tariff, an ad-library page, auction/dealer vehicle sources) and
-evaluation cases. The runner executes each case's workflow — search
+evaluation cases. The runner executes each case's workflow - search
 (web and/or ad library), permitted fetches with commerce fact typing, then
 the commerce operation (score / compare suppliers / vehicle check / landed
-cost) — and checks the phase-8 quality bars deterministically:
+cost) - and checks the phase-8 quality bars deterministically:
 
 - only accessible, permitted fixtures are represented as searched
 - asking prices are estimates, official rates are observed, user inputs are
-  assumptions — and the distinction survives into every output
+  assumptions - and the distinction survives into every output
 - no demand, ad-performance, or availability measure is ever invented
   (scoring exposes no such factor; ad summaries exclude performance keys)
 - scoring factors and their weights are visible and echoed
@@ -269,7 +269,7 @@ async def run_commerce_eval_case(case: dict[str, Any], corpus: list[dict[str, An
             f"expected >= {expect.get('min_sources')} fetched sources, got {len(fetched_ok)}"
         )
 
-    # -- ad-library assertions --------------------------------------------------
+    # ad-library assertions
     if expect.get("ads") is not None and len(ads_out) != int(expect["ads"]):
         failures.append(f"ad-library results {len(ads_out)} != expected {expect['ads']}")
     if expect.get("ad_attributes_contains"):
@@ -294,7 +294,7 @@ async def run_commerce_eval_case(case: dict[str, Any], corpus: list[dict[str, An
                     "disclosure is missing"
                 )
 
-    # -- operation ------------------------------------------------------------
+    # operation
     steps = case.get("steps", {})
     if steps.get("operation"):
         tool, output = _run_operation(case, records, source_types, EVAL_RETRIEVED_AT)

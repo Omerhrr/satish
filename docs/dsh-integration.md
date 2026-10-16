@@ -2,7 +2,7 @@
 
 **Pinned revision:** `dsh-pin-2026-10-15-flash-v4-1`
 **Manifest:** `services/agent-adapter/dsh_adapter/dsh_revision.json` (sha256-gated by `tests/test_dsh_revision.py`)
-**Status:** phase-0 spike complete — contract tests offline (53 passing incl. 21 spike tests); live proof pending an API key via `make dsh-verify`.
+**Status:** phase-0 spike complete - contract tests offline (53 passing incl. 21 spike tests); live proof pending an API key via `make dsh-verify`.
 
 This document is the integration contract required by the plan
 (`agent_and_tooling.dsh_integration.requirements` #2: "Document startup,
@@ -11,7 +11,7 @@ handling"). Everything DSH-specific lives behind
 `services/agent-adapter/dsh_adapter/`; no other module may import an
 OpenAI SDK or talk to the model runtime directly (requirement #3).
 
-## 1. What "upstream" means here — an honesty note
+## 1. What "upstream" means here - an honesty note
 
 The plan describes DSH as "a separately maintained upstream component."
 Researching the upstream landscape on 2026-10-15 found **no canonical,
@@ -27,10 +27,10 @@ model revisions*, which is the piece that can silently drift:
 | Heavy model | `deepseek-v4-pro` → DeepSeek-V4-Pro-0813 | Models & Pricing |
 | Base URL | `https://api.deepseek.com` | Models & Pricing |
 | Thinking mode | ON by default, effort=high; toggle `extra_body.thinking.type` | Thinking Mode guide |
-| Sampling params | inert (thinking) / fixed 1.0 (non-thinking) — not sent | Thinking Mode guide |
-| Legacy `deepseek-chat` / `deepseek-reasoner` | discontinued 2026-07-24 — **rejected by the adapter** | Change Log |
+| Sampling params | inert (thinking) / fixed 1.0 (non-thinking) - not sent | Thinking Mode guide |
+| Legacy `deepseek-chat` / `deepseek-reasoner` | discontinued 2026-07-24 - **rejected by the adapter** | Change Log |
 | Context / max output | 1M / 384K | Models & Pricing |
-| Flash pricing (per 1M) | in $0.15–0.30 (cache-hit $0.003–0.006), out $0.60–1.20 | Models & Pricing |
+| Flash pricing (per 1M) | in $0.15-0.30 (cache-hit $0.003-0.006), out $0.60-1.20 | Models & Pricing |
 
 The spike decision (docs/decisions.md **D8**) records why a manifest pin was
 chosen over a submodule/dependency pin.
@@ -95,7 +95,7 @@ goal → draft_plan (model, non-thinking) → on_plan(persisted)
 ```
 
 - Durable state lives in the **application database** via the injected
-  `PersistenceHooks` — never in transient model context (requirement #4).
+  `PersistenceHooks` - never in transient model context (requirement #4).
 - **Cancellation:** `runner.cancel()` sets a cooperative flag checked
   between steps; the run returns `status="cancelled"` with a partial report.
 - The model response's `reasoning_content` (thinking mode) is **never
@@ -111,7 +111,7 @@ goal → draft_plan (model, non-thinking) → on_plan(persisted)
 | Permanent 4xx | raised immediately (retrying would be dishonest noise) |
 | Retries exhausted | last exception propagates; `on_step` already recorded `running` so the task is resumable |
 | Malformed model JSON | safe empty plan, reported as limitation |
-| Discontinued model name | `LegacyModelError` at startup — never a silent fallback |
+| Discontinued model name | `LegacyModelError` at startup - never a silent fallback |
 | Manifest drift | sha256 checksum gate in tests fails CI |
 
 ## 7. Cost tracking (requirement #8)
@@ -119,7 +119,7 @@ goal → draft_plan (model, non-thinking) → on_plan(persisted)
 - Every model call records usage into `runner.model_usage`:
   prompt/completion/cache-hit tokens + `estimated_cost_usd` computed from
   **pinned pricing** (off-peak). Unpriced models yield `None` + an explicit
-  `cost_note` — never a silent zero.
+  `cost_note` - never a silent zero.
 - Every tool call's XP cost accrues into `spent_xp` against the reserved
   budget (existing XP ledger integration).
 - Summaries appear in `on_plan` payloads and the final report
@@ -129,9 +129,9 @@ goal → draft_plan (model, non-thinking) → on_plan(persisted)
 
 1. Fetch current facts: change log, Models & Pricing, Thinking Mode guide.
 2. Edit `dsh_revision.json` (models, limits, pricing, legacy aliases, `revision_id`, `pinned_at`).
-3. Run `pytest tests/test_dsh_revision.py` — the checksum gate fails; update
+3. Run `pytest tests/test_dsh_revision.py` - the checksum gate fails; update
    `EXPECTED_MANIFEST_SHA256` **in the same change** (conscious, reviewable).
-4. Run `make dsh-verify XP_DEEPSEEK_API_KEY=…` — live proof on the new pin.
+4. Run `make dsh-verify XP_DEEPSEEK_API_KEY=…` - live proof on the new pin.
 5. Record the change in `docs/decisions.md`.
 
 ## 9. Open items (honest)

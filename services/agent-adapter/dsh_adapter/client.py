@@ -53,13 +53,13 @@ SYSTEM_POLICY = """You are the XP research and work agent. Non-negotiable rules:
 - Stay within the user-approved plan and XP budget; do not invent new spending.
 - Email is always drafted for preview first; sending happens only after the
   user approved that exact content, and an uncertain send is reported as
-  uncertain — never retried on your own.
+  uncertain - never retried on your own.
 - Scheduled jobs never grant new scopes and never bypass approval; report
   limitations, inaccessible sources, and coverage gaps honestly.
 """
 
 # Transient upstream conditions worth a bounded retry. 4xx other than
-# 408/429 are permanent (bad request, auth) — retrying would be dishonest
+# 408/429 are permanent (bad request, auth) - retrying would be dishonest
 # noise, so they propagate immediately.
 RETRYABLE_STATUS_CODES = {408, 429, 500, 502, 503, 504}
 
@@ -211,7 +211,7 @@ class DeepSeekChatClient:
 
 @dataclass
 class StubChatClient:
-    """Deterministic offline client — plans a minimal but valid structure."""
+    """Deterministic offline client - plans a minimal but valid structure."""
 
     model: str = "stub-model"
     revision_id: str = "stub"

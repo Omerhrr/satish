@@ -1,4 +1,4 @@
-"""Live DSH pin verification — proves the integration against the pinned revision.
+"""Live DSH pin verification - proves the integration against the pinned revision.
 
 Phase-0 acceptance: "DSH integration is proven against the selected upstream
 revision." The contract tests prove the adapter logic offline; THIS script
@@ -33,7 +33,7 @@ from dsh_adapter.tools import ToolRegistry, ToolSpec
 
 async def main() -> int:
     if not os.environ.get("XP_DEEPSEEK_API_KEY"):
-        print("SKIP: XP_DEEPSEEK_API_KEY not set — live verification not possible.")
+        print("SKIP: XP_DEEPSEEK_API_KEY not set - live verification not possible.")
         print("The pin remains contract-test-verified; run this before release.")
         return 0
 
@@ -43,7 +43,7 @@ async def main() -> int:
 
     client = DeepSeekChatClient(api_key=os.environ["XP_DEEPSEEK_API_KEY"], revision=rev)
 
-    # -- 1. plan call (non-thinking, JSON) ------------------------------------
+    # 1. plan call (non-thinking, JSON)
     response = await client.complete(
         [
             {
@@ -56,7 +56,7 @@ async def main() -> int:
             }
         ]
     )
-    print(f"[1] plan call OK — finish={response['finish_reason']} model={response['model']}")
+    print(f"[1] plan call OK - finish={response['finish_reason']} model={response['model']}")
     usage = response.get("usage", {})
     print(
         f"    usage: {usage.get('prompt_tokens')}in/{usage.get('completion_tokens')}out "
@@ -70,7 +70,7 @@ async def main() -> int:
         print(f"FAIL [1] plan JSON unparseable: {exc}\nraw: {response['content'][:300]}")
         return 1
 
-    # -- 2. tool-call round-trip ----------------------------------------------
+    # 2. tool-call round-trip
     registry = ToolRegistry()
 
     async def echo_handler(args: dict) -> dict:
@@ -98,7 +98,7 @@ async def main() -> int:
     if tool_response["tool_calls"]:
         call = tool_response["tool_calls"][0]
         result = await registry.execute(call["name"], call["arguments"], {"research"})
-        print(f"[2] tool call OK — {call['name']}({call['arguments']}) -> {result}")
+        print(f"[2] tool call OK - {call['name']}({call['arguments']}) -> {result}")
     else:
         print(f"WARN [2] model answered without a tool call: {tool_response['content'][:120]}")
         print("       tool-calling on the pinned model needs review before relying on it.")

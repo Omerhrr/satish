@@ -38,7 +38,7 @@ from xp_core.services import automation as automation_core
 from xp_core.services import ledger
 from xp_core.services import vault as vault_mod
 
-# -- fixtures ---------------------------------------------------------------------
+# fixtures
 
 
 @pytest.fixture()
@@ -147,7 +147,7 @@ async def make_second_user(session) -> tuple:
     return user, token
 
 
-# -- vault: scoped credential storage ----------------------------------------------
+# vault: scoped credential storage
 
 
 @pytest.mark.asyncio
@@ -245,7 +245,7 @@ async def test_scope_set_grants_email_and_automation():
     assert {"email:draft", "email:send", "automation:write"} <= USER_TASK_SCOPES
 
 
-# -- email draft -> preview -> approval -> send --------------------------------------
+# email draft -> preview -> approval -> send
 
 
 @pytest.mark.asyncio
@@ -389,7 +389,7 @@ async def test_expired_pending_approval_cannot_be_approved(
     client, session, dev_user, factory, monkeypatch, smtp_connection
 ):
     """Approval binding #2: the time window. A pending approval past its
-    expiry cannot be approved — the runner will request a fresh one."""
+    expiry cannot be approved - the runner will request a fresh one."""
     from app.services import agent_service
 
     await seed_xp(session, dev_user, 100)
@@ -460,7 +460,7 @@ async def test_stale_approved_approval_re_requests(
     assert drafts[0]["status"] == "drafted"
 
 
-# -- schedule grammar -----------------------------------------------------------------
+# schedule grammar
 
 
 def test_parse_schedule_valid():
@@ -498,7 +498,7 @@ def test_next_run_after_deterministic():
     ) == datetime(2026, 10, 15, 9, 30, 0)
 
 
-# -- jobs API: lifecycle + validation ---------------------------------------------------
+# jobs API: lifecycle + validation
 
 
 @pytest.mark.asyncio
@@ -597,7 +597,7 @@ async def test_job_ownership_enforced(client, session, dev_user):
     ).status_code == 404
 
 
-# -- sweep: budgets, failure policy, approval wait ---------------------------------------
+# sweep: budgets, failure policy, approval wait
 
 
 def make_executor(
@@ -1083,7 +1083,7 @@ async def test_stale_running_run_recovered(session, dev_user, factory, settings)
         assert "worker restart" in (stale.error or "")
 
 
-# -- notifications ------------------------------------------------------------------
+# notifications
 
 
 @pytest.mark.asyncio
@@ -1134,7 +1134,7 @@ async def test_condition_notifications_and_read(
     assert foreign.status_code == 404
 
 
-# -- real SMTP provider against a loopback server (empirical proof) -------------------
+# real SMTP provider against a loopback server (empirical proof)
 
 
 class _LoopbackSMTPServer:

@@ -36,7 +36,7 @@ testmempoolaccept → broadcast → confirm → restore + failure paths, all gre
 5. **The review binds the signature.** `prepare` returns the review payload
    (network, destination, amount, fee, warnings) plus a SHA-256
    `authorization_digest` over exactly those fields. `sign` requires the
-   digest to match. What was shown is what gets signed — no substitution.
+   digest to match. What was shown is what gets signed - no substitution.
 6. **Aliases are labels.** Aliases are unique per user; `prepare` resolves an
    alias once and the digest binds the resolved address, so relabeling the
    address book cannot redirect a prepared transaction (tested).
@@ -49,17 +49,17 @@ testmempoolaccept → broadcast → confirm → restore + failure paths, all gre
 | --- | --- | --- |
 | create | `POST /api/v1/wallets` | 422 bad word count |
 | restore | `POST /api/v1/wallets/restore` | 422 invalid mnemonic; idempotent re-open |
-| list | `GET /api/v1/wallets` | — |
+| list | `GET /api/v1/wallets` | - |
 | balance | `GET /api/v1/wallets/{id}/balance` | 404 foreign/unknown id |
 | unlock | `POST /api/v1/wallets/{id}/unlock` | 403 wrong phrase; 422 garbage |
-| lock | `POST /api/v1/wallets/{id}/lock` | — |
+| lock | `POST /api/v1/wallets/{id}/lock` | - |
 | derive address (+alias) | `POST /api/v1/wallets/{id}/addresses` | 409 alias taken |
 | address book | `GET /wallets/{id}/addresses`, `PATCH /wallets/{id}/addresses/{addr}` | 404 |
 | prepare | `POST /wallets/{id}/prepare` | 422 dust/unparseable/wrong network; 409 insufficient funds |
 | review | response of prepare + `provider.prepared_review` | 404 unknown prepared id |
 | sign | `POST /wallets/{id}/sign` | 403 agent/mismatch; 423 vault locked; 404 |
 | broadcast | `POST /wallets/{id}/broadcast` | 502 definite reject; 504 uncertain (node down) |
-| history | `GET /wallets/{id}/transactions` | — |
+| history | `GET /wallets/{id}/transactions` | - |
 
 Fee policy: `estimatesmartfee 6` when the chain source has data; otherwise
 `XP_WALLET_FALLBACK_FEE_RATE_SAT_VB` (default 2) with an explicit warning;
@@ -72,7 +72,7 @@ On regtest there is no electrs/esplora. Relevant transactions enter the wallet
 graph via `provider.import_transaction(raw_hex)` ("bring-your-own-chain-source");
 the API's `reopen()` restores graph/balance/addresses from the public
 descriptor sqlite after a restart. Swapping in a full Electrum/Esplora sync
-later means replacing only this seam — the signing, review, and policy layers
+later means replacing only this seam - the signing, review, and policy layers
 are untouched.
 
 ## Backup, restore, and migration guide
@@ -83,7 +83,7 @@ wallet ids are deterministic (`descriptor_id`), so the same phrase always
 reopens the same addresses, history, and funds.
 
 **Restore drill (tested):**
-1. `POST /api/v1/wallets/restore {"mnemonic": "…"}` — same id, same first
+1. `POST /api/v1/wallets/restore {"mnemonic": "…"}` - same id, same first
    address as the original wallet.
 2. After a server restart, `reopen()` needs only the stored public
    descriptors; the user's phrase is required again only for signing.
@@ -114,11 +114,11 @@ XP_WALLET_DEFAULT_WORD_COUNT=24
 
 ## Open items (honest)
 
-- Full chain-source sync (Electrum/Esplora) for automatic balance discovery —
+- Full chain-source sync (Electrum/Esplora) for automatic balance discovery -
   `import_transaction` seam is the replacement point.
 - Browser-side / external-signer signing (phase-4+) to close the
   phrase-over-TLS window entirely.
 - Mainnet enablement waits on the security-review release gate (provider
   constructor refuses it today).
-- Lightning (phase-4) selection (LDK vs CLN vs lnd) is a separate decision —
+- Lightning (phase-4) selection (LDK vs CLN vs lnd) is a separate decision -
   no Lightning code depends on this one.

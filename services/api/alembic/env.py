@@ -1,4 +1,4 @@
-"""Alembic environment — wired to xp_core settings and metadata.
+"""Alembic environment - wired to xp_core settings and metadata.
 
 Usage (from services/api):
     ../.venv/bin/alembic upgrade head

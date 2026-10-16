@@ -1,7 +1,7 @@
 <template>
   <div>
     <h1 class="page-title">₿ Wallet</h1>
-    <p class="page-sub">On-chain self-custody — arriving after the phase-3 wallet library decision.</p>
+    <p class="page-sub">On-chain self-custody - arriving after the phase-3 wallet library decision.</p>
 
     <section class="hero">
       <h1 style="font-size: 20px">Custody model, stated plainly</h1>
@@ -17,7 +17,7 @@
       <ul class="small dim" style="padding-left: 18px; line-height: 2">
         <li>That Telegram (or any chat platform) safely stores your keys.</li>
         <li>That an on-chain recovery phrase alone restores Lightning channel state.</li>
-        <li>That the AI agent can "manage" your wallet — it cannot sign anything.</li>
+        <li>That the AI agent can "manage" your wallet - it cannot sign anything.</li>
         <li>That custodial convenience equals self-custody.</li>
       </ul>
     </section>

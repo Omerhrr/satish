@@ -1,7 +1,7 @@
 """Deterministic agent output evaluation (phase 6, deliverable: Agent output
 evaluation).
 
-The evaluation runs in backend code — never in the model — so its verdicts
+The evaluation runs in backend code - never in the model - so its verdicts
 are reproducible and auditable. It scores three axes from the execution
 contract (agent_and_tooling: "Evaluate completeness, source quality, and
 consistency"):
@@ -10,12 +10,12 @@ consistency"):
   plan actually executed?
 - provenance:   do factual/research runs carry sources and citations
   (research_quality: "Cite claims in generated reports")?
-- consistency:  cheap structural checks — duplicate tool steps, empty
+- consistency:  cheap structural checks - duplicate tool steps, empty
   results passed off as findings, contradiction placeholders.
 
 The result is a small dict meant for persistence in the task event stream
 and the final report. Heuristics are intentionally conservative: the score
-describes the artifact's structure, not its truth — limitations are stated
+describes the artifact's structure, not its truth - limitations are stated
 in the notes.
 """
 
@@ -33,7 +33,7 @@ def evaluate_run(
     """Evaluate a finished run. Deterministic; same inputs -> same verdict."""
     notes: list[str] = []
 
-    # -- completeness ---------------------------------------------------------
+    # completeness
     planned = len(plan.get("plan", []) or [])
     completed = sum(1 for s in steps if s.get("status") == "completed")
     deliverable = report.get("deliverable") or plan.get("deliverable")
@@ -54,7 +54,7 @@ def evaluate_run(
         ),
     }
 
-    # -- provenance -------------------------------------------------------------
+    # provenance
     sources = report.get("sources") or []
     research_steps = [
         s
@@ -69,7 +69,7 @@ def evaluate_run(
         "score": 1.0 if not research_steps or sources else 0.0,
     }
 
-    # -- consistency --------------------------------------------------------------
+    # consistency
     tool_seq = [s.get("tool") for s in steps if s.get("tool")]
     duplicates = len(tool_seq) - len(set(tool_seq))
     empty_results = sum(
@@ -83,7 +83,7 @@ def evaluate_run(
         notes.append(f"{duplicates} duplicate tool steps in one plan")
     if empty_results:
         notes.append(
-            f"{empty_results} step results are stubs — findings are placeholders, "
+            f"{empty_results} step results are stubs - findings are placeholders, "
             "not observations (research_quality: do not fabricate)"
         )
     consistency = {
@@ -102,7 +102,7 @@ def evaluate_run(
         "score": overall,
         "notes": notes,
         "limitations": [
-            "structural evaluation only — this does not verify factual truth; "
+            "structural evaluation only - this does not verify factual truth; "
             "sources and claims remain the user's responsibility to review"
         ],
     }

@@ -1,7 +1,7 @@
 """Canonical Lightning state machines (phase 4, decision D11).
 
-Both providers — the canned semantics provider and the real lnd gRPC
-adapter — MUST route every lifecycle mutation through these transitions so
+Both providers - the canned semantics provider and the real lnd gRPC
+adapter - MUST route every lifecycle mutation through these transitions so
 that offline tests and the live node enforce identical rules.
 
 Invoice (receive):  pending -> settled | expired
@@ -12,7 +12,7 @@ Payment (send):     prepared -> authorized -> in_flight -> succeeded | failed
   ``prepare`` is a fee preview + authorization digest (nothing moves);
   ``authorize`` binds the digest the user reviewed; ``submit`` is the node
   submission and its outcome is terminal. Uncertain node outages map to
-  PaymentUncertain — never silently retried.
+  PaymentUncertain - never silently retried.
 """
 
 from __future__ import annotations

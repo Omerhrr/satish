@@ -3,7 +3,7 @@
  *
  * The SDK script is injected when running inside Telegram; outside Telegram
  * (plain browser, preview) everything degrades gracefully. Local storage is
- * NOT treated as a key vault — only display preferences live here.
+ * NOT treated as a key vault - only display preferences live here.
  */
 
 interface TelegramWebApp {

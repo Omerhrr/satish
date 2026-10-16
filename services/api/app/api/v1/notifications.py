@@ -1,7 +1,7 @@
 """Condition-based notifications (phase 9): list + mark read.
 
 Persisted by backend condition evaluation (xp_core.services.automation).
-Telegram relay is a documented open item — the API never pretends a push
+Telegram relay is a documented open item - the API never pretends a push
 happened when it did not.
 """
 

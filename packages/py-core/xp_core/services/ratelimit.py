@@ -6,7 +6,7 @@ Design (honest, phase-10 scope):
   WITHOUT a database hit: ``client_ip`` when no bearer credential is
   presented, otherwise ``client_ip + fingerprint(bearer)`` so concurrent
   sessions of the same client do not drain one shared bucket. The presented
-  bearer is NOT validated here (that is the auth dependency's job) — a forged
+  bearer is NOT validated here (that is the auth dependency's job) - a forged
   bearer only buys the attacker a fresh bucket, the same power spoofing an IP
   behind a proxy has. A validation-joined per-user limit is the documented
   production upgrade path (see docs/security-review.md KL item).
@@ -16,8 +16,8 @@ Design (honest, phase-10 scope):
 - Route classes are code-pinned for phase 10 (auth tightest, money paths
   tight, agent task creation medium, reads loose); ``rate_limit_enabled``
   is the operator kill switch.
-- Trips log a structured warning with a hashed subject — never the raw
-  bearer — and respond 429 with ``Retry-After`` plus honest
+- Trips log a structured warning with a hashed subject - never the raw
+  bearer - and respond 429 with ``Retry-After`` plus honest
   ``X-RateLimit-*`` headers.
 """
 
@@ -161,7 +161,7 @@ def subject_for(client_ip: str, bearer: str | None) -> str:
 
 
 def log_trip(route_class: str, subject: str, path: str, retry_after: int) -> None:
-    # subject may contain an IP; keep it — IPs in ops logs are standard, but
+    # subject may contain an IP; keep it - IPs in ops logs are standard, but
     # never log the raw bearer.
     log.warning(
         "rate_limit_tripped",

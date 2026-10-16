@@ -1,4 +1,4 @@
-"""task_events — append-only task event stream (phase 6)
+"""task_events - append-only task event stream (phase 6)
 
 Revision ID: e5f6a7b8c9d0
 Revises: c7a41f2d9e05

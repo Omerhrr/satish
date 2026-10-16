@@ -3,7 +3,7 @@
     <section class="hero">
       <h1>XP Developer Console</h1>
       <p class="tagline">
-        Phase 1 scaffold status — monorepo, API, worker, ledger, agent adapter and
+        Phase 1 scaffold status - monorepo, API, worker, ledger, agent adapter and
         Mini App wired end to end. Bitcoin + Lightning land after the phase-3
         integration spikes.
       </p>
@@ -38,7 +38,7 @@
     <!-- XP quick card -->
     <section class="card">
       <h2>⚡ XP credits</h2>
-      <p class="sub">Internal usage credits — not Bitcoin, not a token. Rate: 1 sat = {{ balance?.xp_per_sat ?? "…" }} XP.</p>
+      <p class="sub">Internal usage credits - not Bitcoin, not a token. Rate: 1 sat = {{ balance?.xp_per_sat ?? "…" }} XP.</p>
       <div class="balance-big">{{ balance ? balance.balance_xp.toLocaleString() + " XP" : "…" }}</div>
       <div style="display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap">
         <button class="btn primary sensitive-action" :disabled="granting" @click="grant(1000)">
@@ -80,7 +80,7 @@
     <!-- capabilities honesty card -->
     <section class="card">
       <h2>🧭 Capability surface</h2>
-      <p class="sub">What is real today — the product never overclaims.</p>
+      <p class="sub">What is real today - the product never overclaims.</p>
       <div class="table-wrap">
         <table class="ledger">
           <thead>

@@ -8,9 +8,9 @@ cron daily at 03:17 UTC; settings `XP_RETENTION_*`).
 
 | Data | Where | Purpose | Retention | Enforcement |
 | --- | --- | --- | --- | --- |
-| Account + Telegram identity | `users`, `telegram_accounts` | identity, linkage | life of account; deletion is manual (no self-serve erase in this build — disclosed) | none automatic |
+| Account + Telegram identity | `users`, `telegram_accounts` | identity, linkage | life of account; deletion is manual (no self-serve erase in this build - disclosed) | none automatic |
 | Sessions | `sessions` | authentication | 24h TTL by design (phase 2); expired/revoked rows purged **7 days** after expiry/revocation | retention sweep |
-| XP ledger entries | `xp_ledger_entries` | money trail | **NEVER auto-deleted** — append-only, reconciliaton and dispute resolution depend on it | structural (PRESERVED_SURFACES) |
+| XP ledger entries | `xp_ledger_entries` | money trail | **NEVER auto-deleted** - append-only, reconciliaton and dispute resolution depend on it | structural (PRESERVED_SURFACES) |
 | XP accounts (balances) | `xp_accounts` | balance cache over the ledger | **NEVER** auto-deleted while the user exists | structural |
 | Payment intents | `payment_intents` | invoice/settlement records | **NEVER** auto-deleted (financial record) | structural |
 | Task budgets/ledger refs | `tasks` | service delivery + audit | life of account | none automatic |
@@ -34,7 +34,7 @@ cron daily at 03:17 UTC; settings `XP_RETENTION_*`).
   plausibly happen.
 - Backups inherit retention: a restore (R5) resurrects data deleted after
   the backup was taken. Backup snapshots are outside the sweep's reach by
-  design — restore verification, not retention, governs them.
+  design - restore verification, not retention, governs them.
 
 ## Verification
 

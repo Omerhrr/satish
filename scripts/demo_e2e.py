@@ -22,7 +22,7 @@ It boots a fresh in-memory database, then walks the real API surface
 Honesty (plan phase-11: "real supported flows, not mocked financial
 claims"): the money path above is the REAL settlement code (CAS +
 idempotency + 1:1 reconciliation) against CANNED Lightning/wallet
-providers — every canned surface labels itself as such in API responses.
+providers - every canned surface labels itself as such in API responses.
 The real-Bitcoin proofs are separate live drills: `make wallet-regtest`
 (BDK + bitcoind) and `make lightning-drill` (two-node lnd v0.21.4-beta),
 both committed and runnable on a healthy host. This demo never claims
@@ -80,26 +80,26 @@ async def run_demo(log) -> dict[str, Any]:
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as c:
-            # -- 1 health ------------------------------------------------------
+            # 1 health
             r = await c.get("/healthz")
             assert r.status_code == 200
             h = (await c.get("/api/v1/health")).json()
             assert h["database"]["status"] == "ok"
             step("health", status=h["status"], database=h["database"]["status"], env=h["env"])
 
-            # -- 2 identity ----------------------------------------------------
+            # 2 identity
             r = await c.post("/api/v1/auth/telegram", json={"init_data": ""})
             assert r.status_code == 200
             auth = r.json()
             assert auth["mode"] == "dev" and auth["session_token"]
             step("session", mode=auth["mode"], ttl="24h", token_issued=True)
 
-            # -- 3 XP economy ----------------------------------------------------
+            # 3 XP economy
             r = await c.post("/api/v1/xp/dev/grant", json={"amount_xp": 2_000})
             assert r.status_code == 200
             step("xp_grant", balance=r.json()["balance_xp"])
 
-            # -- 4 self-custody wallet ----------------------------------------
+            # 4 self-custody wallet
             r = await c.post("/api/v1/wallets", json={"label": "demo"})
             assert r.status_code == 201, r.text
             wallet = r.json()
@@ -113,7 +113,7 @@ async def run_demo(log) -> dict[str, Any]:
                 seed_stored_server_side=False,
             )
 
-            # -- 5 payments: purchase -> invoice -> settle ----------------------
+            # 5 payments: purchase -> invoice -> settle
             r = await c.post("/api/v1/xp/purchases", json={"pack_id": "pack_1000sats"})
             assert r.status_code == 201, r.text
             purchase = r.json()
@@ -143,7 +143,7 @@ async def run_demo(log) -> dict[str, Any]:
                  double_credit_possible=False, ledger_entry=receipt["ledger_entry_id"][:8] + "…",
                  balance_after=balance)
 
-            # -- 6 agent task ----------------------------------------------------
+            # 6 agent task
             r = await c.post(
                 "/api/v1/tasks",
                 json={
@@ -159,7 +159,7 @@ async def run_demo(log) -> dict[str, Any]:
             r = await c.post(f"/api/v1/tasks/{task['id']}/run")
             assert r.status_code == 202, r.text
             final_status = r.json()["status"]
-            step("agent_run", engine="DSH stub (no API key configured — disclosed)",
+            step("agent_run", engine="DSH stub (no API key configured - disclosed)",
                  status=final_status)
 
             result = (await c.get(f"/api/v1/tasks/{task['id']}/result")).json()
@@ -167,7 +167,7 @@ async def run_demo(log) -> dict[str, Any]:
                  limitations=len(result.get("limitations", [])),
                  xp_receipt=bool(result.get("xp_receipt") or result.get("xp")))
 
-            # -- 7 artifacts -------------------------------------------------------
+            # 7 artifacts
             r = await c.post(
                 "/api/v1/artifacts/demo-pdf",
                 json={
@@ -185,7 +185,7 @@ async def run_demo(log) -> dict[str, Any]:
             step("artifact_pdf", bytes=len(dl.content), magic="%PDF-", private_storage=True,
                  owner_checked=True)
 
-            # -- 8 ops readiness -----------------------------------------------------
+            # 8 ops readiness
             alerts = (await c.get("/api/v1/ops/reconciliation/alerts")).json()
             obs = (await c.get("/api/v1/ops/observability")).json()
             step("ops", open_critical=alerts["open_critical"], open_warning=alerts["open_warning"],
@@ -196,7 +196,7 @@ async def run_demo(log) -> dict[str, Any]:
             "Wallet/Lightning providers here are the canned, deterministic ones; "
             "every API response labels canned surfaces as canned.",
             "The settlement path IS the production code path (CAS + ledger "
-            "idempotency + 1:1 reconciliation) — replay refusal is structural.",
+            "idempotency + 1:1 reconciliation) - replay refusal is structural.",
             "Real-Bitcoin proofs are separate committed drills: make wallet-regtest, "
             "make lightning-drill (need a healthy host).",
             "The agent ran in stub mode because no DeepSeek key is configured; "
@@ -209,7 +209,7 @@ async def _main() -> int:
     def log(msg: str) -> None:
         print(msg, flush=True)
 
-    print("XP end-to-end demo — fresh in-memory DB, zero external services")
+    print("XP end-to-end demo - fresh in-memory DB, zero external services")
     report = await run_demo(log)
     for note in report["honesty_notes"]:
         print(f"  note: {note}")

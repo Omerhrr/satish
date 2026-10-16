@@ -1,9 +1,9 @@
-# XP local infrastructure — Postgres + Redis for developer environments.
+# XP local infrastructure - Postgres + Redis for developer environments.
 #
 #   docker compose -f infra/docker-compose.yml up -d
 #
 # Bitcoin/Lightning regtest nodes (bitcoind, electrs, LDK/CLN) are added in
-# phase 3 after the wallet/Lightning implementation decisions — see
+# phase 3 after the wallet/Lightning implementation decisions - see
 # docs/decisions.md. Nothing here holds secret material.
 services:
   postgres:

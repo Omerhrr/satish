@@ -44,7 +44,7 @@ from app.services import wallet_service as svc
 router = APIRouter(tags=["wallets"])
 
 
-# -- schemas ---------------------------------------------------------------------
+# schemas
 
 
 class WalletCreateIn(BaseModel):
@@ -120,7 +120,7 @@ def _wallet_out(row) -> dict:
     }
 
 
-# -- endpoints ---------------------------------------------------------------------
+# endpoints
 
 
 @router.get("/wallets/capabilities", include_in_schema=True)
@@ -133,7 +133,7 @@ async def wallet_capabilities(session: DbSession, user: CurrentUser):
             "hardware-wallet-level protection",
             "browser-side signing (phase-4+ item)",
         ],
-        "secrets_at_rest": "none — persisted state uses public descriptors only",
+        "secrets_at_rest": "none - persisted state uses public descriptors only",
         "agent_signing": "forbidden by the signing boundary",
         "mainnet": "release-gated on security review",
     }
@@ -147,7 +147,7 @@ async def create_wallet(payload: WalletCreateIn, session: DbSession, user: Curre
     except WalletError as exc:
         raise _http_error(exc) from exc
     row = Wallet(
-        id=created.wallet_id,  # deterministic descriptor id — matches provider state
+        id=created.wallet_id,  # deterministic descriptor id - matches provider state
         user_id=user.id,
         wallet_type="software",
         network=created.network.value,
@@ -164,7 +164,7 @@ async def create_wallet(payload: WalletCreateIn, session: DbSession, user: Curre
         **_wallet_out(row),
         "first_address": created.first_address,
         "mnemonic_once": created.mnemonic_once,
-        "mnemonic_display": "one_time — shown now, never again, never stored",
+        "mnemonic_display": "one_time - shown now, never again, never stored",
     }
 
 
@@ -184,7 +184,7 @@ async def restore_wallet(payload: WalletRestoreIn, session: DbSession, user: Cur
             raise HTTPException(status_code=404, detail="wallet not found")
         return {**_wallet_out(existing), "restored": True, "first_address": created.first_address}
     row = Wallet(
-        id=created.wallet_id,  # deterministic descriptor id — matches provider state
+        id=created.wallet_id,  # deterministic descriptor id - matches provider state
         user_id=user.id,
         wallet_type="software",
         network=created.network.value,
@@ -359,7 +359,7 @@ async def sign_transaction(wallet_id: str, payload: SignIn, session: DbSession, 
         signed = await provider.sign_prepared(
             payload.prepared_id,
             authorization_digest=payload.authorization_digest,
-            actor=f"user:{user.id}",  # user identity — never an agent
+            actor=f"user:{user.id}",  # user identity - never an agent
         )
     except WalletError as exc:
         raise _http_error(exc) from exc
@@ -412,7 +412,7 @@ async def wallet_transactions(wallet_id: str, session: DbSession, user: CurrentU
     }
 
 
-# -- helpers ---------------------------------------------------------------------
+# helpers
 
 
 def _settings():

@@ -1,7 +1,7 @@
 [project]
 name = "xp-worker"
 version = "0.1.0"
-description = "XP background worker (services/worker) — arq queue + WeasyPrint PDF jobs"
+description = "XP background worker (services/worker) - arq queue + WeasyPrint PDF jobs"
 requires-python = ">=3.11"
 dependencies = [
     "xp-core",

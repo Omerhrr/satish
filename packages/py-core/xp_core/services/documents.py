@@ -1,6 +1,6 @@
 """Document generation with quality gates (phase 7 deliverables #5-#8).
 
-Pure rendering + validation — no DB, no network. The report builder in the
+Pure rendering + validation - no DB, no network. The report builder in the
 API layer assembles a ReportSpec from provenance; THIS module enforces the
 report quality checks and refuses to render a spec that violates them:
 
@@ -27,7 +27,7 @@ from typing import Any, Literal
 DocumentKind = Literal["pdf", "csv", "xlsx"]
 
 
-# -- report spec -------------------------------------------------------------------
+# report spec
 
 
 @dataclass
@@ -63,11 +63,11 @@ class ReportSpec:
     mode_notes: list[str] = field(default_factory=list)
 
 
-# -- quality checks -----------------------------------------------------------------
+# quality checks
 
 
 def check_report_spec(spec: ReportSpec) -> list[str]:
-    """Report quality checks (phase 7 deliverable #8) — backend-enforced.
+    """Report quality checks (phase 7 deliverable #8) - backend-enforced.
 
     Returns a list of violations; an empty list means the spec may render.
     These gates are deterministic and re-runnable, so a report that passed
@@ -91,7 +91,7 @@ def check_report_spec(spec: ReportSpec) -> list[str]:
     return violations
 
 
-# -- renderers ---------------------------------------------------------------------
+# renderers
 
 
 def render_report_html(spec: ReportSpec) -> str:
@@ -107,22 +107,22 @@ def render_report_html(spec: ReportSpec) -> str:
         f"<li class='claim kind-{esc(c.kind)}'>"
         f"<span class='kind'>{esc(c.kind)}</span> {esc(c.text)}</li>"
         for c in spec.claims
-    ) or "<li class='claim muted'>No factual claims were collected — see limitations.</li>"
+    ) or "<li class='claim muted'>No factual claims were collected - see limitations.</li>"
 
     conflicts_html = (
         "".join(
-            f"<li><b>{esc(c.get('subject', ''))}</b> — {esc(c.get('detail', ''))}</li>"
+            f"<li><b>{esc(c.get('subject', ''))}</b> - {esc(c.get('detail', ''))}</li>"
             for c in spec.conflicts
         )
         or "<li>None detected among fetched sources.</li>"
     )
     gaps_html = (
         "".join(f"<li>{esc(g)}</li>" for g in spec.gaps)
-        or "<li>None — all required keys were covered.</li>"
+        or "<li>None - all required keys were covered.</li>"
     )
     sources_html = "".join(
         f"<li class='src'><span class='sid'>S{s.index}</span> "
-        f"{esc(s.title or '(untitled)')} — <span class='url'>{esc(s.url)}</span><br>"
+        f"{esc(s.title or '(untitled)')} - <span class='url'>{esc(s.url)}</span><br>"
         f"<span class='srcmeta'>status {esc(s.status)} · retrieved "
         f"{esc(s.retrieved_at.strftime('%Y-%m-%d %H:%M UTC') if s.retrieved_at else 'n/a')} · "
         f"{s.fact_count} facts · mode {esc(s.retrieval_mode)}</span></li>"
@@ -135,7 +135,7 @@ def render_report_html(spec: ReportSpec) -> str:
     doc = f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"><style>
   @page {{ size: A4; margin: 2cm 2.2cm;
-    @bottom-center {{ content: "XP research report — task {esc(spec.task_id)[:8]} — page " counter(page) " of " counter(pages); font-size: 9px; color: #8a8f98; }} }}
+    @bottom-center {{ content: "XP research report - task {esc(spec.task_id)[:8]} - page " counter(page) " of " counter(pages); font-size: 9px; color: #8a8f98; }} }}
   body {{ font-family: "DejaVu Sans", sans-serif; color: #14181f; line-height: 1.5; font-size: 11px; }}
   .brand {{ color: #f7931a; font-weight: 700; letter-spacing: 2px; font-size: 12px; }}
   h1 {{ font-size: 21px; margin: 6px 0 2px; }}
@@ -187,7 +187,7 @@ def render_report_html(spec: ReportSpec) -> str:
 def render_report_pdf(spec: ReportSpec) -> bytes:
     """Render the cited research report to PDF via WeasyPrint.
 
-    Refuses (DocumentQualityError) when the spec violates quality checks —
+    Refuses (DocumentQualityError) when the spec violates quality checks -
     an uncited report never leaves the building.
     """
     from weasyprint import HTML  # lazy: keeps xp_core imports light
@@ -223,7 +223,7 @@ def build_xlsx(sheet_title: str, headers: list[str], rows: list[list[Any]]) -> b
     return buffer.getvalue()
 
 
-# -- validation --------------------------------------------------------------------
+# validation
 
 
 def validate_document(kind: DocumentKind, data: bytes) -> tuple[bool, str]:

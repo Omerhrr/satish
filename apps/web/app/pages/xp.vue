@@ -2,7 +2,7 @@
   <div>
     <h1 class="page-title">⚡ XP Ledger</h1>
     <p class="page-sub">
-      Append-only accounting. Balance always equals the sum of entries — every
+      Append-only accounting. Balance always equals the sum of entries - every
       credit, reservation, charge and refund is a visible line.
     </p>
 
@@ -38,7 +38,7 @@
               <td colspan="6"><span class="spinner" /> Loading…</td>
             </tr>
             <tr v-else-if="ledger.items.length === 0">
-              <td colspan="6" class="dim">No entries yet — seed some XP to see the ledger move.</td>
+              <td colspan="6" class="dim">No entries yet - seed some XP to see the ledger move.</td>
             </tr>
             <tr v-for="e in ledger?.items ?? []" :key="e.id">
               <td class="mono small">{{ shortTime(e.created_at) }}</td>
@@ -47,8 +47,8 @@
                 {{ e.amount >= 0 ? "+" : "" }}{{ e.amount.toLocaleString() }}
               </td>
               <td class="mono" style="text-align: right">{{ e.balance_after.toLocaleString() }}</td>
-              <td class="mono small dim">{{ e.reference_type || "—" }}<template v-if="e.reference_id"> · {{ e.reference_id.slice(0, 8) }}</template></td>
-              <td class="small dim">{{ e.note ?? "—" }}</td>
+              <td class="mono small dim">{{ e.reference_type || "-" }}<template v-if="e.reference_id"> · {{ e.reference_id.slice(0, 8) }}</template></td>
+              <td class="small dim">{{ e.note ?? "-" }}</td>
             </tr>
           </tbody>
         </table>

@@ -1,4 +1,4 @@
-"""PlanRunner — implements the plan's agent_execution_contract stages.
+"""PlanRunner - implements the plan's agent_execution_contract stages.
 
 Stages: goal -> (clarify) -> plan+estimate -> approval gate -> typed tool
 execution with least privilege -> evaluation -> artifact -> transparent
@@ -68,14 +68,14 @@ class PlanRunner:
         self.registry = registry
         self.persistence = persistence or NullPersistence()
         self.max_steps = max_steps
-        # Cancellation (1) cooperative in-process flag — cancel() from any
-        # task; (2) durable check — should_cancel() is awaited between steps
+        # Cancellation (1) cooperative in-process flag - cancel() from any
+        # task; (2) durable check - should_cancel() is awaited between steps
         # so a cancel recorded in the DB stops a worker run mid-flight
         # (phase-6 acceptance: task states persist across worker restarts).
         self._cancel_event = asyncio.Event()
         self._should_cancel = should_cancel
         # Model usage ledger for this runner instance: one entry per model
-        # call (dsh_integration requirement #8 — track cost where measurable).
+        # call (dsh_integration requirement #8 - track cost where measurable).
         self.model_usage: list[dict[str, Any]] = []
 
     async def _cancelled_durably(self) -> bool:
@@ -222,7 +222,7 @@ class PlanRunner:
     ) -> RunResult:
         """Full loop with hard budget cap and step limit (bounded execution).
 
-        skip_steps: indexes already persisted as completed on a resume run —
+        skip_steps: indexes already persisted as completed on a resume run -
         durable-state resume after approval or worker restart.
         """
         plan = await self.draft_plan(goal, constraints)

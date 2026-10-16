@@ -10,7 +10,7 @@ export XP_ENV="${XP_ENV:-dev}"
 
 mkdir -p "$ROOT/data/artifacts"
 
-# -- 1. FastAPI on :8001 (skip if already healthy) -----------------------------
+# 1. FastAPI on :8001 (skip if already healthy)
 if ! curl -sf http://127.0.0.1:8001/healthz >/dev/null 2>&1; then
   cd "$ROOT/services/api"
   "$ROOT/.venv/bin/uvicorn" app.main:app --host 127.0.0.1 --port 8001 >> "$ROOT/data/api.log" 2>&1 &
@@ -25,7 +25,7 @@ for i in $(seq 1 30); do
   sleep 1
 done
 
-# -- 2. Nuxt Mini App on :3000 (foreground process) ----------------------------
+# 2. Nuxt Mini App on :3000 (foreground process)
 cd "$ROOT/apps/web"
 # Gateway mode by default (single exposed port via XTransformPort). Override
 # with an explicit empty NUXT_PUBLIC_API_PORT to use direct API_BASE mode.

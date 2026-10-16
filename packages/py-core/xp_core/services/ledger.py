@@ -3,7 +3,7 @@
 Design:
 - Every mutation happens in the caller's database transaction (invariant #1).
 - Balance changes use an atomic compare-and-swap UPDATE so concurrent tasks
-  can never spend the same credits (invariants #4, #5) — portable across
+  can never spend the same credits (invariants #4, #5) - portable across
   SQLite (dev) and Postgres (prod).
 - Every balance change appends an append-only ledger entry; refunds and
   corrections are new entries (invariant #6) and balance == sum(entries)

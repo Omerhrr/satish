@@ -1,4 +1,4 @@
-"""DSH adapter tool registry tests — allowlist enforcement and budgets."""
+"""DSH adapter tool registry tests - allowlist enforcement and budgets."""
 
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ async def test_unknown_tool_rejected():
 
 
 async def test_scope_denial():
-    """Agent only gets granted scopes — email.send must be unreachable without it."""
+    """Agent only gets granted scopes - email.send must be unreachable without it."""
     registry = default_registry()
     with pytest.raises(ScopeDenied):
         await registry.execute("email.send", {"to": "x@y.z", "subject": "s", "body": "b"}, set())

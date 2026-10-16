@@ -3,11 +3,11 @@
 A purchase IS a receive-direction PaymentIntent viewed through the XP
 economy: the plan's XP group exposes it as POST /xp/purchases ->
 GET /xp/purchases/{purchase_id} (api_contract). Credit still happens only
-through lightning_service.settle's double gate — this service never moves
+through lightning_service.settle's double gate - this service never moves
 XP itself, so there is exactly one settlement processor in the system.
 
 Receipts are DERIVED VIEWS over (payment intent, ledger purchase entry),
-not a new table — the 16-table data model stays intact and a receipt can
+not a new table - the 16-table data model stays intact and a receipt can
 never disagree with the ledger it summarizes. The PDF receipt is a
 WeasyPrint artifact rendered by the worker.
 """

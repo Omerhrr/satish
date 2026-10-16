@@ -1,4 +1,4 @@
-"""arq WorkerSettings — run with: arq worker.settings.WorkerSettings"""
+"""arq WorkerSettings - run with: arq worker.settings.WorkerSettings"""
 
 from __future__ import annotations
 

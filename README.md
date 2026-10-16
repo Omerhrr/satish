@@ -1,14 +1,14 @@
-# XP — Bitcoin-Native Telegram AI Workforce
+# XP - Bitcoin-Native Telegram AI Workforce
 
 Open-source, Telegram-native Bitcoin self-custody wallet and AI work platform.
 Users pay for research, business intelligence, document creation, and approved
 automations using sats converted into application usage credits called **XP**.
 
-> **Status (2026-10-16): phases 0–11 implemented** — 266 tests green, ruff
+> **Status (2026-10-16): phases 0-11 implemented** - 266 tests green, ruff
 > clean, every deliverable traced to the plan. Honest boundaries are
 > first-class: `docs/known-limitations.md` (KL-01…KL-15) lists exactly what
 > is *not* production-proven yet. Nothing here asks you to trust us with
-> custody of your funds — see the security model below.
+> custody of your funds - see the security model below.
 
 ## The one-minute demo (zero external services)
 
@@ -51,7 +51,7 @@ transcript: `docs/demo-walkthrough.md`.
         └────────┬───┘ └────┬─────┘ └──┬───────┘ └───────┬───────┘
                  │          │          │                 │
         ┌────────▼──────────▼──────────▼─────────────────▼───────┐
-        │        xp_core (packages/py-core) — the invariants     │
+        │        xp_core (packages/py-core) - the invariants     │
         │  append-only XP ledger · CAS balances · idempotent     │
         │  settlement · reconciliation alerts · retention sweep  │
         └────────────────────────┬───────────────────────────────┘
@@ -76,8 +76,8 @@ Trust boundaries in prose: `docs/architecture.md`; the full STRIDE review:
 | Job queue | Redis + arq (inline dev fallback without Redis) |
 | PDF/docs | WeasyPrint (`services/worker`) |
 | Telegram bot | aiogram 3 (`apps/bot`) |
-| Bitcoin | BDK (`bdkpython 3.1.1`), public-descriptor persistence — selected via regtest proof (ADR D10) |
-| Lightning | lnd v0.21.4-beta via pinned gRPC stubs — selected via two-node regtest drill (ADR D11) |
+| Bitcoin | BDK (`bdkpython 3.1.1`), public-descriptor persistence - selected via regtest proof (ADR D10) |
+| Lightning | lnd v0.21.4-beta via pinned gRPC stubs - selected via two-node regtest drill (ADR D11) |
 
 ## Repository layout
 
@@ -85,7 +85,7 @@ Trust boundaries in prose: `docs/architecture.md`; the full STRIDE review:
 xp/
 ├── apps/
 │   ├── web/                  # Nuxt Mini App (wallet, XP, tasks, connections, automations…)
-│   └── bot/                  # Telegram bot — 14-command router, deep links to Mini App
+│   └── bot/                  # Telegram bot - 14-command router, deep links to Mini App
 ├── services/
 │   ├── api/                  # FastAPI: /api/v1 (11 routers incl. ops)
 │   ├── worker/               # arq worker: PDF/receipt jobs, agent runs, automation + retention crons
@@ -101,7 +101,7 @@ xp/
 │   └── api-client/           # typed fetch client used by the Mini App
 ├── scripts/                  # drills + audits + demo (committed, runnable)
 ├── infra/                    # docker-compose (Postgres+Redis), env templates
-├── docs/                     # everything: threat model, IR runbooks, policies, decisions D1–D17
+├── docs/                     # everything: threat model, IR runbooks, policies, decisions D1-D17
 └── tests/                    # 266 pytest cases: invariants, forgery, allowlist, lifecycle, drills
 ```
 
@@ -148,7 +148,7 @@ cd services/worker && ../../.venv/bin/arq worker.settings.WorkerSettings
 
 1. Create a bot with @BotFather, put the token in `XP_TELEGRAM_BOT_TOKEN`.
 2. Point `XP_MINI_APP_URL` at your deployed Mini App.
-3. `make run-bot` — `/start`, `/help`, `/xp` (live balance), and every
+3. `make run-bot` - `/start`, `/help`, `/xp` (live balance), and every
    security-sensitive flow deep-links into the Mini App. The bot never asks
    for seed phrases or private keys.
 
@@ -161,9 +161,9 @@ cd services/worker && ../../.venv/bin/arq worker.settings.WorkerSettings
   user approval (digest-bound, TTL-expiring approval records).
 - Retrieved web content is wrapped as untrusted data; instructions inside it
   cannot override server authorization.
-- Without `XP_DEEPSEEK_API_KEY` the adapter runs in deterministic stub mode —
+- Without `XP_DEEPSEEK_API_KEY` the adapter runs in deterministic stub mode -
   CI and local dev stay hermetic. `make dsh-verify` is the live proof
-  (currently pending a key — KL-01).
+  (currently pending a key - KL-01).
 
 ## Tests & quality gates
 
@@ -193,7 +193,7 @@ make backup-drill   # backup/restore roundtrip with ledger re-verification
 - Rate limiting per route class with honest 429s (`XP_RATE_LIMIT_ENABLED`
   kill switch); reconciliation alert queue at `/api/v1/ops/*`
   (DEV_MODE-gated system seam); daily retention sweep that can never touch
-  the ledger; incident runbooks R1–R6 in `docs/incident-response.md`;
+  the ledger; incident runbooks R1-R6 in `docs/incident-response.md`;
   privacy windows in `docs/privacy-retention.md`.
 - The complete "what is not production-proven" register:
   `docs/known-limitations.md`.
@@ -204,19 +204,19 @@ Implemented vs. planned, phase by phase: `docs/roadmap.md`.
 
 ## Contributing
 
-`CONTRIBUTING.md` — setup, quality bars, and the honesty principle that
+`CONTRIBUTING.md` - setup, quality bars, and the honesty principle that
 gates every PR: no uncompleted feature may be represented as
 production-ready.
 
 ## Btrust adoption
 
-`docs/btrust-proposal.md` — why Bitcoin-native self-custody matters for AI
+`docs/btrust-proposal.md` - why Bitcoin-native self-custody matters for AI
 workforces, target users, architecture and security summary, and the
 open-source maintenance plan.
 
 ## License & principles
 
-Open source (license review pending — KL-14/phase-0 deliverable).
+Open source (license review pending - KL-14/phase-0 deliverable).
 Non-negotiables from the plan: self-custody must be real and testable;
 Telegram is an interface, not a key vault; the AI agent never receives seed
 phrases or unrestricted signing authority; Bitcoin and XP are separate

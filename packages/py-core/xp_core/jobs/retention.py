@@ -79,7 +79,7 @@ async def retention_sweep(session: AsyncSession, now: datetime | None = None) ->
     now = _naive(now or datetime.now(UTC))
     report: dict[str, Any] = {"ran_at": now.isoformat(), "deleted": {}, "preserved": PRESERVED_SURFACES}
 
-    # -- sessions --------------------------------------------------------------
+    # sessions
     session_cutoff = now - timedelta(days=settings.retention_sessions_days)
     res = await session.execute(
         delete(Session).where(
@@ -89,7 +89,7 @@ async def retention_sweep(session: AsyncSession, now: datetime | None = None) ->
     )
     report["deleted"]["sessions"] = res.rowcount
 
-    # -- notifications ----------------------------------------------------------
+    # notifications
     read_cutoff = now - timedelta(days=settings.retention_notifications_read_days)
     unread_cutoff = now - timedelta(days=settings.retention_notifications_unread_days)
     res = await session.execute(
@@ -100,7 +100,7 @@ async def retention_sweep(session: AsyncSession, now: datetime | None = None) ->
     )
     report["deleted"]["notifications"] = res.rowcount
 
-    # -- automation runs (finished ones only) ------------------------------------
+    # automation runs (finished ones only)
     run_cutoff = now - timedelta(days=settings.retention_automation_runs_days)
     res = await session.execute(
         delete(AutomationRun).where(
@@ -109,7 +109,7 @@ async def retention_sweep(session: AsyncSession, now: datetime | None = None) ->
     )
     report["deleted"]["automation_runs"] = res.rowcount
 
-    # -- terminal email drafts ----------------------------------------------------
+    # terminal email drafts
     draft_cutoff = now - timedelta(days=settings.retention_email_drafts_sent_days)
     res = await session.execute(
         delete(EmailDraft).where(

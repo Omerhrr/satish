@@ -5,7 +5,7 @@ write ops queues run behind the operator's own access control (documented in
 docs/incident-response.md); exposing them publicly would leak money-integrity
 state, so this build refuses outside DEV_MODE.
 
-Nothing here mutates balances — alerts are a queue over the ledger, the
+Nothing here mutates balances - alerts are a queue over the ledger, the
 ledger stays authoritative.
 """
 
@@ -129,7 +129,7 @@ async def resolve_alert(
     """Explicit operator resolution with a required-trail note.
 
     Critical alerts are never auto-resolved by the sweep (a money-integrity
-    mismatch that "disappears" is itself evidence) — this endpoint is the
+    mismatch that "disappears" is itself evidence) - this endpoint is the
     ONLY path to resolved for them.
     """
     _require_dev()

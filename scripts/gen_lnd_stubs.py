@@ -3,7 +3,7 @@
 Downloads the lnd v0.21.4-beta release source (the SAME tag our provider
 speaks to) and compiles its own .proto set with grpcio-tools into
 ``lightning_adapter/lnd_stubs/``. Generated code is committed so wire drift
-against the pinned release is a reviewable diff — the same philosophy as the
+against the pinned release is a reviewable diff - the same philosophy as the
 DSH revision manifest (D8).
 
 Layout produced:
@@ -115,7 +115,7 @@ def _compile(src_root: Path, proto: str, out: Path) -> None:
     """Compile a proto path relative to src_root/lnrpc (lnd's single -I root).
 
     lnd's protos import siblings as ``lightning.proto`` and subpackages as
-    ``signrpc/signer.proto`` — all relative to ``lnrpc/`` — so that single
+    ``signrpc/signer.proto`` - all relative to ``lnrpc/`` - so that single
     -I resolves everything. Outputs land under ``out`` mirroring the proto's
     path below lnrpc/; callers relocate.
     """
@@ -147,7 +147,7 @@ def generate(src_root: Path) -> None:
         shutil.rmtree(OUT_DIR)
     OUT_DIR.mkdir(parents=True)
     (OUT_DIR / "__init__.py").write_text(
-        '"""Generated lnd gRPC stubs — pinned '
+        '"""Generated lnd gRPC stubs - pinned '
         f"{LND_VERSION} release protos.\n\n"
         "Do not edit by hand; regenerate via scripts/gen_lnd_stubs.py.\n"
         '"""\n'

@@ -1,5 +1,4 @@
-// XP Telegram Mini App — Nuxt 4 configuration.
-//
+// XP Telegram Mini App - Nuxt 4 configuration.
 // SPA mode: Telegram Mini Apps load inside a webview where SSR adds no value
 // and complicates auth; the app talks to the FastAPI service directly.
 export default defineNuxtConfig({
@@ -20,7 +19,7 @@ export default defineNuxtConfig({
   },
   app: {
     head: {
-      title: "XP — Bitcoin-Native AI Workforce",
+      title: "XP - Bitcoin-Native AI Workforce",
       htmlAttrs: { lang: "en" },
       meta: [
         { charset: "utf-8" },

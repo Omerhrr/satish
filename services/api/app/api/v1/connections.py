@@ -3,7 +3,7 @@
 Acceptance coverage: "External actions require valid authorization and
 approved scope" + "Users can revoke connected services". Credentials are
 Fernet-encrypted at rest with the operator master key; NO response ever
-contains a secret — the vault is the single decryption path.
+contains a secret - the vault is the single decryption path.
 """
 
 from __future__ import annotations

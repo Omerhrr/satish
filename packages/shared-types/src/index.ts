@@ -4,7 +4,7 @@
  * These types are the single source of truth for the Nuxt app and the
  * api-client package. Keep them in sync with the FastAPI response models
  * (an OpenAPI-generated client can replace this file once the API
- * stabilizes — api_rules #7).
+ * stabilizes - api_rules #7).
  */
 
 export type Env = "dev" | "regtest" | "testnet" | "staging" | "prod";
@@ -116,7 +116,7 @@ export interface ArtifactOut {
   created_at: string;
 }
 
-// -- task result: explicit result + limitations + XP receipt (phase 7) ------------
+// task result: explicit result + limitations + XP receipt (phase 7)
 
 export interface ResultArtifactOut {
   id: string;
@@ -184,7 +184,7 @@ export interface TaskResultOut {
   scored: ScoredOut | null;
 }
 
-// -- request payloads -------------------------------------------------------------
+// request payloads
 
 export interface TaskCreateIn {
   objective: string;
@@ -203,7 +203,7 @@ export interface DemoPdfIn {
   metadata?: Record<string, unknown>;
 }
 
-// -- Lightning (phase 4) ---------------------------------------------------------
+// Lightning (phase 4)
 
 export type LightningIntentStatus =
   | "created"
@@ -272,7 +272,7 @@ export interface LightningCapabilitiesOut {
   custody_disclosure: string[];
 }
 
-// -- XP economy: purchases / receipts (phase 5) -------------------------------------
+// XP economy: purchases / receipts (phase 5)
 
 export interface RateOut {
   xp_per_sat: number;
@@ -324,7 +324,7 @@ export interface ReconcileReportOut {
   discrepancies: Array<Record<string, unknown>>;
 }
 
-// -- Agent runtime: events / approvals (phase 6) --------------------------------------
+// Agent runtime: events / approvals (phase 6)
 
 export interface TaskEventOut {
   seq: number;
@@ -365,7 +365,7 @@ export interface SettleTaskIn {
   actual_xp: number;
 }
 
-// -- phase 9: connections / email drafts / automation -----------------------------
+// phase 9: connections / email drafts / automation
 
 export interface ConnectionOut {
   id: string;

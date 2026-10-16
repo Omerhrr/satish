@@ -38,7 +38,7 @@ from app.services import lightning_service as svc
 router = APIRouter(prefix="/lightning", tags=["lightning"])
 
 
-# -- schemas ---------------------------------------------------------------------
+# schemas
 
 
 class InvoiceCreateIn(BaseModel):
@@ -93,7 +93,7 @@ def _http_error(exc: Exception) -> HTTPException:
     return HTTPException(status_code=code, detail=str(exc))
 
 
-# -- capabilities / node surface ---------------------------------------------------
+# capabilities / node surface
 
 
 @router.get("/capabilities")
@@ -117,7 +117,7 @@ async def get_channels(settings: SettingsDep) -> dict:
         raise _http_error(exc) from exc
 
 
-# -- receive ------------------------------------------------------------------------
+# receive
 
 
 @router.post("/invoices", status_code=status.HTTP_201_CREATED)
@@ -187,7 +187,7 @@ async def settle_invoice_dev(
 ) -> dict:
     """DEV_MODE-only auto-settle: the backend pulls the preimage from the
     canned provider itself so the Mini App can exercise the full billing
-    flow without handling preimages. Refused outside dev/canned mode —
+    flow without handling preimages. Refused outside dev/canned mode -
     production settlement arrives exclusively from the node's stream."""
     from lightning_adapter import CannedLightningProvider
 
@@ -216,7 +216,7 @@ async def settle_invoice_dev(
         raise _http_error(exc) from exc
 
 
-# -- send -----------------------------------------------------------------------------
+# send
 
 
 @router.post("/payments/prepare", status_code=status.HTTP_201_CREATED)

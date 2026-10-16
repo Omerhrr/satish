@@ -45,7 +45,7 @@ make migrate && make demo   # proves your env end-to-end
    spec; the audit gate will reject `*`, `git+`, and `:latest`.
 4. **Security-relevant changes** (auth, scopes, approvals, wallet,
    Lightning, credentials) need a test that pins the mitigation they touch,
-   and a look at `docs/threat-model.md` — update it if the boundary moves.
+   and a look at `docs/threat-model.md` - update it if the boundary moves.
 5. **Schema changes** go through Alembic with a roundtrip-verified
    migration and a docstring explaining the phase/decision.
 6. **Docs move with code.** If your change alters behavior described in

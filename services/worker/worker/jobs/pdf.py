@@ -27,7 +27,7 @@ _HTML_SHELL = """<!DOCTYPE html>
 <meta charset="utf-8">
 <style>
   @page {{ size: A4; margin: 2cm 2.2cm;
-    @bottom-center {{ content: "XP — page " counter(page) " of " counter(pages);
+    @bottom-center {{ content: "XP - page " counter(page) " of " counter(pages);
                       font-size: 9px; color: #8a8f98; }} }}
   body {{ font-family: "DejaVu Sans", sans-serif; color: #14181f; line-height: 1.55; }}
   .brand {{ color: #f7931a; font-weight: 700; letter-spacing: 2px; font-size: 12px; }}
@@ -48,7 +48,7 @@ _HTML_SHELL = """<!DOCTYPE html>
   <div class="disclaimer">
     Scaffold demo artifact. Research reports produced by the full agent runtime will
     cite sources, record retrieval times, and separate observed facts from estimates.
-    XP is an internal usage credit — it is not Bitcoin and not a blockchain token.
+    XP is an internal usage credit - it is not Bitcoin and not a blockchain token.
   </div>
 </body>
 </html>

@@ -7,7 +7,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-# -- health ---------------------------------------------------------------------
+# health
 
 
 class ComponentStatus(BaseModel):
@@ -26,7 +26,7 @@ class HealthOut(BaseModel):
     dsh_revision: str
 
 
-# -- auth / users -----------------------------------------------------------------
+# auth / users
 
 
 class UserOut(BaseModel):
@@ -43,7 +43,7 @@ class SessionOut(BaseModel):
 
 
 class SessionInfoOut(BaseModel):
-    """Session metadata for the lifecycle UI — never the token or its hash."""
+    """Session metadata for the lifecycle UI - never the token or its hash."""
 
     id: str
     created_via: str
@@ -52,7 +52,7 @@ class SessionInfoOut(BaseModel):
     expires_at: datetime
 
 
-# -- XP ---------------------------------------------------------------------------
+# XP
 
 
 class BalanceOut(BaseModel):
@@ -82,7 +82,7 @@ class DevGrantIn(BaseModel):
     reason: str = "dev seed grant"
 
 
-# -- purchases / receipts (phase 5) ------------------------------------------------
+# purchases / receipts
 
 
 class PackOut(BaseModel):
@@ -153,7 +153,7 @@ class ReconcileOut(BaseModel):
     sum_entries: int
 
 
-# -- tasks ------------------------------------------------------------------------
+# tasks
 
 
 class TaskCreateIn(BaseModel):
@@ -176,7 +176,7 @@ class TaskOut(BaseModel):
     cancelled_at: datetime | None
 
 
-# -- task events / approvals (phase 6) ---------------------------------------------
+# task events / approvals
 
 
 class TaskEventOut(BaseModel):
@@ -202,7 +202,7 @@ class ApprovalOut(BaseModel):
     expires_at: datetime | None
 
 
-# -- task result: explicit result + limitations + XP receipt (phase 7) ---------------
+# task result
 
 
 class ResultArtifactOut(BaseModel):
@@ -279,7 +279,7 @@ class PlanApprovalIn(BaseModel):
     approve: bool = True
 
 
-# -- artifacts ---------------------------------------------------------------------
+# artifacts
 
 
 class ArtifactOut(BaseModel):
@@ -301,7 +301,7 @@ class DemoPdfIn(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
-# -- wallets (scaffold contract shape) ----------------------------------------------
+# wallets
 
 
 class CapabilitiesOut(BaseModel):
@@ -311,7 +311,7 @@ class CapabilitiesOut(BaseModel):
     notes: list[str]
 
 
-# -- connections (phase 9) --------------------------------------------------------
+# connections
 
 
 class ConnectionCreateIn(BaseModel):
@@ -333,7 +333,7 @@ class ConnectionOut(BaseModel):
     disclosure: str | None = None
 
 
-# -- email drafts (phase 9) --------------------------------------------------------
+# email drafts
 
 
 class EmailDraftOut(BaseModel):
@@ -351,7 +351,7 @@ class EmailDraftOut(BaseModel):
     created_at: datetime
 
 
-# -- automation jobs (phase 9) ------------------------------------------------------
+# automation jobs
 
 
 class JobCreateIn(BaseModel):
@@ -409,7 +409,7 @@ class NotificationOut(BaseModel):
     created_at: datetime
 
 
-# -- ops (phase 10: reconciliation alerts, observability) ----------------------
+# ops
 
 
 class ReconciliationAlertOut(BaseModel):

@@ -69,7 +69,7 @@ async def reconcile_all(session: AsyncSession) -> dict[str, Any]:
     }
     discrepancies = report["discrepancies"]
 
-    # -- check 1: balance vs sum(entries) for every account -------------------
+    # check 1: balance vs sum(entries) for every account
     balances: dict[str, dict[str, Any]] = {}
     accounts = (await session.execute(select(XpAccount))).scalars().all()
     report["checked_users"] = len(accounts)
@@ -108,7 +108,7 @@ async def reconcile_all(session: AsyncSession) -> dict[str, Any]:
                 }
             )
 
-    # -- check 2: settled receive intents <-> purchase entries, 1:1 -----------
+    # check 2: settled receive intents <-> purchase entries, 1:1
     settled_intents = (
         await session.execute(
             select(PaymentIntent).where(
@@ -166,7 +166,7 @@ async def reconcile_all(session: AsyncSession) -> dict[str, Any]:
                 }
             )
 
-    # -- check 3: pending receive intents past their expiry -------------------
+    # check 3: pending receive intents past their expiry
     pending = (
         await session.execute(
             select(PaymentIntent).where(
@@ -198,7 +198,7 @@ async def reconcile_all(session: AsyncSession) -> dict[str, Any]:
                 }
             )
 
-    # -- alert persistence (phase 10: payment reconciliation alerts) ----------
+    # alert persistence
     # Every discrepancy becomes/updates an operator-facing alert row.
     #   critical kinds  -> money integrity; NEVER auto-resolved (a mismatch
     #                      that "goes away" is itself evidence worth keeping).

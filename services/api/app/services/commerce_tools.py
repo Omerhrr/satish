@@ -1,6 +1,6 @@
 """Commerce intelligence tool registry (phase 8).
 
-Five tools on the SAME allowlisted registry as research/documents — one
+Five tools on the SAME allowlisted registry as research/documents - one
 scope wall, one budget gate, one audit path. Category is
 ``commerce_intelligence`` (already in the tool-category allowlist).
 
@@ -164,7 +164,7 @@ def register_commerce_tools(
         """Typed landed-cost template. When the model binds source ids, the
         line kinds come from the PERSISTED facts (asking snapshot -> estimate;
         official published rate -> observed); unbound inputs are assumptions.
-        Source ids must belong to this task — provenance cannot be imported
+        Source ids must belong to this task - provenance cannot be imported
         from another task."""
         records = await _records_from_rows(session, task)
         by_id = {r.source_id: r for r in records}
@@ -190,7 +190,7 @@ def register_commerce_tools(
         )
         duty_fact, duty_citation = _bound(duty_source_id, {"duty_rate_pct"})
 
-        # When a source is bound, the VALUE must come from the source fact —
+        # When a source is bound, the VALUE must come from the source fact -
         # the model cannot cite [S2] and pass a different number.
         def _fact_number(fact) -> float | None:
             if fact is None:

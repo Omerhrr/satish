@@ -1,7 +1,7 @@
 """Page extraction (phase 7: retrieval -> structured facts).
 
 Deterministic, dependency-free HTML-to-text + fact extraction using the
-stdlib HTMLParser. Output is the raw material for provenance records —
+stdlib HTMLParser. Output is the raw material for provenance records -
 everything extracted is UNTRUSTED data and is only ever handed to the model
 wrapped in the adapter's untrusted markers, never as instructions.
 """
@@ -108,7 +108,7 @@ def extract_html(data: bytes, *, base_title: str = "") -> ExtractedPage:
     try:
         parser.feed(data.decode("utf-8", errors="replace"))
         parser.close()
-    except Exception:  # malformed HTML must not crash research — extract what we have
+    except Exception:  # malformed HTML must not crash research - extract what we have
         title, text = base_title, ""
         return ExtractedPage(
             title=title,

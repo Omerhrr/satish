@@ -2,8 +2,8 @@
   <div>
     <h1 class="page-title">🔗 Connected services</h1>
     <p class="page-sub">
-      Link an email service so the agent can draft and — only after you approve the
-      exact content — send. Credentials are encrypted at rest and never shown again,
+      Link an email service so the agent can draft and - only after you approve the
+      exact content - send. Credentials are encrypted at rest and never shown again,
       not even here.
     </p>
 
@@ -33,7 +33,7 @@
       <h2>Your connections</h2>
       <p v-if="loadError" class="small" style="color: #f59e0b">{{ loadError }}</p>
       <p v-else-if="!connections.length" class="small dim">
-        No services linked yet. Without a connection, email drafts stay preview-only —
+        No services linked yet. Without a connection, email drafts stay preview-only -
         the agent cannot send anything.
       </p>
       <div v-for="c in connections" :key="c.id" class="row-list">
@@ -61,9 +61,9 @@
       <h2>Email drafts (preview)</h2>
       <p class="small dim">
         Every draft the agent prepared. Status shows the honest send outcome:
-        <code>sent</code>, <code>failed</code> (definite refusal — safe to retry),
+        <code>sent</code>, <code>failed</code> (definite refusal - safe to retry),
         or <code>unknown_outcome</code> (the server may have accepted it; the system
-        never retries automatically — a resend requires a new draft and a new approval).
+        never retries automatically - a resend requires a new draft and a new approval).
       </p>
       <p v-if="!drafts.length" class="small dim">No drafts yet.</p>
       <div v-for="d in drafts" :key="d.id" class="row-list">
@@ -106,7 +106,7 @@ const form = reactive({
 });
 
 function fmt(iso: string | null): string {
-  if (!iso) return "—";
+  if (!iso) return "-";
   try {
     return new Date(iso).toLocaleString();
   } catch {

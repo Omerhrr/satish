@@ -1,9 +1,9 @@
-"""Pinned DSH revision — loader, validator, and cost estimator.
+"""Pinned DSH revision - loader, validator, and cost estimator.
 
 The pin (dsh_revision.json) is the single source of truth for which
 upstream DeepSeek API surface this adapter is tested against (plan:
-dsh_integration.requirements #1 — "Pin a tested upstream DSH revision";
-architecture logical_components #5 security note — "Pin a tested DSH
+dsh_integration.requirements #1 - "Pin a tested upstream DSH revision";
+architecture logical_components #5 security note - "Pin a tested DSH
 revision and document the integration contract").
 
 Editing the manifest is a deliberate act: tests/test_dsh_revision.py
@@ -53,7 +53,7 @@ class PinnedRevision:
         self._data = data
         self.checksum = checksum
 
-    # -- identity ------------------------------------------------------------
+    # identity
     @property
     def revision_id(self) -> str:
         return self._data["revision_id"]
@@ -66,7 +66,7 @@ class PinnedRevision:
     def base_url(self) -> str:
         return self._data["provider"]["base_url"]
 
-    # -- models ----------------------------------------------------------------
+    # models
     @property
     def primary_model(self) -> str:
         return self._data["models"]["primary"]["name"]
@@ -107,7 +107,7 @@ class PinnedRevision:
             f"retired-but-served alias listed in the manifest"
         )
 
-    # -- limits / contract -------------------------------------------------------
+    # limits / contract
     @property
     def limits(self) -> dict[str, Any]:
         return self._data["adapter_contract"]["adapter_limits"]
@@ -116,7 +116,7 @@ class PinnedRevision:
     def thinking_default(self) -> bool:
         return self._data["models"]["primary"]["thinking_mode_default"]
 
-    # -- cost ---------------------------------------------------------------------
+    # cost
     def estimate_cost_usd(
         self,
         model: str,

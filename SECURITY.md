@@ -8,12 +8,12 @@ issue for anything you believe is exploitable.
 
 Include: affected surface (endpoint/module), reproduction steps or a
 proof-of-concept, and the commit you tested against. Regtest/canned-mode
-findings are welcome — the deterministic twin is designed to make
+findings are welcome - the deterministic twin is designed to make
 settlement bugs reproducible without mainnet funds.
 
 ## Scope
 
-In scope: everything in this repository — the FastAPI surface, the XP
+In scope: everything in this repository - the FastAPI surface, the XP
 ledger and settlement path, wallet/Lightning adapters, the DSH agent wall
 (scopes, approvals, tool registry, untrusted-content handling), the
 credential vault, the Mini App, and the operational tooling
@@ -36,7 +36,7 @@ via `make audit` and dependency review).
 ## What we will honestly say today
 
 - This build has **not** had an independent external security review yet
-  (KL-15) — that is a release gate for real-value production use.
+  (KL-15) - that is a release gate for real-value production use.
 - `/ops/*` endpoints are DEV_MODE-gated only (KL-11); do not deploy to
   shared environments before an operator identity layer exists.
 - The rate limiter is per-process in-memory (KL-09); multi-worker

@@ -1,4 +1,4 @@
-"""Telegram initData validation tests — forged/stale payloads are rejected."""
+"""Telegram initData validation tests - forged/stale payloads are rejected."""
 
 from __future__ import annotations
 

@@ -6,14 +6,14 @@ storage" + "Users can revoke connected services".
 Design:
 - One ``ConnectedService`` row per link; exactly one ``ServiceCredential``
   row holding the Fernet-encrypted credential payload (key derived from the
-  operator master key via sha256 — the master key itself is never stored).
+  operator master key via sha256 - the master key itself is never stored).
 - The plaintext never appears in logs, task events, audit metadata, or API
   responses; ``load_credential`` is the ONLY decryption path.
 - Revocation hard-deletes the credential row (a revoked connection cannot
   authenticate even if other layers were bypassed) and is audited.
 - In dev mode a documented fallback key keeps local development zero-config;
   the fallback is disclosed on every surface. Non-dev environments refuse to
-  link connections until ``XP_CONNECTIONS_CREDENTIAL_KEY`` is configured —
+  link connections until ``XP_CONNECTIONS_CREDENTIAL_KEY`` is configured -
   silently encrypting with a shipped constant would be fake security.
 """
 
@@ -42,7 +42,7 @@ DEV_DISCLOSURE = (
 )
 
 # Provider allowlist: what may be linked and which tool scopes it unlocks.
-# Unknown providers are refused — never stored-and-ignored.
+# Unknown providers are refused - never stored-and-ignored.
 PROVIDER_SPECS: dict[str, dict[str, Any]] = {
     "smtp": {
         "label": "SMTP email sending",
@@ -134,7 +134,7 @@ async def link_connection(
     """Link a service and store its credential encrypted at rest.
 
     Returns (connection, disclosure). Scopes are intersected with the
-    provider allowlist — a link can never grant a scope the provider does
+    provider allowlist - a link can never grant a scope the provider does
     not define.
     """
     _validate_credential(provider, payload)
@@ -279,7 +279,7 @@ async def revoke_connection(
 async def find_active_connection(
     session: AsyncSession, user_id: str, provider: str, scope: str
 ) -> ConnectedService | None:
-    """The linked, non-revoked connection that unlocks ``scope`` — or None."""
+    """The linked, non-revoked connection that unlocks ``scope`` - or None."""
     spec = PROVIDER_SPECS.get(provider)
     if spec is None or scope not in spec["scopes"]:
         return None

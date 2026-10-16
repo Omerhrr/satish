@@ -6,12 +6,12 @@ shown (result endpoint, comparison rows, report appendix):
 - freshness: how old the retrieval snapshot is relative to a reference time.
   fresh (<24h) / recent (<7d) / stale (<30d) / outdated (>=30d) / unknown.
 - confidence: how much the record's facts can be trusted as evidence, from
-  status, retrieval mode, and cross-source agreement — capped below 1.0
+  status, retrieval mode, and cross-source agreement - capped below 1.0
   because nothing here verifies truth, only provenance quality. Canned
   fixtures are honestly marked synthetic-for-the-world in the rationale.
 
 Neither indicator is ever derived from page content claims (a page saying
-"trusted!" changes nothing) — only from the platform's own retrieval facts.
+"trusted!" changes nothing) - only from the platform's own retrieval facts.
 """
 
 from __future__ import annotations
@@ -25,11 +25,11 @@ FRESHNESS_ORDER = ("fresh", "recent", "stale", "outdated", "unknown")
 # status -> base trust (0..1)
 _STATUS_BASE = {"ok": 0.7, "listed": 0.2, "unavailable": 0.0, "denied": 0.0, "error": 0.0}
 # retrieval mode -> bonus: http content was really retrieved from the world;
-# canned content is a committed fixture — deterministic, but synthetic.
+# canned content is a committed fixture - deterministic, but synthetic.
 _MODE_BONUS = {"http": 0.2, "canned": 0.1}
 # cross-source agreement bonus (compare_sources found the same value elsewhere)
 _AGREEMENT_BONUS = 0.1
-# nothing in this platform verifies factual truth — confidence never hits 1.0
+# nothing in this platform verifies factual truth - confidence never hits 1.0
 _CONFIDENCE_CAP = 0.9
 
 

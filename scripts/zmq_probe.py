@@ -2,13 +2,13 @@
 
 Proves (or disproves) that PUB->SUB over 127.0.0.1 works in the current
 environment. lnd's default chain-notify path is zmq; if THIS probe drops
-messages, no lnd/bitcoind zmq configuration can work in the sandbox — that
+messages, no lnd/bitcoind zmq configuration can work in the sandbox - that
 is an environment defect, not an lnd API defect.
 
 Usage: .venv/bin/python scripts/zmq_probe.py
 Exit:  0 if a published message round-trips, 1 otherwise.
 
-Recorded result in this sandbox (2026-10-15): FAIL — even a pure Python
+Recorded result in this sandbox (2026-10-15): FAIL - even a pure Python
 PUB->SUB over loopback drops messages; documented in
 docs/lightning-integration.md ("The honest sandbox limitation").
 """
@@ -39,7 +39,7 @@ def main() -> int:
                 print(f"PASS: round-trip on attempt {attempt}: {payload.decode()}")
                 return 0
         print("FAIL: 10 published messages over 127.0.0.1, none delivered")
-        print("loopback zmq is broken in this environment — lnd's zmq chain")
+        print("loopback zmq is broken in this environment - lnd's zmq chain")
         print("notifications cannot work here (see docs/lightning-integration.md)")
         return 1
     finally:

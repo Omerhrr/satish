@@ -1,4 +1,4 @@
-"""XP data model — product-plan tables (data_model.tables).
+"""XP data model - product-plan tables (data_model.tables).
 
 Conventions (data_rules):
 - UTC datetimes, integer satoshi and integer XP units (never floats),
@@ -27,7 +27,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from xp_core.db import Base, new_id, utcnow
 
-# -- users & identity ---------------------------------------------------------
+# users & identity
 
 
 class User(Base):
@@ -48,7 +48,7 @@ class TelegramAccount(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
-    telegram_user_id: Mapped[int] = mapped_column(BigInteger, unique=True)  # unique mapping
+    telegram_user_id: Mapped[int] = mapped_column(BigInteger, unique=True)
     username: Mapped[str | None] = mapped_column(String(64), nullable=True)
     linked_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     status: Mapped[str] = mapped_column(String(32), default="linked")
@@ -70,11 +70,11 @@ class Session(Base):
     created_via: Mapped[str] = mapped_column(String(32), default="miniapp")
 
 
-# -- wallets -------------------------------------------------------------------
+# wallets
 
 
 class Wallet(Base):
-    """Non-secret wallet metadata only — no seed/private-key fields by design."""
+    """Non-secret wallet metadata only - no seed/private-key fields by design."""
 
     __tablename__ = "wallets"
 
@@ -119,7 +119,7 @@ class WalletTransaction(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 
 
-# -- payments & XP ---------------------------------------------------------------
+# payments & XP
 
 
 class PaymentIntent(Base):
@@ -178,7 +178,7 @@ class XpLedgerEntry(Base):
     )
 
 
-# -- agent tasks -----------------------------------------------------------------
+# agent tasks
 
 
 class Task(Base):
@@ -288,7 +288,7 @@ class ScheduledJob(Base):
 
     Budget discipline: every spawned run's task budget is capped at
     ``budget_per_run_xp`` AND at whatever remains of ``budget_total_xp``
-    (when configured) — the ledger refuses settlement beyond a task's
+    (when configured) - the ledger refuses settlement beyond a task's
     budget, so these caps are enforced in backend code, not by the model.
     """
 
@@ -304,7 +304,6 @@ class ScheduledJob(Base):
     next_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     last_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
-    # -- phase 9: budget totals + failure bookkeeping --------------------------
     budget_total_xp: Mapped[int | None] = mapped_column(Integer, nullable=True)
     total_spent_xp: Mapped[int] = mapped_column(Integer, default=0)
     run_count: Mapped[int] = mapped_column(Integer, default=0)
@@ -348,7 +347,7 @@ class ReconciliationAlert(Base):
     """Operator-facing payment/ledger discrepancy alert (phase 10).
 
     Written by xp_core.jobs.reconciliation when a sweep finds a mismatch.
-    One open alert per (kind, subject) — repeat sightings bump last_seen_at
+    One open alert per (kind, subject) - repeat sightings bump last_seen_at
     instead of stacking duplicates, so the queue measures distinct problems,
     not sweep frequency. Acknowledgement and resolution are explicit operator
     actions; nothing here mutates balances (the ledger stays authoritative).
@@ -424,7 +423,7 @@ class EmailDraft(Base):
 
     ``digest`` is sha256 over the canonical {to, subject, body}; the
     email.send approval binds to the tool action digest, which contains the
-    exact same content — the user approves what they previewed. Status moves
+    exact same content - the user approves what they previewed. Status moves
     drafted -> sent | failed | unknown_outcome | refused; a sent draft can
     never be sent again (repeat send requires a new draft + new approval).
     """
@@ -455,7 +454,7 @@ class EmailDraft(Base):
 class AutomationRun(Base):
     """One execution attempt of a scheduled job (phase 9: run history).
 
-    Every attempt — success, failure, or skip — is recorded here with its
+    Every attempt - success, failure, or skip - is recorded here with its
     reason. Failures never silently repeat consequential actions: the next
     sweep sees the failure count, and approval-blocked runs surface as
     ``blocked_on_approval`` while pending, then ``skipped_approval_pending``
@@ -492,7 +491,7 @@ class Notification(Base):
 
     Created by backend evaluation of scheduled-job conditions (run outcomes,
     balance thresholds). Persisted and API-readable; Telegram relay is a
-    documented open item — pretending to push without a bot token would
+    documented open item - pretending to push without a bot token would
     fabricate delivery.
     """
 

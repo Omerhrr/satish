@@ -6,8 +6,8 @@ three-way distinction the reports must make:
 - asking prices  -> ``estimate``  (market/auction/dealer listings and
   supplier quotations are SNAPSHOTS; they are what someone asks, not what
   was paid)
-- observed facts -> ``observed``  (including OFFICIAL published rates —
-  tariff/fee schedules — which are the closest thing to verified costs
+- observed facts -> ``observed``  (including OFFICIAL published rates -
+  tariff/fee schedules - which are the closest thing to verified costs
   this pipeline can ground)
 - verified costs -> none exist here, and every consumer says so: nothing
   in the collected evidence is a confirmed transaction price. The landed

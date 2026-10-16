@@ -127,7 +127,7 @@ def compare_suppliers(
         if record.status == "listed":
             result.disclosures.append(
                 f"source {label_of.get(record.source_id, '[S?]')} {record.url} was "
-                "listed by search but never fetched — it contributes no quote"
+                "listed by search but never fetched - it contributes no quote"
             )
 
     # rows over the sourcing keys, all cited

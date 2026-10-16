@@ -22,21 +22,21 @@ Detection surfaces: `/api/v1/ops/reconciliation/alerts` (operator queue),
 
 ---
 
-## R1 — Payment discrepancy (balance/alert)
+## R1 - Payment discrepancy (balance/alert)
 
 **Detect**: open `balance_mismatch` / `purchase_credited_more_than_once` /
 `purchase_entry_without_settled_intent` critical alert in /ops; or
 `xp_reconciliation_complete ok=false` in worker logs.
 
 **Triage**: read the alert's `expected` vs `observed` (ledger sum vs account
-row — the ledger is authoritative by design). Pull the user's
+row - the ledger is authoritative by design). Pull the user's
 `GET /api/v1/xp/ledger` and the payment intent trail. Establish which side
 is wrong: a wrong balance row (repairable) vs a wrong ledger entry
-(append-only — needs a corrective `adjust` entry, never a rewrite).
+(append-only - needs a corrective `adjust` entry, never a rewrite).
 
 **Contain**: if credits may be duplicated, suspend new agent task creation
 for the affected user (task budget reservations consume XP) and stop
-`purchase` settlement by pausing the worker's reconciliation/settle path —
+`purchase` settlement by pausing the worker's reconciliation/settle path -
 NOT by editing ledger rows.
 
 **Recover**: repair the account row to equal the ledger sum (or append an
@@ -49,7 +49,7 @@ with a note describing the actual repair.
 the repair adjust). Record the root cause in docs/known-limitations.md if it
 reveals a structural gap.
 
-## R2 — Ledger/job queue stuck (worker down)
+## R2 - Ledger/job queue stuck (worker down)
 
 **Detect**: `/health` queue component `not_configured`/error; reconciliation
 timestamps in observability going stale; receipts/agent jobs never
@@ -57,7 +57,7 @@ finishing.
 
 **Triage**: check Redis connectivity (XP_REDIS_URL), worker process logs,
 and whether the cron heartbeat fired. Distinguish worker-down from
-queue-poisoning (one job crashing repeatedly — job_timeout=300s bounds it).
+queue-poisoning (one job crashing repeatedly - job_timeout=300s bounds it).
 
 **Contain**: restart the worker. A poisoned job is identified by its
 repeated error in automation_runs/task_events; fix code, do not hand-edit
@@ -67,13 +67,13 @@ rows.
 receipt dedupe); re-running the sweep is safe. Verify with a manual
 reconcile.
 
-## R3 — Lightning node unavailable / uncertain payment
+## R3 - Lightning node unavailable / uncertain payment
 
 **Detect**: `/health` lightning component; payment stuck `in_flight`;
 `unknown_outcome` disclosures from the adapter.
 
 **Triage**: the adapter's taxonomy is authoritative: `failed` (definitively
-not paid — safe to refund/release), `unknown_outcome` (MUST NOT be treated
+not paid - safe to refund/release), `unknown_outcome` (MUST NOT be treated
 as paid or unpaid until the node answers). Check lnd reachability (ping,
 grpc), channel liquidity via `/lightning/health`.
 
@@ -88,7 +88,7 @@ any settle/release decision. SCB channel recovery follows
 **Postmortem**: any `unknown_outcome` that later resolved either way must be
 reconciled against the payment intent row; document timing.
 
-## R4 — Credential compromise (bot token, vault key, session)
+## R4 - Credential compromise (bot token, vault key, session)
 
 **Detect**: unexpected sessions (`GET /api/v1/auth/sessions` last_used_at
 heartbeat), audit_events showing foreign access, operator-side alerts.
@@ -98,14 +98,14 @@ heartbeat), audit_events showing foreign access, operator-side alerts.
 
 **Contain**: revoke affected sessions server-side (24h TTL bounds exposure
 by design); rotate the Telegram bot token via BotFather; if the vault key
-leaked, rotate `XP_CONNECTIONS_CREDENTIAL_KEY` — note stored credentials
+leaked, rotate `XP_CONNECTIONS_CREDENTIAL_KEY` - note stored credentials
 must then be re-linked by users (Fernet cannot be migrated without the old
 key).
 
 **Recover**: users re-launch the Mini App (fresh initData exchange). Verify
 via sessions list.
 
-## R5 — Data loss / restore (database or artifacts)
+## R5 - Data loss / restore (database or artifacts)
 
 **Detect**: unavailable DB, corrupted volume, accidental deletion.
 
@@ -119,10 +119,10 @@ split-brain.
 **Recover**: restore Postgres via pg_restore; restore artifact bytes;
 re-run the drill's verification gates against the restored instance: row
 counts, `reconcile_all` ok, settled-intent 1:1, artifact digests. The
-Lightning channel state recovers from SCB per R3/drill — a seed phrase
+Lightning channel state recovers from SCB per R3/drill - a seed phrase
 alone never restores channels (documented limitation).
 
-## R6 — Abuse / rate-limit event
+## R6 - Abuse / rate-limit event
 
 **Detect**: `rate_limit_tripped` log spikes from one subject; 429 ratio in
 observability.
@@ -135,12 +135,12 @@ if a specific bearer is abusive (R4).
 
 **Recover**: no data repair needed; verify bucket behavior returns to
 normal. If limits themselves are wrong (legit users tripped), tune
-`xp_core/services/ratelimit.py` RULES — changes are code-reviewed and
+`xp_core/services/ratelimit.py` RULES - changes are code-reviewed and
 tested, not hot-patched.
 
 ## Ops access reality (honest disclosure)
 
 `/ops/*` endpoints are DEV_MODE-gated in this build. Production operation
 requires putting an operator access control (VPN, mTLS, or an admin
-authenticator) in front of them before disabling that gate — see
+authenticator) in front of them before disabling that gate - see
 docs/security-review.md F-03.

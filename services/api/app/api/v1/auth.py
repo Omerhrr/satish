@@ -2,7 +2,7 @@
 
 Phase-2 hardening: logout performs server-side revocation, users can list
 and individually revoke their active sessions, sessions are short-lived
-(trust boundary control), and ownership is enforced everywhere — a session
+(trust boundary control), and ownership is enforced everywhere - a session
 id that belongs to somebody else is indistinguishable from a missing one.
 """
 
@@ -130,7 +130,7 @@ async def revoke_session(
     """Revoke one of the caller's own sessions by id (ownership enforced)."""
     revoked = await revoke_session_by_id(session, user.id, session_id)
     if not revoked:
-        # Same answer for "not yours" and "doesn't exist" — no oracle.
+        # Same answer for "not yours" and "doesn't exist" - no oracle.
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="session not found")
     await session.commit()
     return {"status": "revoked", "session_id": session_id}

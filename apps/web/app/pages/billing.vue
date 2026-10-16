@@ -3,7 +3,7 @@
     <header>
       <h1 class="page-title">XP Billing</h1>
       <p class="page-sub">
-        Packs, purchases, and receipts. XP is an internal usage credit — not Bitcoin,
+        Packs, purchases, and receipts. XP is an internal usage credit - not Bitcoin,
         not a token. Rate: 1 sat = {{ rate?.xp_per_sat ?? "…" }} XP
         <span v-if="rate" class="env-chip">{{ rate.can_change ? "rate may change" : "fixed" }}</span>
       </p>
@@ -21,7 +21,7 @@
       <h2>Buy XP</h2>
       <p class="dim small">
         Choosing a pack creates a Lightning invoice. XP credits only after the
-        payment settles — verified by the backend, never by a client claim.
+        payment settles - verified by the backend, never by a client claim.
       </p>
       <div class="packs">
         <button
@@ -70,7 +70,7 @@
               >
                 <span v-if="receipting === p.id" class="spinner" /> PDF
               </button>
-              <span v-else class="dim small">—</span>
+              <span v-else class="dim small">-</span>
             </td>
           </tr>
         </tbody>

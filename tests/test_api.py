@@ -1,4 +1,4 @@
-"""API contract tests: health, auth, XP flow, task reservation — via ASGI transport."""
+"""API contract tests: health, auth, XP flow, task reservation - via ASGI transport."""
 
 from __future__ import annotations
 

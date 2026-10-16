@@ -128,7 +128,7 @@
     <section v-if="result" class="card">
       <h2>Result <span class="dim small">task {{ result.task_id.slice(0, 8) }}</span></h2>
       <p class="small" style="margin: 6px 0">
-        <strong>Deliverable:</strong> {{ result.deliverable || "—" }}
+        <strong>Deliverable:</strong> {{ result.deliverable || "-" }}
       </p>
 
       <h3 class="small" style="margin: 14px 0 4px">Artifacts (validated, private)</h3>
@@ -145,7 +145,7 @@
       <ul class="small">
         <li v-for="(s, i) in result.sources" :key="i">
           [{{ i + 1 }}] <span class="badge" :class="s.status">{{ s.status }}</span>
-          {{ s.title || "(untitled)" }} — <span class="mono small">{{ s.url }}</span>
+          {{ s.title || "(untitled)" }} - <span class="mono small">{{ s.url }}</span>
           · {{ s.fact_count }} facts · {{ s.retrieval_mode }}
           · <span class="dim">freshness {{ s.freshness }}</span>
           · <span class="dim">confidence {{ s.confidence }}</span>
@@ -155,16 +155,16 @@
 
       <div v-if="result.conflicts.length" class="notice small" style="border-left-color: var(--red)">
         <strong>Conflicts between sources</strong>
-        <div v-for="(c, i) in result.conflicts" :key="i">{{ c.subject }} — {{ c.detail }}</div>
+        <div v-for="(c, i) in result.conflicts" :key="i">{{ c.subject }} - {{ c.detail }}</div>
       </div>
       <div v-if="result.gaps.length" class="notice small">
         <strong>Coverage gaps:</strong> {{ result.gaps.join(", ") }}
       </div>
 
       <div v-if="result.scored" class="notice small">
-        <strong>Commerce score: {{ result.scored.product }} — {{ result.scored.score }} / 100</strong>
+        <strong>Commerce score: {{ result.scored.product }} - {{ result.scored.score }} / 100</strong>
         <div class="dim small" style="margin: 4px 0">
-          Structural signals only — this score does not measure demand, ad
+          Structural signals only - this score does not measure demand, ad
           performance, or availability. Factors and weights are operator-configured:
         </div>
         <table class="small" style="width: 100%; border-collapse: collapse; margin-top: 4px">
@@ -181,7 +181,7 @@
               <td style="padding: 2px 6px 2px 0">{{ f.name }}<span v-if="!f.included"> (excluded)</span></td>
               <td style="padding: 2px 6px">{{ f.weight }}</td>
               <td style="padding: 2px 6px">{{ f.signal }}</td>
-              <td style="padding: 2px 6px">{{ f.normalized ?? "—" }}</td>
+              <td style="padding: 2px 6px">{{ f.normalized ?? "-" }}</td>
             </tr>
           </tbody>
         </table>

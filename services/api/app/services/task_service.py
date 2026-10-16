@@ -6,11 +6,11 @@ Rules implemented here, all deterministic backend code:
   raises before any entry lands if it would (acceptance #6: "A task cannot
   exceed its approved XP budget without additional authorization").
 - Additional authorization: raising a budget is a USER action through
-  POST /tasks/{id}/increase-budget — it reserves the delta atomically with
+  POST /tasks/{id}/increase-budget - it reserves the delta atomically with
   its own idempotency key and appends an audit event. The agent registry has
   no tool that reaches this function (proven by test), so the agent cannot
   grant itself more budget.
-- Failed-task rule: a failed task releases its FULL unused reservation —
+- Failed-task rule: a failed task releases its FULL unused reservation -
   the user is not charged for work the platform failed to deliver
   (pricing_requirements #6: clear failed-task rules). The release is an
   auditable reservation_release entry, never a history rewrite.
@@ -98,7 +98,7 @@ async def settle_task_usage(
 
     Called by the worker at the end of a run (phase 6) and exposed as a
     system seam for tests/ops. actual_xp > budget_xp is refused by the
-    ledger BEFORE anything is written — the approved cap is a hard ceiling.
+    ledger BEFORE anything is written - the approved cap is a hard ceiling.
     """
     task = await get_owned_task(session, user_id, task_id)
     if task.status in {"completed", "failed", "cancelled"}:
@@ -176,7 +176,7 @@ async def build_task_result(
     """Explicit task result: deliverable, artifacts, provenance, limitations,
     and the XP receipt (phase-7 acceptance #4).
 
-    Derived entirely from durable rows — no hidden state: artifacts and
+    Derived entirely from durable rows - no hidden state: artifacts and
     research sources by task, the latest research.compared verdict, the
     evaluation notes, and the ledger entries that reference the task.
     """
@@ -326,7 +326,7 @@ async def build_task_result(
         if s.status in {"unavailable", "denied", "error"}
     )
 
-    # XP receipt from the ledger — the append-only trail IS the receipt.
+    # XP receipt from the ledger - the append-only trail IS the receipt.
     entries = (
         await session.execute(
             select(XpLedgerEntry)

@@ -1,7 +1,7 @@
 """XP purchase receipt PDF (phase 5, deliverable: Receipts and billing UI).
 
 Renders the receipt from DB-owned data only (the purchase intent row and
-its ledger purchase entry) — never from client input — so a receipt can
+its ledger purchase entry) - never from client input - so a receipt can
 never contradict the ledger. Branded WeasyPrint output, stored as a
 private-by-default artifact.
 """
@@ -27,7 +27,7 @@ _RECEIPT_SHELL = """<!DOCTYPE html>
 <meta charset="utf-8">
 <style>
   @page {{ size: A5; margin: 1.6cm;
-    @bottom-center {{ content: "XP receipt {purchase_id_short} — page " counter(page);
+    @bottom-center {{ content: "XP receipt {purchase_id_short} - page " counter(page);
                       font-size: 8px; color: #8a8f98; }} }}
   body {{ font-family: "DejaVu Sans", sans-serif; color: #14181f; line-height: 1.5; }}
   .brand {{ color: #f7931a; font-weight: 700; letter-spacing: 2px; font-size: 11px; }}
@@ -56,7 +56,7 @@ _RECEIPT_SHELL = """<!DOCTYPE html>
     <tr class="total"><td class="k">XP credited</td><td class="v">+{xp_amount} XP</td></tr>
   </table>
   <div class="disclaimer">
-    XP is an internal usage credit — it is not Bitcoin, not a blockchain token,
+    XP is an internal usage credit - it is not Bitcoin, not a blockchain token,
     and not a claim on funds. This receipt summarizes the append-only XP ledger
     entry created when the payment settled; the ledger is the source of truth.
   </div>

@@ -25,11 +25,9 @@ from dsh_adapter.revision import (
 from dsh_adapter.runner import PlanRunner
 from dsh_adapter.tools import default_registry
 
-# ---------------------------------------------------------------------------
 # Drift gate: editing dsh_revision.json requires consciously updating this
-# constant — the pin must never move silently.
-# ---------------------------------------------------------------------------
-EXPECTED_MANIFEST_SHA256 = "6be7b9cc10776ef456f34f6fefbee42016e8272642043d8cc05cc17141bcea4c"
+# constant - the pin must never move silently.
+EXPECTED_MANIFEST_SHA256 = "2d49a18b14f1082326f68c9b97b63aecfc613012dc88a6926b4a97af4e75632d"
 
 
 @pytest.fixture()
@@ -37,7 +35,7 @@ def revision():
     return load_revision()
 
 
-# -- pin integrity -----------------------------------------------------------
+# pin integrity
 
 
 def test_manifest_checksum_matches_drift_gate(revision):
@@ -71,7 +69,7 @@ def test_unknown_model_rejected(revision):
         revision.validate_model("gpt-4o")
 
 
-# -- client wiring -------------------------------------------------------------
+# client wiring
 
 
 def test_client_defaults_to_pinned_primary(revision):
@@ -161,7 +159,7 @@ def no_sleep(monkeypatch):
     return sleeps
 
 
-# -- resilience: retries -------------------------------------------------------
+# resilience: retries
 
 
 async def test_retry_on_503_then_success(revision, no_sleep):
@@ -204,7 +202,7 @@ def _make_status_error(status: int) -> Exception:
     return openai.APIStatusError(f"upstream {status}", response=response, body=None)
 
 
-# -- concurrency + output cap + usage ------------------------------------------
+# concurrency + output cap + usage
 
 
 async def test_concurrency_semaphore_bounds_in_flight(revision):
@@ -249,7 +247,7 @@ def test_thinking_toggle_sent_non_thinking_default(revision):
     attach(client, Probe([]))
     asyncio.run(client.complete([{"role": "user", "content": "hi"}]))
     assert captured["extra_body"]["thinking"]["type"] == "disabled"
-    assert "temperature" not in captured  # V4.x: sampling params inert — not sent
+    assert "temperature" not in captured  # V4.x: sampling params inert - not sent
 
 
 def test_cost_estimator_math(revision):
@@ -262,7 +260,7 @@ def test_cost_estimator_math(revision):
     assert revision.estimate_cost_usd("unknown-model", 10, 10) is None
 
 
-# -- runner integration ------------------------------------------------------------
+# runner integration
 
 
 async def test_runner_records_model_usage_in_report(revision):
@@ -300,7 +298,7 @@ async def test_plan_json_embedding_of_usage(revision):
     assert plan["model_usage"]["model_calls"] == 1
 
 
-# -- manifest JSON sanity (bytes on disk) -----------------------------------------
+# manifest JSON sanity (bytes on disk)
 
 
 def test_manifest_json_parses_and_has_sources():

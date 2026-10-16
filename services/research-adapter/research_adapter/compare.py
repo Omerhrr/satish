@@ -3,7 +3,7 @@
 Takes the task's provenance records and produces a cited comparison:
 - subjects: fact keys seen across sources, each row carrying every source's
   value WITH its citation index
-- conflicts: same subject, different values — surfaced, never averaged away
+- conflicts: same subject, different values - surfaced, never averaged away
 - gaps: required keys no source provides (and keys individual sources omit)
 - disclosures: estimate/staleness notes, unavailable/denied/errored sources
 
@@ -126,7 +126,7 @@ def compare_sources(
         elif record.status == "listed":
             result.disclosures.append(
                 f"source {label_of.get(record.source_id, '[S?]')} {record.url} was listed by "
-                "search but never fetched — it contributes no facts"
+                "search but never fetched - it contributes no facts"
             )
     return result
 

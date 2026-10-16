@@ -126,7 +126,7 @@ def _tariff() -> SourceRecord:
     )
 
 
-# -- deliverable #7: freshness + confidence ---------------------------------------------
+# deliverable #7: freshness + confidence
 
 
 def test_freshness_labels_and_confidence():
@@ -157,7 +157,7 @@ def test_freshness_labels_and_confidence():
     assert score == pytest.approx(0.9)
 
 
-# -- deliverable #3 / acceptance #4: transparent, configurable scoring ------------------
+# deliverable #3 / acceptance #4: transparent, configurable scoring
 
 
 def test_scoring_deterministic_and_transparent():
@@ -252,7 +252,7 @@ def test_mixed_currency_spread_excluded():
     assert "price_spread" in verdict.excluded
 
 
-# -- deliverable #4: supplier and listing comparison -------------------------------------
+# deliverable #4: supplier and listing comparison
 
 
 def test_supplier_comparison_roles_conflicts_and_citations():
@@ -278,7 +278,7 @@ def test_supplier_comparison_roles_conflicts_and_citations():
     assert any("no official published rate" in d for d in no_official.disclosures)
 
 
-# -- deliverable #5: vehicle auction research --------------------------------------------
+# deliverable #5: vehicle auction research
 
 
 def test_vehicle_check_matches_mismatches_and_unknown_keys():
@@ -324,7 +324,7 @@ def test_vehicle_check_without_vehicle_sources_discloses():
     assert any("no fetched source carried vehicle attributes" in d for d in verdict.disclosures)
 
 
-# -- deliverable #6: landed-cost estimate template ----------------------------------------
+# deliverable #6: landed-cost estimate template
 
 
 def test_landed_cost_template_types_lines():
@@ -359,7 +359,7 @@ def test_landed_cost_refuses_invalid_inputs():
         compute_landed_cost(unit_price=-5, currency="USD")
 
 
-# -- deliverable #2 / acceptance #1 + #3: ad-library integration --------------------------
+# deliverable #2 / acceptance #1 + #3: ad-library integration
 
 
 async def test_ad_library_provider_honesty():
@@ -386,11 +386,11 @@ def test_ad_library_summarize_excludes_performance():
                           "regions": "NG, GH", "creative": "5kW hybrid inverter"}
     assert "ctr" not in attributes
     assert any("performance" in d and "ctr" in d for d in disclosures)
-    # the raw fact is still in provenance — recorded, never summarized
+    # the raw fact is still in provenance - recorded, never summarized
     assert any(f.key == "ctr" for f in facts)
 
 
-# -- registry over the application DB ------------------------------------------------------
+# registry over the application DB
 
 
 def _product_task(task_id: str, user_id: str) -> Task:
@@ -615,7 +615,7 @@ async def test_commerce_tools_scope_wall_and_costs(session, dev_user, settings):
 
 async def test_scoring_config_fallback_disclosed(session, dev_user, settings, monkeypatch):
     """A broken operator config degrades to documented defaults WITH a
-    disclosure in the tool output — never silently, never a crash."""
+    disclosure in the tool output - never silently, never a crash."""
     monkeypatch.setattr(settings, "commerce_scoring_factors", "{broken json")
     registry, _task, _ids = await _fetched_registry(
         session, dev_user, settings,
@@ -629,7 +629,7 @@ async def test_scoring_config_fallback_disclosed(session, dev_user, settings, mo
     assert any("invalid JSON" in d for d in out["disclosures"])
 
 
-# -- explicit task result: freshness/confidence + scored verdict --------------------------
+# explicit task result: freshness/confidence + scored verdict
 
 class _Scripted:
     def __init__(self, plan: dict) -> None:
@@ -701,7 +701,7 @@ async def test_result_endpoint_carries_freshness_confidence_and_scored(
     assert result["artifacts"], "PDF attached"
 
 
-# -- report integration -------------------------------------------------------------------
+# report integration
 
 
 def test_report_renders_commerce_fact_kinds():

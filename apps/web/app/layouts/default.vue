@@ -24,7 +24,7 @@
     </main>
 
     <footer class="site-footer">
-      XP · Bitcoin-native AI workforce · Phase 1 scaffold — self-custody is real:
+      XP · Bitcoin-native AI workforce · Phase 1 scaffold - self-custody is real:
       your keys, your bitcoin, never stored by this service.
     </footer>
   </div>

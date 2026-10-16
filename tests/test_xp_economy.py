@@ -27,7 +27,7 @@ from xp_core.config import get_settings
 from xp_core.models.entities import AuditEvent, PaymentIntent, XpAccount, XpLedgerEntry
 from xp_core.services import ledger
 
-# -- fixtures ----------------------------------------------------------------------
+# fixtures
 
 
 class FakeClock:
@@ -72,7 +72,7 @@ def _preimage_for(client, payment_hash: str) -> str:
     return provider._invoices[payment_hash].invoice.preimage
 
 
-# -- published pricing ---------------------------------------------------------------
+# published pricing
 
 
 async def test_rate_is_published_and_changeable(client):
@@ -94,7 +94,7 @@ async def test_packs_list_the_published_table(client):
     assert len({p["pack_id"] for p in packs}) == len(packs)
 
 
-# -- purchase flow ---------------------------------------------------------------------
+# purchase flow
 
 
 async def test_purchase_pack_creates_invoice_with_xp_preview(client):
@@ -151,7 +151,7 @@ async def test_settle_credits_once_and_receipt_binds_ledger(client):
 
 
 async def test_two_distinct_settlements_credit_twice(client):
-    """Each verified settled payment credits once — different intents both pay."""
+    """Each verified settled payment credits once - different intents both pay."""
     total = 0
     for _ in range(2):
         created = await client.post("/api/v1/xp/purchases", json={"amount_sats": 100})
@@ -235,7 +235,7 @@ async def test_receipt_pdf_refused_for_unsettled_purchase(client):
     assert resp.status_code == 409
 
 
-# -- reconciliation ---------------------------------------------------------------------
+# reconciliation
 
 
 async def test_reconcile_healthy_ledger_is_ok(session, dev_user, client):
@@ -329,7 +329,7 @@ async def test_reconcile_flags_double_credited_intent(session, dev_user, client)
     assert "purchase_credited_more_than_once" in kinds
 
 
-# -- concurrency: reservations cannot overdraw ---------------------------------------------
+# concurrency: reservations cannot overdraw
 
 
 async def test_concurrent_reservations_cannot_overdraw(session, dev_user, tmp_path):
@@ -393,7 +393,7 @@ async def test_concurrent_reservations_cannot_overdraw(session, dev_user, tmp_pa
         await engine.dispose()
 
 
-# -- refunds and audit -------------------------------------------------------------------
+# refunds and audit
 
 
 async def test_refund_is_auditable(session, dev_user):
@@ -426,7 +426,7 @@ async def test_refund_replay_is_idempotent(session, dev_user):
     assert r1.balance_after == r2.balance_after
 
 
-# -- task budget cap (acceptance #6) --------------------------------------------------------
+# task budget cap (acceptance #6)
 
 
 async def test_settle_refuses_over_budget(session, dev_user, client):
@@ -520,7 +520,7 @@ async def test_estimate_endpoint_is_deterministic(client):
     assert any("web.search" in a for a in r1["variable_cost_activities"])
 
 
-# -- failed-task rule ------------------------------------------------------------------------
+# failed-task rule
 
 
 async def test_fail_task_releases_full_reservation(session, dev_user, client):
@@ -547,7 +547,7 @@ async def test_fail_task_releases_full_reservation(session, dev_user, client):
     assert audits[0].metadata_redacted["released_xp"] == 120
 
 
-# -- ownership ---------------------------------------------------------------------------------
+# ownership
 
 
 async def test_purchases_are_own_records_only(session, dev_user, client):

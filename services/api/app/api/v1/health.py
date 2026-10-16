@@ -56,7 +56,7 @@ async def health(session: DbSession) -> HealthOut:
 
 @router.get("/capabilities", response_model=CapabilitiesOut)
 async def capabilities() -> CapabilitiesOut:
-    """Honest capability surface — what is real today vs. pending spikes."""
+    """Honest capability surface - what is real today vs. pending spikes."""
     return CapabilitiesOut(
         wallets="pending_integration_spike (phase 3)",
         lightning="pending_implementation_poc (phase 3+)",

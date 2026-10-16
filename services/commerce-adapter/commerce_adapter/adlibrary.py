@@ -6,7 +6,7 @@ Honesty contract, enforced structurally:
 - CANNED ONLY. There is no permitted live ad-library API configured, so the
   integration serves the committed offline fixture corpus and says so
   verbatim on every result. Only accessible, permitted sources are ever
-  represented as searched (acceptance #1) — a query that matches no fixture
+  represented as searched (acceptance #1) - a query that matches no fixture
   returns zero results plus the disclosure, never filler.
 - NO PERFORMANCE METRICS. Ad attributes (advertiser, platform, dates,
   regions, creative text) are summarized from the page's own facts. If a
@@ -39,7 +39,7 @@ AD_ATTRIBUTE_KEYS = {
 
 CANNED_DISCLOSURE = (
     "ad-library integration runs in canned mode over the committed offline "
-    "fixture corpus — no live or private ad library is accessed, and only "
+    "fixture corpus - no live or private ad library is accessed, and only "
     "these permitted fixtures are represented as searched"
 )
 
@@ -111,7 +111,7 @@ def summarize_ad(facts: list[Fact]) -> tuple[dict[str, str], list[str]]:
         disclosures.append(
             "the page text also mentions performance metric(s) "
             f"({', '.join(leaked)}); they are kept as untrusted provenance and "
-            "excluded from this summary — no ad-performance claim is made"
+            "excluded from this summary - no ad-performance claim is made"
         )
     return attributes, disclosures
 

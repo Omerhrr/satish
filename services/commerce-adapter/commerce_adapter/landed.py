@@ -177,7 +177,7 @@ def compute_landed_cost(
         [
             "landed cost is an ESTIMATE built from asking-price snapshots and "
             "user-supplied assumptions; it is not a quotation",
-            "no verified transaction cost exists in this pipeline — asking "
+            "no verified transaction cost exists in this pipeline - asking "
             "prices and published rates are not paid invoices",
         ]
     )

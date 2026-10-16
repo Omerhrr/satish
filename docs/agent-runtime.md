@@ -1,4 +1,4 @@
-# Agent runtime — durable DSH task execution (phase 6)
+# Agent runtime - durable DSH task execution (phase 6)
 
 Status: implemented. Tests: `tests/test_agent_runtime.py` (16).
 
@@ -28,16 +28,16 @@ between steps and stops, releasing the untouched reservation.
 
 ## Execution loop (PlanRunner)
 
-1. **Plan** — model call (non-thinking per pin) returns JSON steps; each
+1. **Plan** - model call (non-thinking per pin) returns JSON steps; each
    step becomes a `task_steps` row + `plan.created` event.
-2. **Per step** — deterministic gates in order:
+2. **Per step** - deterministic gates in order:
    registry knows the tool → **scope wall** (server-side `USER_TASK_SCOPES`,
    never content-derived) → **budget** (`max_cost_xp ≤ remaining`) →
    **approval** (DB-checked, digest-bound) → **hard timeout** (`asyncio.wait_for`
    on the spec timeout) → execute.
-3. **Settle** — `ledger.settle_task(reserved, actual=min(spent, budget))`;
+3. **Settle** - `ledger.settle_task(reserved, actual=min(spent, budget))`;
    the ledger refuses anything above the approved cap.
-4. **Evaluate** — deterministic structural evaluation (completeness /
+4. **Evaluate** - deterministic structural evaluation (completeness /
    provenance / consistency) persisted as an event; never a model verdict.
 
 ## Acceptance criteria → mechanisms
@@ -57,13 +57,13 @@ between steps and stops, releasing the untouched reservation.
 `approval.requested|approved|denied|reused`, `evaluation.completed`,
 `task.completed|failed|cancelled`. `GET /tasks/{id}/events` replays it;
 `GET /tasks/{id}/steps` shows the durable step table. Payloads carry shape
-(status, keys) rather than raw tool output — the stream stays inspectable
+(status, keys) rather than raw tool output - the stream stays inspectable
 without becoming an untrusted-content channel.
 
 ## Audit records
 
 Every terminal tool call writes `audit_events(actor_type="agent",
-event_type="tool.call", resource_id=tool)` with task/step/status only —
+event_type="tool.call", resource_id=tool)` with task/step/status only -
 never argument values or output text.
 
 ## Approvals
@@ -92,8 +92,8 @@ cost note, never a silent zero.
 ## Stub mode
 
 Without `XP_DEEPSEEK_API_KEY` the client is deterministic (plan:
-web.search → docs.generate_pdf with valid arguments), so the full loop —
-reservation, execution, events, evaluation, settlement — is testable and
+web.search → docs.generate_pdf with valid arguments), so the full loop -
+reservation, execution, events, evaluation, settlement - is testable and
 demoable offline.
 
 ## Open items

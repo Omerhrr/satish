@@ -1,4 +1,4 @@
-# ruff: noqa: PLW1510, BLE001, S110, B015, RUF046 — one-shot spike evidence, kept as record
+# ruff: noqa: PLW1510, BLE001, S110, B015, RUF046 - one-shot spike evidence, kept as record
 """Empirical phase-3 spike: BDK (bdkpython) + bitcoind regtest end-to-end.
 
 Proves: create / receive / balance / send / fee / broadcast / confirm / restore
@@ -70,7 +70,7 @@ def main():
         rpc("generatetoaddress", "101", miner_addr)
         print("mined 101 blocks; miner balance:", rpc("getbalance"))
 
-        # ---- 1. CREATE: BIP39 mnemonic -> BIP84 descriptor -> wallet ----
+        # 1. CREATE: BIP39 mnemonic -> BIP84 descriptor -> wallet
         mnemonic = bdk.Mnemonic(word_count=bdk.WordCount.WORDS12)
         words = str(mnemonic)
         sk = bdk.DescriptorSecretKey(network_kind=bdk.NetworkKind.TEST, mnemonic=mnemonic, password="")
@@ -83,7 +83,7 @@ def main():
         )
         print("wallet created; descriptor checksum:", wallet.descriptor_checksum(bdk.KeychainKind.EXTERNAL))
 
-        # ---- 2. RECEIVE: reveal address, fund from miner, import into wallet graph ----
+        # 2. RECEIVE: reveal address, fund from miner, import into wallet graph
         addr_info = wallet.reveal_next_address(bdk.KeychainKind.EXTERNAL)
         recv_addr = str(addr_info.address)
         assert recv_addr.startswith("bcrt1"), recv_addr
@@ -108,12 +108,12 @@ def main():
         bal = wallet.balance()
         print("confirmed-ish balance sats:", bal.confirmed.to_sat(), "total:", bal.total.to_sat())
 
-        # ---- 3. FEE: bitcoind estimatesmartfee as the fee source ----
+        # 3. FEE: bitcoind estimatesmartfee as the fee source
         est = rpc("estimatesmartfee", "1")
         fee_rate_sat_vb = max(1, int(round(est.get("feerate", 0.0001) * 1e8 / 1000)))
         print("estimatesmartfee ->", est.get("feerate"), f"~{fee_rate_sat_vb} sat/vB")
 
-        # ---- 4. SEND: build PSBT, sign, finalize, extract, broadcast ----
+        # 4. SEND: build PSBT, sign, finalize, extract, broadcast
         dest_addr = rpc("getnewaddress", "", "bech32")
         send_amt = 150_000_000  # 1.5 BTC in sats
         psbt = (
@@ -142,13 +142,13 @@ def main():
         txid2 = rpc("sendrawtransaction", raw_hex)
         print("broadcast ok:", txid2[:16], "...")
 
-        # ---- 5. CONFIRMATION TRACKING ----
+        # 5. CONFIRMATION TRACKING
         rpc("generatetoaddress", "1", miner_addr)
         got = rpc("gettransaction", txid2)  # wallet RPC: works without -txindex
         print("confirmations:", got.get("confirmations"))
         assert got.get("confirmations", 0) >= 1
 
-        # ---- 6. RESTORE: same mnemonic -> same descriptor -> same address ----
+        # 6. RESTORE: same mnemonic -> same descriptor -> same address
         restored_m = bdk.Mnemonic.from_string(words)
         rsk = bdk.DescriptorSecretKey(network_kind=bdk.NetworkKind.TEST, mnemonic=restored_m, password="")
         rdesc = bdk.Descriptor.new_bip84(rsk, bdk.KeychainKind.EXTERNAL, bdk.NetworkKind.TEST)
@@ -162,7 +162,7 @@ def main():
         assert raddr == recv_addr, f"restore mismatch {raddr} != {recv_addr}"
         print("restore round-trip: same first address", raddr)
 
-        # ---- 7. FAILURE PATHS ----
+        # 7. FAILURE PATHS
         # 7a. overspend -> InsufficientFunds
         try:
             bdk.TxBuilder().add_recipient(

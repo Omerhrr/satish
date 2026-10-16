@@ -14,11 +14,11 @@ Stages (mirrors docs/lightning-integration.md "Recovery and backups"):
 Stages 3-6 are BLOCKED in this sandbox by the documented environment defect
 (broken loopback zmq + btcwallet block-processor stall on rpcpolling; lnd
 #9108/#10389/#11004). The drill detects the stall and reports BLOCKED with
-diagnostics instead of pretending — re-run on a healthy host to complete.
+diagnostics instead of pretending - re-run on a healthy host to complete.
 
 Usage: make lightning-drill   (or .venv/bin/python scripts/lnd_regtest_drill.py)
 Exit:  0 = all reachable stages passed (BLOCKED stages reported honestly),
-       1 = unexpected failure (a real bug — fix before shipping).
+       1 = unexpected failure (a real bug - fix before shipping).
 """
 
 from __future__ import annotations
@@ -62,7 +62,7 @@ RESULTS: list[tuple[str, str, str]] = []  # (stage, verdict, note)
 
 def report(stage: str, verdict: str, note: str = "") -> None:
     RESULTS.append((stage, verdict, note))
-    print(f"[{stage}] {verdict}" + (f" — {note}" if note else ""))
+    print(f"[{stage}] {verdict}" + (f" - {note}" if note else ""))
 
 
 def wait_for(fn, timeout: float, what: str):
@@ -73,7 +73,7 @@ def wait_for(fn, timeout: float, what: str):
             last = fn()
             if last:
                 return last
-        except Exception as exc:  # noqa: BLE001 — probe loop
+        except Exception as exc:  # noqa: BLE001 - probe loop
             last = exc
         time.sleep(1)
     raise TimeoutError(f"{what} not ready in {timeout}s (last: {last})")
@@ -239,7 +239,7 @@ class LndNode:
 
 def main() -> int:
     if not BITCOIND.exists() or not LND_BIN.exists():
-        print("drill binaries missing under .tools/ — download lnd "
+        print("drill binaries missing under .tools/ - download lnd "
               f"{LND_VERSION} + bitcoind first (see docs/lightning-integration.md)")
         return 1
     work = TOOLS / "ln-regtest-data"
@@ -250,12 +250,12 @@ def main() -> int:
     b = LndNode("node-b", work / "node-b", 10110, 19736)
 
     try:
-        # -- stage 1: chain up -----------------------------------------------------
+        # stage 1: chain up
         bitcoind.start()
         bitcoind.mine(101)
         report("1-chain", "PASS", "bitcoind regtest up, 101 blocks")
 
-        # -- stage 2: two nodes ACTIVE ---------------------------------------------
+        # stage 2: two nodes ACTIVE
         a.start()
         b.start()
         a.init_wallet()
@@ -266,7 +266,7 @@ def main() -> int:
         pub_b = stub_b.GetInfo(lpb.GetInfoRequest(), timeout=10).identity_pubkey
         report("2-nodes", "PASS", f"a={pub_a[:12]}… b={pub_b[:12]}…")
 
-        # -- stage 3: fund + channel (environmentally blocked) ----------------------
+        # stage 3: fund + channel (environmentally blocked)
         addr_rsp = stub_a.NewAddress(lpb.NewAddressRequest(type=lpb.AddressType.WITNESS_PUBKEY_HASH), timeout=10)
         bitcoind.mine(6, addr_rsp.address)
         # rpcpolling + the btcwallet block-processor stall: outputs never credit.
@@ -300,7 +300,7 @@ def main() -> int:
                 lpb.ListChannelsRequest(), timeout=10).channels), 120, "channel active")
             report("3-fund-channel", "PASS", f"channel {chan_rsp.funding_txid[:12]}…")
 
-            # -- stage 4-6: invoice -> pay -> settle -> fee cap ----------------------
+            # stage 4-6: invoice -> pay -> settle -> fee cap
             inv = stub_b.AddInvoice(lpb.Invoice(value_msat=50_000_000, memo="drill"), timeout=10)
             pay_stream = stub_a.SendPaymentV2(routerrpc.SendPaymentRequest(
                 payment_request=inv.payment_request, fee_limit_msat=10_000, timeout_seconds=30,
@@ -313,7 +313,7 @@ def main() -> int:
                 r_hash_str=inv.r_hash, r_hash=inv.r_hash), timeout=10)
             ok5 = settled.state == lpb.Invoice.SETTLED and settled.r_preimage == update.payment_preimage
             report("5-settle", "PASS" if ok5 else "FAIL", "preimage matches" if ok5 else "")
-            # -- stage 6: fee-cap rejection (fresh invoice, absurdly low cap) ------
+            # stage 6: fee-cap rejection (fresh invoice, absurdly low cap)
             inv2 = stub_b.AddInvoice(lpb.Invoice(value_msat=20_000_000, memo="cap"), timeout=10)
             try:
                 stream6 = stub_a.SendPaymentV2(routerrpc.SendPaymentRequest(
@@ -328,7 +328,7 @@ def main() -> int:
             except grpc.RpcError as exc:
                 report("6-fee-cap", "PASS", f"node refused above-cap route: {exc.code().name}")
 
-        # -- stage 7: restart drill ---------------------------------------------------
+        # stage 7: restart drill
         a.stop(signal.SIGTERM)
         a.start()
 
@@ -346,7 +346,7 @@ def main() -> int:
         a.wait_active()
         report("7-restart", "PASS", "unlock after SIGTERM restart; wallet ACTIVE")
 
-        # -- stage 8: data-loss DLP drill (environmentally blocked without stage 3) ----
+        # stage 8: data-loss DLP drill (environmentally blocked without stage 3)
         if not credited:
             report("8-data-loss", "BLOCKED", "needs a funded+channelled node from stage 3")
         else:
@@ -370,11 +370,11 @@ def main() -> int:
 
         blocked = [r for r in RESULTS if r[1] == "BLOCKED"]
         failed = [r for r in RESULTS if r[1] == "FAIL"]
-        print(f"\ndrill summary: {len(RESULTS)} stages — "
+        print(f"\ndrill summary: {len(RESULTS)} stages - "
               f"{sum(1 for r in RESULTS if r[1] == 'PASS')} PASS, "
               f"{len(blocked)} BLOCKED, {len(failed)} FAIL")
         return 1 if failed else 0
-    except Exception as exc:  # noqa: BLE001 — drill must report, not crash silently
+    except Exception as exc:  # noqa: BLE001 - drill must report, not crash silently
         report("unexpected", "FAIL", f"{type(exc).__name__}: {exc}")
         return 1
     finally:

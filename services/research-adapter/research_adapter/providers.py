@@ -3,7 +3,7 @@
 Two transports, one honest contract:
 
 - ``canned`` (default): deterministic providers served from the committed
-  research evaluation corpus. Every result discloses its mode — canned output
+  research evaluation corpus. Every result discloses its mode - canned output
   is clearly labeled offline data, never dressed up as live web results.
 - ``http`` (fetch only): real page retrieval through the FetchPolicy wall
   (scheme/port/userinfo/localhost checks, per-hop redirect re-checks,
@@ -32,7 +32,7 @@ MAX_REDIRECTS = 3
 USER_AGENT = "XP-Research-Agent/0.1 (research tool; fetched pages are untrusted data)"
 
 
-# -- shared shapes ----------------------------------------------------------------
+# shared shapes
 
 
 @dataclass
@@ -61,7 +61,7 @@ class FetchOutcome:
     reason: str = ""
 
 
-# -- search ------------------------------------------------------------------------
+# search
 
 
 class SearchProvider(Protocol):
@@ -105,12 +105,12 @@ class CannedSearchProvider:
             results=[s[2] for s in scored[: max(1, limit)]],
             disclosure=(
                 "search runs in canned mode over the committed offline evaluation "
-                "corpus — results are fixed research fixtures, not live web listings"
+                "corpus - results are fixed research fixtures, not live web listings"
             ),
         )
 
 
-# -- fetch -------------------------------------------------------------------------
+# fetch
 
 
 class FetchProvider(Protocol):
@@ -120,7 +120,7 @@ class FetchProvider(Protocol):
 class CannedFetchProvider:
     """Serves corpus pages by exact URL, byte-identical every time.
 
-    A URL absent from the corpus returns status=unavailable — the honest
+    A URL absent from the corpus returns status=unavailable - the honest
     canned equivalent of a dead page, which the eval set uses to prove that
     unavailable sources are disclosed.
     """

@@ -2,7 +2,7 @@
 
 The user supplies EXPLICIT specifications (make, model, year bounds, mileage
 cap, budget cap); every fetched vehicle source is checked against them.
-Matches and mismatches are both first-class cited facts — a mismatched
+Matches and mismatches are both first-class cited facts - a mismatched
 listing is information, not an error. Cross-source value conflicts (two
 sources, different mileage for the same vehicle) are surfaced, never
 averaged away.
@@ -112,7 +112,7 @@ def check_vehicles(
         if record.status == "listed":
             result.disclosures.append(
                 f"source {label_of.get(record.source_id, '[S?]')} {record.url} was listed "
-                "by search but never fetched — it contributes no vehicle data"
+                "by search but never fetched - it contributes no vehicle data"
             )
     if not vehicles:
         result.disclosures.append(

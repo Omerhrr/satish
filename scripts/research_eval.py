@@ -26,7 +26,7 @@ def main() -> int:
     report = run_eval_set(path)
     print(json.dumps(report, indent=2, default=str))
     verdict = "PASS" if report["ok"] else "FAIL"
-    print(f"\nresearch eval: {verdict} — {report['passed']}/{report['total']} cases")
+    print(f"\nresearch eval: {verdict} - {report['passed']}/{report['total']} cases")
     return 0 if report["ok"] else 1
 
 

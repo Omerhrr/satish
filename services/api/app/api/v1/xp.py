@@ -90,7 +90,7 @@ async def ledger_entries(
     return LedgerPageOut(items=items, total=int(total))
 
 
-# -- purchases / receipts (billing_flow) ---------------------------------------------
+# purchases / receipts (billing_flow)
 
 
 @router.post("/purchases", response_model=PurchaseOut, status_code=status.HTTP_201_CREATED)
@@ -167,7 +167,7 @@ async def purchase_receipt_pdf(
     }
 
 
-# -- reconciliation (system seam) ------------------------------------------------------
+# reconciliation (system seam)
 
 
 @router.post("/reconcile", response_model=ReconcileReportOut)

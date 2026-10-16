@@ -1,6 +1,6 @@
 """BDK-backed on-chain wallet provider (phase-3, decision D10).
 
-Library: bdkpython (BDK 1.x core, UniFFI bindings) — proven end-to-end on
+Library: bdkpython (BDK 1.x core, UniFFI bindings) - proven end-to-end on
 bitcoin regtest in scripts/regtest_proof.py before this integration.
 
 Custody model (honesty rules from wallet_and_security):
@@ -11,8 +11,8 @@ Custody model (honesty rules from wallet_and_security):
   never written to disk, DB, logs, or task context, and dropped on lock/expiry.
 - The signing boundary rejects agent actors outright and requires a fresh
   unlock plus an authorization digest binding the reviewed transaction.
-- The unsigned PSBT is built by the persisted (public) wallet — it owns the
-  UTXO graph — and is signed by the in-memory private wallet, whose derivation
+- The unsigned PSBT is built by the persisted (public) wallet - it owns the
+  UTXO graph - and is signed by the in-memory private wallet, whose derivation
   coverage is synced to the persisted wallet's indexes at unlock time.
 
 This is a server-side signing-vault design, NOT browser-side signing and NOT
@@ -48,7 +48,7 @@ def _word_count(count: int) -> bdk.WordCount:
         raise InvalidMnemonic(f"unsupported word count {count}") from exc
 
 
-# -- errors ---------------------------------------------------------------------
+# errors
 
 
 class WalletError(RuntimeError):
@@ -72,7 +72,7 @@ class BroadcastUncertain(WalletError):
     """The node could not be reached during broadcast; outcome unknown."""
 
 
-# -- data types -----------------------------------------------------------------
+# data types
 
 
 @dataclass(frozen=True, slots=True)
@@ -115,7 +115,7 @@ class TxStatus:
     block_height: int | None
 
 
-# -- helpers --------------------------------------------------------------------
+# helpers
 
 _NETWORK_ORDINALS = ["BITCOIN", "TESTNET", "TESTNET4", "SIGNET", "REGTEST"]
 
@@ -143,7 +143,7 @@ def _parses_on_other_network(destination: str, own: Network) -> bool:
 
 
 def _descriptor_checksum(desc: bdk.Descriptor) -> str:
-    # to_string_with_secret() = wpkh(...)#checksum — checksum is the suffix.
+    # to_string_with_secret() = wpkh(...)#checksum - checksum is the suffix.
     return desc.to_string_with_secret().rsplit("#", 1)[-1]
 
 
@@ -183,7 +183,7 @@ class _Pending:
     psbt: bdk.Psbt
 
 
-# -- provider ---------------------------------------------------------------------
+# provider
 
 
 class BdkWalletProvider:
@@ -223,7 +223,7 @@ class BdkWalletProvider:
         self._pending: dict[str, _Pending] = {}
         self._lock = asyncio.Lock()
 
-    # -- construction helpers ---------------------------------------------------
+    # construction helpers
 
     def _descriptors_from_mnemonic(
         self, mnemonic: bdk.Mnemonic, password: str
@@ -275,7 +275,7 @@ class BdkWalletProvider:
             raise WalletNotFound(f"wallet {wallet_id} is not open in this process")
         return handle
 
-    # -- create / restore ---------------------------------------------------------
+    # create / restore
 
     async def create_wallet(
         self, *, label: str = "", word_count: int | None = None, password: str = ""
@@ -386,7 +386,7 @@ class BdkWalletProvider:
                 descriptor=ext, wallet=wallet, persister=persister,
             )
 
-    # -- unlock / lock (in-memory signing vault) ----------------------------------
+    # unlock / lock (in-memory signing vault)
 
     async def unlock(
         self, wallet_id: str, *, mnemonic_words: str, ttl_seconds: int | None = None
@@ -443,7 +443,7 @@ class BdkWalletProvider:
             raise SigningLocked("signing vault is locked; unlock with the recovery phrase first")
         return unlocked
 
-    # -- protocol surface ----------------------------------------------------------
+    # protocol surface
 
     async def create_wallet_metadata(self, *, network: Network, label: str) -> dict[str, Any]:
         """Protocol shim: same as create_wallet; mnemonic returned once in the dict."""
@@ -457,7 +457,7 @@ class BdkWalletProvider:
             "change_public_descriptor": created.change_public_descriptor,
             "first_address": created.first_address,
             "mnemonic_once": created.mnemonic_once,
-            "mnemonic_display": "one_time — never shown again, never stored",
+            "mnemonic_display": "one_time - never shown again, never stored",
         }
 
     async def derive_address(self, wallet_id: str, *, index: int = 0) -> str:
@@ -490,7 +490,7 @@ class BdkWalletProvider:
 
         return await asyncio.to_thread(_balance)
 
-    # -- transaction preparation / signing / broadcast ------------------------------
+    # transaction preparation / signing / broadcast
 
     async def prepare_transaction(
         self, wallet_id: str, *, destination: str, amount_sats: int, fee_rate_sat_vb: int | None = None
@@ -607,7 +607,7 @@ class BdkWalletProvider:
     async def sign_prepared(
         self, prepared_id: str, *, authorization_digest: str, actor: str
     ) -> SignedTransaction:
-        """SigningBoundary implementation — the ONLY path from review to signature.
+        """SigningBoundary implementation - the ONLY path from review to signature.
 
         Validation failures (locked vault, wrong actor, wrong digest) do NOT
         consume the pending transaction; only a completed signature does.
@@ -692,7 +692,7 @@ class BdkWalletProvider:
             return TxStatus(txid=txid, state="mempool", confirmations=0, block_height=None)
         return TxStatus(txid=txid, state="unknown", confirmations=0, block_height=None)
 
-    # -- regtest/dev chain-data import (no electrs required on regtest) -------------
+    # regtest/dev chain-data import (no electrs required on regtest)
 
     async def import_transaction(self, wallet_id: str, raw_tx_hex: str) -> dict[str, Any]:
         """Feed a chain transaction into the wallet graph (bring-your-own-chain-source).

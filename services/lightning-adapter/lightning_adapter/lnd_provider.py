@@ -1,4 +1,4 @@
-"""Real lnd gRPC adapter (phase 4, decision D11) — lnd v0.21.4-beta.
+"""Real lnd gRPC adapter (phase 4, decision D11) - lnd v0.21.4-beta.
 
 The node surface is pinned the same way the DSH integration pins its API
 (see D8): the gRPC stubs under ``lightning_adapter.lnd_stubs`` are generated
@@ -92,7 +92,7 @@ class LndLightningProvider:
         self._stub_state: Any = None
         self._channel: Any = None
 
-    # -- channel plumbing --------------------------------------------------------
+    # channel plumbing
 
     def _load_stubs(self) -> None:
         """One-time lazy connect: secure credentials from disk, build stubs."""
@@ -155,7 +155,7 @@ class LndLightningProvider:
                     raise PaymentRejected(str(exc)) from exc
             raise PaymentRejected(str(exc)) from exc
 
-    # -- receive -------------------------------------------------------------------
+    # receive
 
     async def create_invoice(
         self, *, amount_msat: int, description: str, expiry_seconds: int
@@ -219,7 +219,7 @@ class LndLightningProvider:
     async def settle_invoice(self, payment_hash: str, preimage: str) -> bool:
         """Verify a settlement claim against the node's own invoice state.
 
-        The production caller is the node's SubscribeInvoices stream — the
+        The production caller is the node's SubscribeInvoices stream - the
         preimage must be the node-supplied one; this verification refuses a
         settle if the node has not actually marked the invoice SETTLED.
         """
@@ -245,7 +245,7 @@ class LndLightningProvider:
         status, _ = await self.invoice_status(payment_hash)
         return status
 
-    # -- send ------------------------------------------------------------------------
+    # send
 
     async def prepare_payment(self, bolt11: str) -> PreparedPayment:
         """Fee preview via the router; clamped to the published cap."""
@@ -368,7 +368,7 @@ class LndLightningProvider:
                 )
         raise PaymentNotFound("payment not found")
 
-    # -- node surface -------------------------------------------------------------------
+    # node surface
 
     async def health(self) -> dict:
         from lightning_adapter.lnd_stubs import stateservice_pb2 as spb
@@ -404,7 +404,7 @@ class LndLightningProvider:
             for c in rsp.channels
         ]
 
-    # -- recovery -------------------------------------------------------------------------
+    # recovery
 
     async def export_scb(self) -> tuple[bytes, str]:
         import hashlib
@@ -424,7 +424,7 @@ class LndLightningProvider:
         from lightning_adapter.lnd_stubs import lightning_pb2 as lpb
 
         if hashlib.sha256(blob).hexdigest() != checksum:
-            raise LightningProviderError("SCB checksum mismatch — blob corrupted")
+            raise LightningProviderError("SCB checksum mismatch - blob corrupted")
         await self._call(
             self._stub_lightning.RestoreChanBackup,
             lpb.RestoreChanBackupRequest(backup=blob),

@@ -2,7 +2,7 @@
 
 Drafts are created by the agent's email.draft tool. The preview endpoint is
 owner-checked; the send path lives in the tool registry behind the approval
-gate — this router is read-only by design.
+gate - this router is read-only by design.
 """
 
 from __future__ import annotations

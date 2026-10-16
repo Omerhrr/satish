@@ -4,7 +4,7 @@ Every tool declares: JSON-schema inputs, required scope, XP cost budget,
 timeout, and whether user approval is required before execution
 (dsh_integration requirements: schemas, permissions, budgets, timeouts).
 The registry is the ONLY way tools reach the model runtime, and unknown or
-out-of-scope tools are rejected here — defense in depth against model-driven
+out-of-scope tools are rejected here - defense in depth against model-driven
 privilege escalation.
 """
 
@@ -37,7 +37,7 @@ class InvalidArguments(ToolRegistryError):
 
 
 class ToolTimeout(ToolRegistryError):
-    """Raised when a tool exceeds its spec timeout — deterministic backend
+    """Raised when a tool exceeds its spec timeout - deterministic backend
     enforcement (phase-6 acceptance: budget limits and tool timeouts are
     enforced by deterministic backend code, never by the model's goodwill)."""
 

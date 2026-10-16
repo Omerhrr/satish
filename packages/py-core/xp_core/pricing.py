@@ -1,6 +1,6 @@
 """Published XP pricing configuration (phase 5, pricing_requirements).
 
-One canonical conversion: ``xp_per_sat`` — XP credited per satoshi paid.
+One canonical conversion: ``xp_per_sat`` - XP credited per satoshi paid.
 It is the ONLY rate in the system; every surface (API, bot, Mini App)
 derives its display from it. The rate is published with ``can_change: true``
 so clients must never cache it (pricing_requirements #1).
@@ -25,10 +25,10 @@ from xp_core.config import Settings
 # Activities that may incur variable external costs, disclosed verbatim
 # (pricing_requirements #3). Keep in sync with docs/xp-economy.md.
 VARIABLE_COST_ACTIVITIES = [
-    "web.search — upstream search provider usage",
-    "web.fetch_page — fetching large or slow pages",
-    "docs.generate_pdf — document rendering time",
-    "model usage — DeepSeek tokens are metered and reported per task",
+    "web.search - upstream search provider usage",
+    "web.fetch_page - fetching large or slow pages",
+    "docs.generate_pdf - document rendering time",
+    "model usage - DeepSeek tokens are metered and reported per task",
 ]
 
 MIN_PURCHASE_SATS = 100
@@ -82,7 +82,7 @@ def rate_disclosure(settings: Settings) -> dict:
         "note": (
             "The sats-to-XP conversion is published as XP per satoshi and may "
             "change; always re-check this rate before purchasing. XP is an "
-            "internal usage credit — not Bitcoin, not a blockchain token, and "
+            "internal usage credit - not Bitcoin, not a blockchain token, and "
             "not a claim on funds."
         ),
     }

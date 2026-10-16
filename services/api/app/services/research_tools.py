@@ -1,7 +1,7 @@
 """Product tool registry (phase 7): real research + document tools.
 
 Replaces the phase-6 scaffold stubs at runtime. The model still only ever
-sees typed, allowlisted tools — but the handlers now do the real work:
+sees typed, allowlisted tools - but the handlers now do the real work:
 
 - web.search        canned provider over the committed evaluation corpus;
                     every listing persisted as a ResearchSource row
@@ -78,7 +78,7 @@ def content_digest(to: str, subject: str, body: str) -> str:
     """sha256 over the canonical draft content.
 
     The email.send approval binds to the tool action digest, which wraps
-    THIS content — the user approves exactly what they previewed.
+    THIS content - the user approves exactly what they previewed.
     """
     canonical = json.dumps(
         {"to": to, "subject": subject, "body": body},
@@ -111,7 +111,7 @@ def load_commerce_corpus(settings: Settings) -> list[dict[str, Any]]:
     listings, an official tariff, and an ad-library fixture. Entries carry
     ``source_type``; merged into the same canned providers so web.search and
     web.fetch_page reach them through ONE permission wall. A missing or
-    malformed file degrades to an empty corpus with a warning — commerce
+    malformed file degrades to an empty corpus with a warning - commerce
     tools then honestly report zero fixtures, never fabricated ones."""
     import json
     from pathlib import Path
@@ -259,7 +259,7 @@ async def _build_report_spec(
 
     comparison = compare_sources(records)
     unavailable = [
-        f"S{index_of[r.source_id]} {r.url} — {r.status}: {r.note or 'no reason recorded'}"
+        f"S{index_of[r.source_id]} {r.url} - {r.status}: {r.note or 'no reason recorded'}"
         for r in records
         if r.status in {"unavailable", "denied", "error"} and r.source_id in index_of
     ]
@@ -267,7 +267,7 @@ async def _build_report_spec(
     limitations = [
         "claims reflect what the fetched pages said at retrieval time; the report "
         "does not verify factual truth beyond source agreement",
-        "structural quality gates only — sources and claims remain the user's "
+        "structural quality gates only - sources and claims remain the user's "
         "responsibility to review",
     ]
     if any(claim.kind == "estimate" for claim in claims):
@@ -277,7 +277,7 @@ async def _build_report_spec(
         )
     if not records:
         limitations.append(
-            "no sources were collected — this report contains disclosures only, "
+            "no sources were collected - this report contains disclosures only, "
             "no findings"
         )
 
@@ -576,7 +576,7 @@ def build_product_registry(
             "disclosure": "validated XLSX stored privately",
         }
 
-    # -- communication (phase 9): draft -> preview -> approval -> send --------
+    # communication (phase 9): draft -> preview -> approval -> send
 
     async def draft_email(to: str, subject: str, body: str) -> dict[str, Any]:
         digest = content_digest(to, subject, body)
@@ -725,7 +725,7 @@ def build_product_registry(
             "disclosure": outcome.disclosure,
         }
 
-    # -- automation (phase 9) ----------------------------------------------------
+    # automation (phase 9)
 
     async def schedule_job(
         schedule: str,
@@ -1014,7 +1014,7 @@ def build_product_registry(
         )
     )
 
-    # -- commerce intelligence (phase 8) -------------------------------------
+    # commerce intelligence (phase 8)
     from app.services.commerce_tools import register_commerce_tools
 
     register_commerce_tools(

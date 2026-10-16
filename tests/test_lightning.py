@@ -26,7 +26,7 @@ from sqlalchemy import func, select
 from wallet_adapter import Network
 from xp_core.models.entities import XpLedgerEntry
 
-# -- fixtures ----------------------------------------------------------------------
+# fixtures
 
 
 def make_provider(*, clock=None, **kw) -> CannedLightningProvider:
@@ -77,7 +77,7 @@ def _preimage_for(provider: CannedLightningProvider, payment_hash: str) -> str:
     return provider._invoices[payment_hash].invoice.preimage
 
 
-# -- state machines ------------------------------------------------------------------
+# state machines
 
 
 def test_payment_state_machine_legal_chain():
@@ -140,7 +140,7 @@ async def test_invoice_settlement_requires_matching_preimage_and_is_idempotent(c
     assert await provider.settle_invoice(inv.payment_hash, inv.preimage) is False
 
 
-# -- payments (send) ------------------------------------------------------------------
+# payments (send)
 
 
 async def test_payment_fee_preview_moves_nothing_then_submit_moves_liquidity(clock):
@@ -207,7 +207,7 @@ async def test_wrong_authorization_digest_rejected(clock):
     assert status.status == "prepared"  # nothing advanced, nothing moved
 
 
-# -- recovery + construction gates -------------------------------------------------------
+# recovery + construction gates
 
 
 async def test_scb_roundtrip_and_checksum(clock):
@@ -252,7 +252,7 @@ def test_factory_canned_default_and_lnd_requires_host():
         )
 
 
-# -- API surface -----------------------------------------------------------------------
+# API surface
 
 
 async def test_invoice_create_and_idempotent_replay(client, session, clock):

@@ -66,7 +66,7 @@ def create_app() -> FastAPI:
         response.headers[settings.request_id_header] = rid
         return response
 
-    # -- abuse controls (phase 10): token buckets per route class -------------
+    # abuse controls (phase 10): token buckets per route class
     limiter = RateLimiter(
         bucket_ttl_seconds=settings.rate_limit_bucket_ttl_seconds,
         max_buckets=settings.rate_limit_max_buckets,

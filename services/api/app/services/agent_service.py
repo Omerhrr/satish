@@ -4,13 +4,13 @@ Wires the PlanRunner into the application database so every deliverable of
 dsh_integration is enforced by DETERMINISTIC backend code:
 
 - Durable state: plan, steps, and events persist in task_steps/task_events
-  and survive worker restarts (acceptance #3) — the runner holds no state
+  and survive worker restarts (acceptance #3) - the runner holds no state
   that matters; a resumed run reconstructs from the DB.
 - Budget-aware dispatch: the registry refuses a tool whose max_cost_xp
   exceeds the remaining budget; the ledger refuses settlement above the
   approved cap (acceptance #5).
 - Approval gate: approval-required tools stop the run; the decision is an
-  Approval row the USER creates through the API — the model cannot approve
+  Approval row the USER creates through the API - the model cannot approve
   itself, and the digest binds the decision to the exact action
   (acceptance #2).
 - Durable cancellation: the cancel endpoint flips task.status; the runner
@@ -54,7 +54,7 @@ log = get_logger(__name__)
 # tools NOT covered here are structurally unreachable, whatever the model
 # plans. Phase-9 adds the email/automation product surfaces: email:send and
 # automation:write are granted to tasks, and BOTH their tools still carry
-# requires_approval=True — the scope wall and the approval gate stack.
+# requires_approval=True - the scope wall and the approval gate stack.
 USER_TASK_SCOPES = {
     "research:read",
     "documents:write",
@@ -72,12 +72,12 @@ class TaskNotRunnable(AgentRuntimeError):
     pass
 
 
-# -- event stream helpers ------------------------------------------------------------
+# event stream helpers
 # append_event / load_events live in task_events.py (shared with the research
 # tool handlers); re-exported here for the routers' import compatibility.
 
 
-# -- persistence hooks --------------------------------------------------------------
+# persistence hooks
 
 
 class DbPersistenceHooks(PersistenceHooks):
@@ -128,14 +128,14 @@ class DbPersistenceHooks(PersistenceHooks):
         await self.session.commit()
 
     async def on_approval_required(self, action: dict[str, Any]) -> bool:
-        """Determine approval from the DB — never from the model.
+        """Determine approval from the DB - never from the model.
 
         If the user already approved THIS digest (resume case) AND the
         approval is still within its TTL, return True. Expired approvals
         (pending OR approved) are marked expired and a fresh request is
         created: an approval binds to the action content AND a time window
         (phase-9 acceptance: "Approval is bound to the specific action
-        content and expires"). Execution after expiry re-requests — no
+        content and expires"). Execution after expiry re-requests - no
         stale sends.
         """
         digest = action.get("digest", "")
@@ -262,7 +262,7 @@ class DbPersistenceHooks(PersistenceHooks):
         }:
             row.completed_at = now
 
-        # Tool-call audit record (deliverable #8): digest-level facts only —
+        # Tool-call audit record (deliverable #8): digest-level facts only -
         # never argument content, never tool output text.
         if tool_name and status in {
             "completed",
@@ -348,7 +348,7 @@ class DbPersistenceHooks(PersistenceHooks):
         await self.session.commit()
 
 
-# -- the run loop ---------------------------------------------------------------------
+# run loop
 
 
 async def run_agent_task(

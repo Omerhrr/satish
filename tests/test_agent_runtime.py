@@ -33,7 +33,7 @@ from xp_core.config import get_settings
 from xp_core.models.entities import AuditEvent, Task
 from xp_core.services import ledger
 
-# -- fixtures ---------------------------------------------------------------------
+# fixtures
 
 
 class ScriptedClient:
@@ -100,7 +100,7 @@ async def seed_xp(session, dev_user, amount: int) -> None:
     await session.commit()
 
 
-# -- acceptance: no private key material -----------------------------------------------
+# acceptance: no private key material
 
 
 def test_registry_has_no_key_material():
@@ -124,12 +124,12 @@ def test_registry_has_no_key_material():
 
 def test_registry_has_no_budget_mutation_tool():
     """The agent cannot raise its own budget: no registered tool reaches the
-    task budget endpoints — additional authorization is a USER route."""
+    task budget endpoints - additional authorization is a USER route."""
     names = {s.name for s in default_registry().list_specs()}
     assert not any("task" in n or "budget" in n for n in names)
 
 
-# -- deterministic enforcement: timeout + budget ---------------------------------------
+# deterministic enforcement: timeout + budget
 
 
 @pytest.mark.asyncio
@@ -242,7 +242,7 @@ async def test_over_budget_settlement_refused_at_ledger(session, dev_user):
     assert "cannot exceed" in str(excinfo.value)
 
 
-# -- the golden path: full run, events, audit, settlement -------------------------------
+# the golden path: full run, events, audit, settlement
 
 
 async def test_full_run_completes_charges_and_audits(client, session, dev_user, factory, monkeypatch):
@@ -269,7 +269,7 @@ async def test_full_run_completes_charges_and_audits(client, session, dev_user, 
     balance = (await client.get("/api/v1/xp/balance")).json()["balance_xp"]
     assert balance == 85
 
-    # Event stream: start, plan, steps, evaluation, completion — in order.
+    # Event stream: start, plan, steps, evaluation, completion - in order.
     events = (await client.get(f"/api/v1/tasks/{task['id']}/events")).json()["events"]
     types = [e["event_type"] for e in events]
     assert types[0] == "task.started"
@@ -311,7 +311,7 @@ async def test_run_requires_reservation_and_ownership(client, dev_user):
     assert resp.status_code == 402
 
 
-# -- scope wall: untrusted content ------------------------------------------------------
+# scope wall: untrusted content
 
 
 async def test_untrusted_content_cannot_expand_scopes(
@@ -320,7 +320,7 @@ async def test_untrusted_content_cannot_expand_scopes(
     """Fetched content begging for more permissions changes nothing: scopes
     are server-side constants and the registry denies what they don't cover.
     Phase-9 stacking: tools inside the granted scopes but flagged
-    requires_approval (email.send) are NOT denied by the scope wall anymore —
+    requires_approval (email.send) are NOT denied by the scope wall anymore -
     they are stopped by the approval gate instead, which untrusted content
     equally cannot bypass. Both denials are asserted with a custom registry
     that adds a registered-but-ungranted tool (admin.purge)."""
@@ -384,7 +384,7 @@ async def test_untrusted_content_cannot_expand_scopes(
     assert UNTRUSTED_OPEN in wrapped
 
 
-# -- approval gate (unit-level with a custom registry) ------------------------------------
+# approval gate (unit-level with a custom registry)
 
 
 def build_approval_registry() -> ToolRegistry:
@@ -504,21 +504,21 @@ async def test_approval_denial_blocks_execution(client, session, dev_user, facto
 
 
 async def test_approval_digest_binds_action(session, dev_user):
-    """A different action digest is a different approval — no blanket consent."""
+    """A different action digest is a different approval - no blanket consent."""
     spec = default_registry().get("email.send")
     digest_a = spec.action_digest({"to": "a@x.y", "subject": "s", "body": "b1"})
     digest_b = spec.action_digest({"to": "a@x.y", "subject": "s", "body": "b2"})
     assert digest_a != digest_b
 
 
-# -- durable state across "worker restart" ------------------------------------------------
+# durable state across "worker restart"
 
 
 async def test_state_survives_restart_and_resume(
     client, session, dev_user, factory, monkeypatch
 ):
     """Kill the runner object mid-task (awaiting approval), rebuild everything
-    from the DB — steps/events/approvals are intact and resume completes."""
+    from the DB - steps/events/approvals are intact and resume completes."""
     await seed_xp(session, dev_user, 100)
     plan = {
         "plan": [
@@ -542,7 +542,7 @@ async def test_state_survives_restart_and_resume(
     resp = await client.post(f"/api/v1/tasks/{task['id']}/run")
     assert resp.json()["status"] == "awaiting_approval"
 
-    # --- "restart": everything the old process held is gone; DB only. ---
+    # "restart": everything the old process held is gone; DB only.
     approvals = (await client.get(f"/api/v1/tasks/{task['id']}/approvals")).json()
     assert len(approvals) == 1
     steps = (await client.get(f"/api/v1/tasks/{task['id']}/steps")).json()
@@ -577,7 +577,7 @@ async def test_state_survives_restart_and_resume(
     assert by_index == {1: "completed", 2: "completed", 3: "completed"}
 
 
-# -- durable cancellation -----------------------------------------------------------------
+# durable cancellation
 
 
 async def test_durable_cancel_between_steps(client, session, dev_user, factory, monkeypatch):
@@ -650,7 +650,7 @@ async def test_durable_cancel_between_steps(client, session, dev_user, factory, 
     assert balance == 100
 
 
-# -- evaluation ---------------------------------------------------------------------------
+# evaluation
 
 
 def test_evaluation_is_deterministic():

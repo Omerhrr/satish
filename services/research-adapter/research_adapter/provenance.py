@@ -2,7 +2,7 @@
 
 Research quality rules implemented here (agent_and_tooling.research_quality):
 - every source keeps url, retrieval time, title, and extracted facts
-- facts are typed: observed | estimate | assumption — estimates are NEVER
+- facts are typed: observed | estimate | assumption - estimates are NEVER
   presented as live observations (e.g. a marketplace listing snapshot)
 - citations are stable [S{n}] references resolved against the source list
 - unavailable sources are first-class records, disclosed, never silently
@@ -22,7 +22,7 @@ SOURCE_STATUSES = ("listed", "ok", "unavailable", "denied", "error")
 
 _CITATION = re.compile(r"\[S(\d+)\]")
 
-# Fact keys that mean "a price figure" — combined with a listing snapshot
+# Fact keys that mean "a price figure" - combined with a listing snapshot
 # flag they are classified as estimates, never as live observed prices.
 PRICE_KEYS = {"price", "asking_price", "listed_price", "unit_price", "current_price"}
 
@@ -75,7 +75,7 @@ def citations_in(text: str) -> list[int]:
     return [int(m) for m in _CITATION.findall(text)]
 
 
-# -- fact classification ----------------------------------------------------------
+# fact classification
 
 
 def facts_from_extraction(

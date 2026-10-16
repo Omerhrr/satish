@@ -3,14 +3,14 @@ container scanning).
 
 What it does, honestly:
 
-1. PYTHON INVENTORY — parses every workspace pyproject.toml (packages/*,
+1. PYTHON INVENTORY - parses every workspace pyproject.toml (packages/*,
    services/*, apps/bot) with tomllib and inventories declared dependencies.
-2. CONTAINER INVENTORY — parses infra/docker-compose.yml and lists images.
-3. NODE INVENTORY — parses apps/web/package.json (runtime + dev deps).
+2. CONTAINER INVENTORY - parses infra/docker-compose.yml and lists images.
+3. NODE INVENTORY - parses apps/web/package.json (runtime + dev deps).
 4. GATES (exit 1 on any hard finding):
    - python/node dependency spec containing ``*`` or ``git+`` or a local path
    - container image without an explicit tag or tagged ``:latest``
-5. OPTIONAL LIVE SCANNERS — pip-audit / trivy / bun audit are run only if
+5. OPTIONAL LIVE SCANNERS - pip-audit / trivy / bun audit are run only if
    present on PATH; when absent the report says so explicitly instead of
    pretending a scan happened. Network-dependent scanners are therefore a
    documented operator step (docs/incident-response.md), not a silent skip.

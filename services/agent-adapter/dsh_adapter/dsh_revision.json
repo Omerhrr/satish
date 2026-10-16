@@ -68,7 +68,7 @@
       "note": "thinking is ON by default with effort=high; adapter disables it for the plan/tool loop"
     },
     "sampling_note": "V4.x: temperature/presence_penalty/frequency_penalty are inert in thinking mode and temperature is fixed at 1.0 in non-thinking mode; the adapter therefore does NOT send temperature",
-    "reasoning_content": "thinking mode returns chain-of-thought in reasoning_content; must be passed back on subsequent tool-loop turns that carry tools — the adapter avoids this by running non-thinking for planning",
+    "reasoning_content": "thinking mode returns chain-of-thought in reasoning_content; must be passed back on subsequent tool-loop turns that carry tools - the adapter avoids this by running non-thinking for planning",
     "adapter_limits": {
       "request_timeout_seconds": 60,
       "max_retries": 2,

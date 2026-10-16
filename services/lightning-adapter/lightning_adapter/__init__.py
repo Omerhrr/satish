@@ -4,7 +4,7 @@ lnd v0.21.4-beta selected via empirical two-node regtest drill; gRPC stubs
 generated from the release's own protos (same manifest-pin philosophy as the
 DSH decision, D8). The ``CannedLightningProvider`` carries lnd-identical
 semantics in memory so every lifecycle/idempotency criterion is provable
-offline — it is disclosed as canned wherever it is surfaced, never presented
+offline - it is disclosed as canned wherever it is surfaced, never presented
 as a real node.
 
 The node admin surface is NEVER exposed to the agent runtime.
@@ -111,7 +111,7 @@ def make_lightning_provider(settings) -> CannedLightningProvider:
 
     ``settings.lightning_mode`` selects the implementation; ``lnd`` requires
     host/tls/macaroon (else LndConfigError) and is refused on mainnet like
-    every other provider. The default is canned — dev/test semantics with
+    every other provider. The default is canned - dev/test semantics with
     honest disclosure at the API surface.
     """
     network = Network(settings.lightning_network)

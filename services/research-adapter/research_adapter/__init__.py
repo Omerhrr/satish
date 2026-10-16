@@ -5,7 +5,7 @@ comparison workflow behind one package boundary, so the API/agent layers
 never touch the network directly.
 
 Live status, stated honestly:
-- search: canned-only (a live provider needs a search API key — none configured)
+- search: canned-only (a live provider needs a search API key - none configured)
 - fetch:  canned (offline corpus) or http (real retrieval behind FetchPolicy)
 """
 

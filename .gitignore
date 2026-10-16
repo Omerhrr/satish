@@ -25,7 +25,7 @@ node_modules/
 .cache/
 dist/
 
-# Env & secrets — never commit (plan: no production secrets in repo)
+# Env & secrets - never commit (plan: no production secrets in repo)
 .env
 .env.*
 !.env.example

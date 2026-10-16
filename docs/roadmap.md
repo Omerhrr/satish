@@ -1,7 +1,7 @@
-# Roadmap — implemented vs. planned (phase 11)
+# Roadmap - implemented vs. planned (phase 11)
 
 Status per plan phase; "implemented" means code + tests + docs are
-committed and green (266 tests). Every planned item's absence is honest —
+committed and green (266 tests). Every planned item's absence is honest -
 see `docs/known-limitations.md` for the instrument that closes each gap.
 
 | # | Phase | Status | Evidence |
@@ -35,5 +35,5 @@ see `docs/known-limitations.md` for the instrument that closes each gap.
   non-dev deployment.
 - **KL-14**: merge the parked CI workflows (`backup-with-ci` branch) once a
   `workflow`-scoped token is available; add license review.
-- **KL-15**: independent external security review — the release gate for
+- **KL-15**: independent external security review - the release gate for
   real-value production use.

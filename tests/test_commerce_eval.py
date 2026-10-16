@@ -2,7 +2,7 @@
 
 Run by ``make commerce-eval`` and here as pytest: every case must pass its
 quality bars, and the set must be reproducible (same inputs -> same
-verdicts) — that is what makes it the regression harness for the commerce
+verdicts) - that is what makes it the regression harness for the commerce
 pipeline.
 """
 

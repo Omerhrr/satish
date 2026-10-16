@@ -1,14 +1,14 @@
 """Minimal async bitcoind JSON-RPC client (phase-3, decision D10).
 
-Scope: exactly the calls the BDK-backed provider needs — fee estimation,
+Scope: exactly the calls the BDK-backed provider needs - fee estimation,
 raw-transaction broadcast + mempool acceptance probing, and chain/wallet
 state queries. No wallet-file management, no admin surface; the node is a
 chain source, not a custody boundary (keys live in the BDK layer).
 
 Failure taxonomy (acceptance: "Failed and uncertain broadcasts are
 represented accurately"):
-- ``RpcRejected``      — bitcoind answered with a definite rejection.
-- ``RpcUnavailable``   — the node could not be reached at all; any broadcast
+- ``RpcRejected``      - bitcoind answered with a definite rejection.
+- ``RpcUnavailable``   - the node could not be reached at all; any broadcast
   attempted during such an outage is UNCERTAIN (it may or may not have
   arrived before the connection failed).
 """
@@ -76,7 +76,7 @@ class BitcoindRpc:
             )
         return body.get("result")
 
-    # -- sugar ---------------------------------------------------------------
+    # sugar
 
     async def estimatesmartfee_sat_vb(self, conf_target: int = 6) -> tuple[int, bool]:
         """Return (sat/vB, is_fallback). BDK-compatible integer sat/vB."""

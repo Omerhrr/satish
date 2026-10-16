@@ -68,7 +68,7 @@ async def test_refund_appends_new_entry(session, dev_user):
     await ledger.refund(session, user_id=dev_user.id, amount=100, reason="failed task")
     entries = (await ledger.reconcile(session, dev_user.id))[0]
     assert entries == 600
-    # original purchase entry is untouched — two entries now exist
+    # original purchase entry is untouched - two entries now exist
     from sqlalchemy import func, select
     from xp_core.models.entities import XpLedgerEntry
 

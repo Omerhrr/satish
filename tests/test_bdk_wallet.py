@@ -4,7 +4,7 @@ Two layers:
 - Offline (no bitcoind): wallet creation/restore, descriptor secrecy, unlock
   semantics, review/authorization binding, fee policy, error taxonomy.
 - Regtest integration (spawns bitcoind from .tools/, skipped honestly if the
-  binary is absent — e.g. CI): create/receive/send/broadcast/confirm/restore
+  binary is absent - e.g. CI): create/receive/send/broadcast/confirm/restore
   flows per phases[3] acceptance criteria.
 """
 
@@ -63,7 +63,7 @@ def _rpc(*args: object) -> object:
         return out.stdout.strip()
 
 
-# -- fixtures ---------------------------------------------------------------------
+# fixtures
 
 
 @pytest.fixture()
@@ -77,7 +77,7 @@ def provider(tmp_path: Path, rpc: BitcoindRpc) -> BdkWalletProvider:
 def bitcoind_regtest():
     """Session bitcoind on regtest with a funded miner wallet."""
     if not BITCOIND.exists():
-        pytest.skip("bitcoind binary not available (CI without .tools) — regtest proof lives in scripts/regtest_proof.py")
+        pytest.skip("bitcoind binary not available (CI without .tools) - regtest proof lives in scripts/regtest_proof.py")
     data = XP / ".tools" / "regtest-test-data"
     if data.exists():
         shutil.rmtree(data)
@@ -129,7 +129,7 @@ async def funded_wallet(provider: BdkWalletProvider, rpc: BitcoindRpc, bitcoind_
     return created
 
 
-# -- offline: creation / secrecy ------------------------------------------------------
+# offline: creation / secrecy
 
 
 class TestCreationAndSecrecy:
@@ -188,7 +188,7 @@ class TestCreationAndSecrecy:
             BdkWalletProvider(network=Network.MAINNET, data_dir=tmp_path)
 
 
-# -- offline: unlock semantics ---------------------------------------------------------
+# offline: unlock semantics
 
 
 class TestUnlockSemantics:
@@ -226,7 +226,7 @@ class TestUnlockSemantics:
             provider._get_unlocked(created.wallet_id)
 
 
-# -- offline: review binding + authorization digest -------------------------------------
+# offline: review binding + authorization digest
 
 
 class TestReviewBinding:
@@ -243,7 +243,7 @@ class TestReviewBinding:
             provider.prepared_review("does-not-exist")
 
 
-# -- offline: transaction policy ------------------------------------------------------
+# offline: transaction policy
 
 
 class TestTransactionPolicy:
@@ -303,7 +303,7 @@ class TestTransactionPolicy:
         assert "balance" in str(exc_info.value).lower() or "Insufficient" in type(exc_info.value).__name__
 
 
-# -- regtest: end-to-end acceptance flows ---------------------------------------------
+# regtest: end-to-end acceptance flows
 
 
 class TestRegtestFlows:

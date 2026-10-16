@@ -1,11 +1,11 @@
-# Btrust Technical Proposal — XP: a Bitcoin-native AI workforce (phase 11)
+# Btrust Technical Proposal - XP: a Bitcoin-native AI workforce (phase 11)
 
 *Audience: Btrust (BitMEX founder Arthur Hayes' bitcoin-focused grant
 program) reviewers and any funder evaluating Bitcoin utility projects.*
 
 ## 1. The Bitcoin utility thesis
 
-AI assistance is rapidly becoming a purchasable commodity — research,
+AI assistance is rapidly becoming a purchasable commodity - research,
 document drafting, monitoring, and approved automation. Today that
 commodity is sold through custodial intermediaries: card processors,
 subscription rails, and platforms that hold the user's money (and data)
@@ -20,7 +20,7 @@ default**: users pay for work in sats over Lightning and on-chain, the
 application credits (XP) are an append-only ledger derived from verified
 payments, and the user's keys never leave the user. The platform can be
 evaluated, operated, and abandoned without anyone granting maintainers
-custody of funds — that is a deliberate acceptance criterion of the plan
+custody of funds - that is a deliberate acceptance criterion of the plan
 and it is testable today (`make demo`, `make wallet-regtest`).
 
 ## 2. Target users
@@ -29,10 +29,10 @@ and it is testable today (`make demo`, `make wallet-regtest`).
   product intelligence, document generation, approved email/automation)
   without opening a custodial account anywhere.
 - **Telegram communities** in regions where Telegram is the primary
-  internet surface — the Mini App + bot pattern meets users where they
+  internet surface - the Mini App + bot pattern meets users where they
   already are, with no app-store gatekeeper.
 - **Operators of small AI-work businesses** who need auditable,
-  budget-capped agent execution with human approval gates — not an
+  budget-capped agent execution with human approval gates - not an
   autonomous agent with a blank check.
 - **Open-source auditors and funders** who need every claim in this
   document to be reproducible from the repository, not taken on faith.
@@ -58,10 +58,10 @@ and it is testable today (`make demo`, `make wallet-regtest`).
 - **Operational readiness**: rate limiting, reconciliation alert queue
   with operator lifecycle, daily retention sweep that structurally cannot
   touch money/audit trails, backup/restore drills, dependency audits, and
-  incident runbooks (R1–R6).
+  incident runbooks (R1-R6).
 
 Full detail: `docs/architecture.md`, `docs/threat-model.md`,
-`docs/decisions.md` (D1–D17).
+`docs/decisions.md` (D1-D17).
 
 ## 4. Security posture (summary)
 
@@ -69,8 +69,8 @@ Threat-model-driven from phase 0: assets, adversaries, and mitigations are
 written down, then tests pin each mitigation (initData forgery, scope-wall
 bypass attempts, SSRF hops, settlement replay, credential-vault paths).
 The current build's known gaps are registered publicly (KL-01…KL-15), and
-the one unresolved release-gate item — **independent external security
-review** — is explicitly marked as pending rather than implied (KL-15).
+the one unresolved release-gate item - **independent external security
+review** - is explicitly marked as pending rather than implied (KL-15).
 No uncompleted feature is represented as production-ready anywhere in the
 documentation, and canned/offline surfaces label themselves at the API
 layer, not just in prose.
@@ -83,7 +83,7 @@ layer, not just in prose.
   acceptance criteria traceable to tests and docs.
 - **Quality gates**: `make test` (266 cases), `make lint`,
   `make audit` (dependency/container pin gates), `make backup-drill`,
-  `make demo` (end-to-end golden path) — all runnable by a new contributor
+  `make demo` (end-to-end golden path) - all runnable by a new contributor
   in under ten minutes with zero external services.
 - **Honesty as governance**: the known-limitations register and the
   roadmap's implemented/planned split are part of the review surface; PRs
@@ -97,7 +97,7 @@ layer, not just in prose.
 - **What funding would accelerate**: the pending live proofs (DeepSeek key,
   lnd drill host, Postgres restore rehearsal), the Redis-backed multi-worker
   rate-limit backend, the operator identity layer for `/ops`, the
-  independent security review, and the Telegram notification relay — each
+  independent security review, and the Telegram notification relay - each
   already scoped in `docs/roadmap.md`.
 
 ## 6. Why this is evaluable without custody
@@ -106,5 +106,5 @@ Every dollar-equivalent flow can be exercised on regtest
 (`make wallet-regtest`, `make lightning-drill`) or on the canned twin
 (`make demo`) without mainnet funds, without a custodial account, and
 without giving maintainers anything but public repository access. The
-wallet model has no server-side secret fields by construction — the data
+wallet model has no server-side secret fields by construction - the data
 model itself is the audit.

@@ -21,7 +21,7 @@ async def current_user(
     """Resolve the caller.
 
     - Bearer session token when provided (Mini App / bot).
-    - Dev user when DEV_MODE and no credentials — local/sandbox convenience.
+    - Dev user when DEV_MODE and no credentials - local/sandbox convenience.
     """
     settings = get_settings()
     if authorization and authorization.lower().startswith("bearer "):

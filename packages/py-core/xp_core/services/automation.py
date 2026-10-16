@@ -10,7 +10,7 @@ Design rules (all enforced in THIS module, never by the model):
 - Deterministic schedule grammar: ``every <n><s|m|h|d>`` (>= 60s),
   ``daily HH:MM`` (UTC), plus the aliases ``hourly`` and ``daily``.
   Anything else is a loud refusal.
-- Every attempt is recorded as an ``AutomationRun`` row — success, failure,
+- Every attempt is recorded as an ``AutomationRun`` row - success, failure,
   or skip, always with its reason.
 - Budget: each run's task budget is ``min(budget_per_run_xp, remaining
   total)``; the ledger refuses settlement beyond a task budget, so the cap
@@ -18,7 +18,7 @@ Design rules (all enforced in THIS module, never by the model):
 - Failures: consecutive failures auto-pause the job and notify the user.
 - Approval-blocked runs (the spawned task needs a user decision) WAIT: the
   sweep neither re-runs the job nor re-requests approval while one is
-  pending — consequential actions are never silently repeated. A denied
+  pending - consequential actions are never silently repeated. A denied
   approval fails the task explicitly; an approved one resumes it.
 - xp_core stays transport-agnostic: the executor callable is injected (the
   worker passes the agent runner; tests pass their own).
@@ -225,8 +225,6 @@ async def create_job(
     return job, disclosure
 
 
-# -- sweep ----------------------------------------------------------------------
-
 Executor = Callable[..., Awaitable[dict[str, Any]]]
 
 RUN_STATUSES = {
@@ -269,7 +267,7 @@ async def _latest_run(session: AsyncSession, job_id: str) -> AutomationRun | Non
 
 
 async def _approval_state(session: AsyncSession, task_id: str) -> str:
-    """pending | denied | approved | none — for the task's pending-flow approvals."""
+    """pending | denied | approved | none - for the task's pending-flow approvals."""
     rows = (
         (
             await session.execute(
@@ -431,7 +429,7 @@ async def process_job(
 
     The caller owns the transaction: this function commits at the safe
     boundaries (after task+run creation, and after finalization) so a worker
-    crash can never double-charge — the run_number is unique per job and the
+    crash can never double-charge - the run_number is unique per job and the
     reservation key is deterministic (``automation:{job_id}:{run_number}``).
     """
     now = _naive(now) or datetime.now(UTC)
@@ -465,7 +463,7 @@ async def process_job(
             )
         await session.commit()
 
-    # 2) Approval-blocked continuation: WAIT, resume, or fail — never repeat.
+    # 2) Approval-blocked continuation: WAIT, resume, or fail - never repeat.
     last = await _latest_run(session, job.id)
     if last is not None and last.status == "blocked_on_approval" and last.task_id:
         task = (
@@ -547,7 +545,7 @@ async def process_job(
         budget = min(budget, remaining_total)
 
     # 4) Affordability pre-check: record the skip WITHOUT touching the
-    #    ledger. The reserve below remains the atomic gate — this pre-check
+    #    ledger. The reserve below remains the atomic gate - this pre-check
     #    exists so the common "balance too low" case is a clean, fully
     #    committed skip row instead of an aborted reservation transaction.
     account = (
@@ -610,7 +608,7 @@ async def process_job(
     except ledger.LedgerError as exc:
         # Race lost between the pre-check and the reserve (another concurrent
         # spend won the balance). The transaction is aborted ATOMICALLY by the
-        # ledger; do NOT continue on this transaction — surface loudly and let
+        # ledger; do NOT continue on this transaction - surface loudly and let
         # the next sweep retry cleanly (nothing was committed).
         await session.rollback()
         log.warning(
@@ -626,7 +624,7 @@ async def process_job(
     job.next_run_at = next_run_after(job.schedule, now)
     await session.commit()
 
-    # 5) Execute in its own session (the durable runner owns its commits).
+    # 6) Execute in its own session (the durable runner owns its commits).
     await execute_task(session_factory, task.id, settings)
     await session.refresh(task)
     await _finalize_run(session, job=job, run=run, task=task, settings=settings)

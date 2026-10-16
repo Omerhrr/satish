@@ -2,7 +2,7 @@
 
 External actions are the most dangerous surface an agent has: a wrong email
 or a runaway scheduled job costs real trust. This phase's design therefore
-front-loads the limits — preview before send, approvals bound to content
+front-loads the limits - preview before send, approvals bound to content
 and time, encrypted revocable credentials, hard XP budgets, and run history
 that records every attempt including the ones that did nothing.
 
@@ -17,7 +17,7 @@ that records every attempt including the ones that did nothing.
 | Jobs | `POST/GET /jobs`, `GET /jobs/{id}` | direct user creation needs no approval (the user is the actor) |
 | Lifecycle | `POST /jobs/{id}/pause\|resume\|cancel` | resume recomputes `next_run_at`; cancel is terminal |
 | Run history | `GET /jobs/{id}/runs` | every attempt with status, XP, error |
-| Manual run | `POST /jobs/{id}/run` | SAME `process_job` code path as the sweep — never a bypass |
+| Manual run | `POST /jobs/{id}/run` | SAME `process_job` code path as the sweep - never a bypass |
 | Notifications | `GET /notifications`, `POST /notifications/{id}/read` | persisted; Telegram relay is an open item |
 | Agent tools | `email.draft`, `email.send`, `automation.schedule` | scope wall + approval gate stack (`email:send`, `automation:write` in USER_TASK_SCOPES) |
 
@@ -34,11 +34,11 @@ email.send   -> scope wall (email:send granted) -> approval gate
              -> provider send (canned | smtp) -> sent | failed | unknown_outcome
 ```
 
-- The approval digest wraps the EXACT `{to, subject, body}` — what you
+- The approval digest wraps the EXACT `{to, subject, body}` - what you
   approve is what gets sent, byte-for-byte.
 - A sent draft can never be sent again; a resend needs a new draft (new
   digest) and a new approval.
-- Refusals (no connection, credential error) do NOT consume the draft —
+- Refusals (no connection, credential error) do NOT consume the draft -
   link a service and retry with a fresh approval.
 
 ## Outcome taxonomy (honest uncertainty)
@@ -56,7 +56,7 @@ to `unknown`. Tests prove both against a local asyncio loopback SMTP server
 
 ## Credential vault
 
-- Fernet ciphertext in `service_credentials`; key = sha256(master) — the
+- Fernet ciphertext in `service_credentials`; key = sha256(master) - the
   master key is never stored. `XP_CONNECTIONS_CREDENTIAL_KEY` in non-dev.
 - Dev fallback key is a documented constant, used only in dev mode and
   DISCLOSED on every connection response.
@@ -81,7 +81,7 @@ run_due_jobs (worker cron, XP_AUTOMATION_SWEEP_INTERVAL_SECONDS)
 ```
 
 - Schedules: `every <n><s|m|h|d>` (>= 60s), `daily HH:MM` (UTC), `hourly`,
-  `daily`. Anything else is refused loudly — no silent cron guessing.
+  `daily`. Anything else is refused loudly - no silent cron guessing.
 - Conditions (whitelist-validated, unknown keys refused):
   `{"notify_on": ["run_succeeded"|"run_failed"], "balance_below_xp": N}`.
 - Budgets are operator-capped (`XP_AUTOMATION_MAX_BUDGET_*`) and enforced
@@ -92,7 +92,7 @@ run_due_jobs (worker cron, XP_AUTOMATION_SWEEP_INTERVAL_SECONDS)
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `XP_CONNECTIONS_CREDENTIAL_KEY` | — (dev fallback) | vault master key |
+| `XP_CONNECTIONS_CREDENTIAL_KEY` | - (dev fallback) | vault master key |
 | `XP_EMAIL_SEND_MODE` | `canned` | `canned` \| `smtp` |
 | `XP_APPROVAL_TTL_MINUTES` | `60` | approval expiry window |
 | `XP_AUTOMATION_SWEEP_INTERVAL_SECONDS` | `60` | worker sweep cadence |
@@ -113,5 +113,5 @@ run_due_jobs (worker cron, XP_AUTOMATION_SWEEP_INTERVAL_SECONDS)
   deterministic and testable.
 - The manual `POST /jobs/{id}/run` executes inline in dev (no Redis); with
   Redis configured the scheduled sweep runs on the worker while manual
-  triggers remain inline — long-running runs therefore block that HTTP
+  triggers remain inline - long-running runs therefore block that HTTP
   request, which the endpoint discloses by returning the final run row.

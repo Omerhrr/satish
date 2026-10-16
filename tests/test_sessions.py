@@ -42,7 +42,7 @@ async def _auth(client) -> str:
     return resp.json()["session_token"]
 
 
-# -- logout = server-side revocation ---------------------------------------------
+# logout = server-side revocation
 
 
 async def test_logout_revokes_session_server_side(client):
@@ -51,7 +51,7 @@ async def test_logout_revokes_session_server_side(client):
     logout = await client.post("/api/v1/auth/logout", headers={"Authorization": f"Bearer {token}"})
     assert logout.status_code == 200
     assert logout.json()["revoked"] is True
-    # The token is dead server-side — a stolen copy afterwards is worthless.
+    # The token is dead server-side - a stolen copy afterwards is worthless.
     me = await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
     assert me.status_code == 401
 
@@ -75,7 +75,7 @@ async def test_double_logout_is_unauthorized_not_500(client):
     assert (await client.post("/api/v1/auth/logout", headers=h)).status_code == 401
 
 
-# -- session listing + per-session revoke ------------------------------------------
+# session listing + per-session revoke
 
 
 async def test_sessions_list_and_revoke_by_id(client):
@@ -129,7 +129,7 @@ async def test_cannot_revoke_someone_elses_session(client, session, dev_user):
     assert await resolve_user_from_token(session, stranger_token) is not None
 
 
-# -- short-lived sessions ----------------------------------------------------------
+# short-lived sessions
 
 
 async def test_expired_session_rejected(client, session):
@@ -174,7 +174,7 @@ async def test_last_used_tracked(client, session):
     assert abs((datetime.now(UTC) - row.last_used_at.replace(tzinfo=UTC)).total_seconds()) < 60
 
 
-# -- Telegram auth regressions (phase-2 acceptance #1) ------------------------------
+# Telegram auth regressions (phase-2 acceptance #1)
 
 
 def test_forged_init_data_rejected_at_unit_level():
@@ -195,7 +195,7 @@ def test_stale_init_data_rejected():
     )
 
 
-# -- bot copy guardrail (phase-2 acceptance #3) -------------------------------------
+# bot copy guardrail (phase-2 acceptance #3)
 
 FORBIDDEN_REQUEST_PATTERNS = [
     r"(send|share|enter|type|paste|provide)\b.{0,40}\b(seed(\s?phrase)?|mnemonic|recovery phrase|private key(s)?)",

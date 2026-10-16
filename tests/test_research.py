@@ -52,7 +52,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 EVAL_SET = REPO_ROOT / "tests" / "data" / "research_eval_set.json"
 
 
-# -- fetch permission policy -----------------------------------------------------------
+# fetch permission policy
 
 
 @pytest.mark.parametrize(
@@ -145,7 +145,7 @@ async def test_http_fetch_enforces_size_cap():
     assert "byte limit" in outcome.reason
 
 
-# -- extraction + provenance classification --------------------------------------------
+# extraction + provenance classification
 
 
 def test_extraction_deterministic_title_facts_and_hash():
@@ -178,7 +178,7 @@ def test_price_facts_from_listing_snapshots_are_estimates():
     assert by_key["brand"].kind == "observed"
 
 
-# -- comparison workflow ---------------------------------------------------------------
+# comparison workflow
 
 
 def _rec(sid: str, url: str, facts: list[Fact], status: str = "ok") -> SourceRecord:
@@ -211,7 +211,7 @@ def test_compare_discloses_gaps_and_unreachable_sources():
     assert "listed" in joined and "never fetched" in joined
 
 
-# -- documents: quality gates, renderers, validation ------------------------------------
+# documents: quality gates, renderers, validation
 
 
 def _spec(claims: list[ReportClaim], sources: list[ReportSource]) -> ReportSpec:
@@ -247,7 +247,7 @@ def test_rendered_report_pdf_is_cited_and_valid():
     spec = _spec([ReportClaim(text="price: 100", citations=[1])], sources)
     spec.conflicts = [{"subject": "price", "detail": "2 differing values"}]
     spec.gaps = ["warranty"]
-    spec.unavailable = ["S3 https://c.test/ — unavailable: dead"]
+    spec.unavailable = ["S3 https://c.test/ - unavailable: dead"]
     # The HTML is the honest textual surface for content assertions; WeasyPrint
     # compresses+encodes text as glyphs in the PDF, so byte-grepping PDFs is meaningless.
     from xp_core.services.documents import render_report_html
@@ -284,7 +284,7 @@ def test_csv_and_xlsx_build_and_validate():
     assert not validate_document("xlsx", b"PK\x03\x04 but not really a zip")[0]
 
 
-# -- corpus + canned providers -----------------------------------------------------------
+# corpus + canned providers
 
 
 def test_corpus_loads_from_eval_set(settings):
@@ -314,7 +314,7 @@ async def test_canned_search_and_fetch_are_deterministic_and_honest(settings):
     assert missing.status == "unavailable" and "canned" in missing.reason
 
 
-# -- product registry over the application DB -------------------------------------------
+# product registry over the application DB
 
 
 def _product_task(task_id: str, user_id: str) -> Task:
@@ -414,7 +414,7 @@ async def test_registry_quality_gate_refuses_to_render_uncited(session, dev_user
     assert any("S1" in v or "cited" in v for v in refused["violations"])
 
 
-# -- explicit result + XP receipt (end-to-end through the runtime) ----------------------
+# explicit result + XP receipt (end-to-end through the runtime)
 
 
 @pytest.fixture()

@@ -4,7 +4,7 @@ Keeps DSH-specific code behind a controlled adapter (dsh_integration.pattern):
 the rest of the application never talks to the model runtime directly.
 
 Phase-0 spike: the upstream surface is pinned via dsh_revision.json
-(revision.py) — see docs/dsh-integration.md for the full integration
+(revision.py) - see docs/dsh-integration.md for the full integration
 contract (startup, configuration, tool interface, lifecycle, errors).
 """
 

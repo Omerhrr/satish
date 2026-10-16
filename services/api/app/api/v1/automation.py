@@ -3,7 +3,7 @@
 Deliverables: "Scheduled jobs", "Pause, resume, cancel, and failure
 handling", "Automation run history". Budget enforcement lives in
 xp_core.services.automation (per-run cap, total cap, deterministic
-reservation keys) — this router only validates ownership and state.
+reservation keys) - this router only validates ownership and state.
 
 Direct user creation needs NO approval (the user is the actor); only the
 agent-initiated automation.schedule tool passes the approval gate.
@@ -245,7 +245,7 @@ async def trigger_run(
     job_id: str, user: CurrentUser, session: DbSession
 ) -> AutomationRunOut:
     """Manual one-shot trigger. Budgets, approval-wait, and failure policy
-    are the SAME code path as the scheduled sweep (process_job) — a manual
+    are the SAME code path as the scheduled sweep (process_job) - a manual
     run is never a bypass. Paused jobs may be triggered deliberately;
     cancelled jobs may not."""
     from xp_core.db import get_session_factory

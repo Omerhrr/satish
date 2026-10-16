@@ -61,7 +61,7 @@ class NotYetSelectedError(RuntimeError):
     """Raised by stubs until the wallet library decision spike (phase 3) lands."""
 
 
-# -- phase-3: BDK-backed provider (decision D10) ---------------------------------
+# phase-3: BDK-backed provider (decision D10)
 
 from wallet_adapter.bdk_provider import (  # noqa: E402 - protocol classes must be defined first
     AgentSigningForbidden,
@@ -160,7 +160,7 @@ class RegtestStubProvider:
             raise ValueError("fee_rate must be positive")
         if not destination or len(destination) < 14:
             raise ValueError("destination must be a valid address")
-        # No real construction yet — this is a validated contract shape.
+        # No real construction yet - this is a validated contract shape.
         vsize_estimate = 141  # single-input single-output P2WPKH approximation
         fee = vsize_estimate * fee_rate_sat_vb
         return PreparedTransaction(

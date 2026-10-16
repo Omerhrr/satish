@@ -123,7 +123,7 @@ async def increase_budget(
     task_id: str, payload: IncreaseBudgetIn, user: CurrentUser, session: DbSession
 ) -> TaskOut:
     """User-authorized budget increase (acceptance #6: exceeding the approved
-    budget requires ADDITIONAL authorization — this endpoint is that
+    budget requires ADDITIONAL authorization - this endpoint is that
     authorization, and only the user can call it; the agent registry has no
     path here)."""
     task = await task_service.increase_budget(
@@ -199,7 +199,7 @@ async def cancel_task(task_id: str, user: CurrentUser, session: DbSession) -> Ta
     return _task_out(task)
 
 
-# -- agent runtime (phase 6) ------------------------------------------------------------
+# agent runtime (phase 6)
 
 
 @router.post(

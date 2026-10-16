@@ -2,7 +2,7 @@
   <div>
     <h1 class="page-title">⏱ Automations</h1>
     <p class="page-sub">
-      Scheduled jobs run within hard XP budgets — per run and in total. Every attempt
+      Scheduled jobs run within hard XP budgets - per run and in total. Every attempt
       is recorded, failures pause the job instead of silently repeating, and anything
       consequential (like email) always waits for your approval.
     </p>
@@ -13,7 +13,7 @@
         <label>Objective (task goal)<input v-model="form.objective" placeholder="Monitor supplier prices daily" /></label>
         <label>Schedule<input v-model="form.schedule" placeholder="every 1h · daily 09:30 · hourly" /></label>
         <label>Budget per run (XP)<input v-model="form.budgetPerRun" inputmode="numeric" /></label>
-        <label>Total budget (XP, optional)<input v-model="form.budgetTotal" inputmode="numeric" placeholder="—" /></label>
+        <label>Total budget (XP, optional)<input v-model="form.budgetTotal" inputmode="numeric" placeholder="-" /></label>
       </div>
       <p class="small dim">
         Supported schedules: <code>every &lt;n&gt;&lt;s|m|h|d&gt;</code> (≥ 60s),
@@ -70,7 +70,7 @@
       <h2>Notifications</h2>
       <p class="small dim">
         Condition-based alerts from your jobs (run outcomes, balance thresholds).
-        Persisted here; Telegram relay is a planned addition — this page is the
+        Persisted here; Telegram relay is a planned addition - this page is the
         delivery surface for now.
       </p>
       <p v-if="!notifications.length" class="small dim">Nothing yet.</p>
@@ -110,7 +110,7 @@ const form = reactive({
 });
 
 function fmt(iso: string | null): string {
-  if (!iso) return "—";
+  if (!iso) return "-";
   try {
     return new Date(iso).toLocaleString();
   } catch {
