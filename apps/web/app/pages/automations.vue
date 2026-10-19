@@ -2,32 +2,31 @@
   <div>
     <h1 class="page-title">⏱ Automations</h1>
     <p class="page-sub">
-      Scheduled jobs run within hard XP budgets - per run and in total. Every attempt
-      is recorded, failures pause the job instead of silently repeating, and anything
-      consequential (like email) always waits for your approval.
+      Repeat a task on a schedule. You set a spending cap per run and in total;
+      if something fails it pauses instead of retrying, and emails always wait
+      for your approval.
     </p>
 
     <section class="card">
-      <h2>New scheduled job</h2>
+      <h2>New automation</h2>
       <div class="form-grid">
-        <label>Objective (task goal)<input v-model="form.objective" placeholder="Monitor supplier prices daily" /></label>
+        <label>What should it do?<input v-model="form.objective" placeholder="Monitor supplier prices daily" /></label>
         <label>Schedule<input v-model="form.schedule" placeholder="every 1h · daily 09:30 · hourly" /></label>
         <label>Budget per run (XP)<input v-model="form.budgetPerRun" inputmode="numeric" /></label>
         <label>Total budget (XP, optional)<input v-model="form.budgetTotal" inputmode="numeric" placeholder="-" /></label>
       </div>
       <p class="small dim">
-        Supported schedules: <code>every &lt;n&gt;&lt;s|m|h|d&gt;</code> (≥ 60s),
-        <code>daily HH:MM</code> (UTC), <code>hourly</code>, <code>daily</code>.
+        Examples: <code>every 6h</code>, <code>daily 09:30</code> (UTC), <code>hourly</code>.
       </p>
       <button class="btn" :disabled="creating || !form.objective" @click="create">
-        <span v-if="creating" class="spinner" /> Create job
+        <span v-if="creating" class="spinner" /> Create automation
       </button>
       <span v-if="note" class="small" style="margin-left: 10px">{{ note }}</span>
       <p v-if="createError" class="small" style="color: #f59e0b">{{ createError }}</p>
     </section>
 
     <section class="card">
-      <h2>Jobs</h2>
+      <h2>Your automations</h2>
       <p v-if="loadError" class="small" style="color: #f59e0b">{{ loadError }}</p>
       <p v-else-if="!jobs.length" class="small dim">No automations yet.</p>
       <div v-for="j in jobs" :key="j.id" class="job">
@@ -35,8 +34,8 @@
           <div>
             <div class="small"><b>{{ j.objective }}</b></div>
             <div class="small dim">
-              {{ j.schedule }} · {{ j.status }}
-              <span v-if="j.auto_paused_reason"> ({{ j.auto_paused_reason }})</span>
+              {{ j.schedule }} · {{ human(j.status) }}
+              <span v-if="j.auto_paused_reason"> (paused: {{ j.auto_paused_reason }})</span>
               · next: {{ fmt(j.next_run_at) }}
               · spent {{ j.total_spent_xp }}/{{ j.budget_total_xp ?? "∞" }} XP
               · {{ j.run_count }} runs
@@ -56,7 +55,7 @@
         <div v-if="openRuns === j.id" class="runs">
           <p v-if="!runs.length" class="small dim">No runs recorded yet.</p>
           <div v-for="r in runs" :key="r.id" class="small run-row">
-            <span>#{{ r.run_number }} · {{ r.trigger }} ·
+            <span>Run {{ r.run_number }} · {{ human(r.trigger) }} ·
               <span class="badge" :data-status="r.status">{{ r.status }}</span>
               · {{ r.xp_charged }}/{{ r.xp_budget_per_run }} XP
             </span>
@@ -69,9 +68,8 @@
     <section class="card">
       <h2>Notifications</h2>
       <p class="small dim">
-        Condition-based alerts from your jobs (run outcomes, balance thresholds).
-        Each is pushed to Telegram once - relay status shows exactly what
-        happened (sent, refused, unknown, or skipped).
+        Updates from your automations, like finished runs or a low balance.
+        Each one is also sent to you on Telegram.
       </p>
       <p v-if="!notifications.length" class="small dim">Nothing yet.</p>
       <div v-for="n in notifications" :key="n.id" class="row-list">
@@ -79,7 +77,7 @@
           <div class="small">
             <b>{{ n.kind }}</b>
             <span v-if="!n.read_at" class="badge">unread</span>
-            <span v-if="n.relay_status" class="badge">relay: {{ n.relay_status }}</span>
+            <span v-if="n.relay_status" class="badge">Telegram: {{ human(n.relay_status) }}</span>
           </div>
           <div class="small dim">{{ fmt(n.created_at) }} · {{ JSON.stringify(n.payload) }}</div>
         </div>
@@ -167,7 +165,7 @@ async function act(fn: () => Promise<unknown>, done: string) {
 const pause = (id: string) => act(() => api.pauseJob(id), "Job paused.");
 const resume = (id: string) => act(() => api.resumeJob(id), "Job resumed.");
 const cancel = (id: string) => {
-  if (window.confirm("Cancel this job permanently?")) {
+  if (window.confirm("Stop this automation for good?")) {
     return act(() => api.cancelJob(id), "Job cancelled.");
   }
   return Promise.resolve();

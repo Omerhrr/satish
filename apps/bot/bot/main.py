@@ -25,15 +25,15 @@ log = get_logger(__name__)
 router = Router(name="commands")
 
 SECURITY_NOTE = (
-    "⚠️ I will never ask for your seed phrase or private keys - "
-    "anyone who does is trying to steal your bitcoin."
+    "🔒 I will never ask for your recovery phrase or private keys. "
+    "Anyone who does is trying to steal your bitcoin."
 )
 
 
 def mini_app_keyboard(settings=None):
     settings = settings or get_settings()
     builder = InlineKeyboardBuilder()
-    builder.button(text="🔓 Open XP Mini App", web_app=WebAppInfo(url=settings.mini_app_url))
+    builder.button(text="⚡ Open XP", web_app=WebAppInfo(url=settings.mini_app_url))
     return builder.as_markup()
 
 
@@ -52,18 +52,22 @@ async def _api_get(path: str) -> dict | None:
     return None
 
 
+async def _open_app(message: Message, text: str) -> None:
+    await message.answer(text, reply_markup=mini_app_keyboard(get_settings()))
+
+
 @router.message(CommandStart())
 async def cmd_start(message: Message) -> None:
-    settings = get_settings()
     await message.answer(
-        "Welcome to <b>XP</b> - your Bitcoin-native AI workforce.\n\n"
-        "Self-custody first: your keys, your bitcoin. "
-        "I help you run research, commerce intelligence, vehicle comparisons, "
-        "document jobs, and email/automation workflows paid in sats via XP "
-        "credits.\n\n"
+        "Welcome to <b>XP</b> 👋\n\n"
+        "Get research, reports and everyday work done by an AI assistant, "
+        "and pay for it in bitcoin.\n\n"
+        "1. Buy XP credits with sats over Lightning\n"
+        "2. Tell the assistant what you need and set a budget\n"
+        "3. Get your answer or PDF report. Unused XP comes back to you\n\n"
         f"{SECURITY_NOTE}\n\n"
-        "Tap below to open the Mini App, or try /help.",
-        reply_markup=mini_app_keyboard(settings),
+        "Tap <b>Open XP</b> to get started, or send /help.",
+        reply_markup=mini_app_keyboard(get_settings()),
         parse_mode=ParseMode.HTML,
     )
 
@@ -71,102 +75,77 @@ async def cmd_start(message: Message) -> None:
 @router.message(Command("help"))
 async def cmd_help(message: Message) -> None:
     await message.answer(
-        "<b>Commands</b>\n"
-        "/wallet - wallet overview (Mini App)\n"
-        "/receive - receive bitcoin\n"
-        "/send - send bitcoin (Mini App confirmation)\n"
-        "/addresses - address book\n"
-        "/history - transaction history\n"
-        "/balance - on-chain balance\n"
-        "/xp - XP balance and usage receipts\n"
-        "/fund - buy XP credits with sats\n"
-        "/research - start a research task\n"
-        "/tasks - running and past tasks\n"
-        "/automations - scheduled jobs (Mini App: runs, budgets, notifications)\n"
-        "/connections - linked email service (Mini App)\n"
-        "/settings - security and recovery\n\n"
+        "<b>What I can do</b>\n"
+        "/xp - check your XP balance\n"
+        "/fund - buy XP with bitcoin\n"
+        "/research - ask the assistant to research something\n"
+        "/tasks - see your tasks and reports\n"
+        "/automations - tasks that repeat on a schedule\n"
+        "/connections - connect your email\n"
+        "/wallet - your bitcoin wallet\n"
+        "/settings - security and your account\n\n"
         f"{SECURITY_NOTE}",
         parse_mode=ParseMode.HTML,
-    )
-
-
-@router.message(Command("wallet", "receive", "send", "addresses", "history", "settings"))
-async def cmd_to_mini_app(message: Message) -> None:
-    await message.answer(
-        "This flow runs inside the Mini App so your data stays out of chat history.",
         reply_markup=mini_app_keyboard(get_settings()),
     )
 
 
-@router.message(Command("balance"))
-async def cmd_balance(message: Message) -> None:
-    data = await _api_get("/health")
-    if data is None:
-        await message.answer("API is unreachable right now - try again shortly.")
-        return
-    await message.answer(
-        "Balances live in the Mini App wallet view - on-chain (phase 3) and "
-        "Lightning invoices/payments (phase 4) are wired end-to-end there.",
-        reply_markup=mini_app_keyboard(get_settings()),
-    )
+@router.message(Command("wallet", "receive", "send", "addresses", "history", "balance"))
+async def cmd_wallet(message: Message) -> None:
+    await _open_app(message, "Your wallet opens inside XP, so nothing sensitive ends up in this chat.")
+
+
+@router.message(Command("settings"))
+async def cmd_settings(message: Message) -> None:
+    await _open_app(message, "Security, sign-ins and your data are under Security in XP.")
 
 
 @router.message(Command("xp"))
 async def cmd_xp(message: Message) -> None:
-    data = await _api_get("/xp/balance")
-    if data is None:
-        await message.answer("XP service is unreachable - try again shortly.")
-        return
-    await message.answer(
-        f"⚡ XP balance: <b>{data['balance_xp']:,} XP</b>\n"
-        f"Rate: 1 sat = {data['xp_per_sat']} XP\n\n"
-        "XP is an internal usage credit - not Bitcoin, not a token.",
-        parse_mode=ParseMode.HTML,
-        reply_markup=mini_app_keyboard(get_settings()),
-    )
+    await _open_app(message, "⚡ Your XP balance and history are on the XP home screen.")
 
 
 @router.message(Command("fund"))
 async def cmd_fund(message: Message) -> None:
-    await message.answer(
-        "XP purchases flow through the Mini App: choose a pack, review the "
-        "sats cost, pay from your wallet, and the credit lands once payment "
-        "settles - credited exactly once.",
-        reply_markup=mini_app_keyboard(get_settings()),
+    await _open_app(
+        message,
+        "Open XP, go to Buy XP and pick a pack. Pay the Lightning invoice and "
+        "your XP arrives as soon as the payment is confirmed.",
     )
 
 
 @router.message(Command("research"))
 async def cmd_research(message: Message) -> None:
-    await message.answer(
-        "Describe your objective and constraints in the Mini App task form - "
-        "product sourcing, supplier comparison, vehicle auction research, or "
-        "general research. The agent proposes a plan with an XP estimate; you "
-        "approve the budget before anything runs.",
-        reply_markup=mini_app_keyboard(get_settings()),
+    await _open_app(
+        message,
+        "Open XP, go to Tasks and describe what you need: compare products, "
+        "find suppliers, research a car, or any question. You approve the "
+        "budget before anything starts.",
     )
 
 
 @router.message(Command("tasks"))
 async def cmd_tasks(message: Message) -> None:
-    await message.answer(
-        "Task plans, progress, and receipts are tracked in the Mini App.",
-        reply_markup=mini_app_keyboard(get_settings()),
-    )
+    await _open_app(message, "Your tasks, progress and reports are under Tasks in XP.")
 
 
 @router.message(Command("automations"))
 async def cmd_automations(message: Message) -> None:
-    await message.answer(
-        "Scheduled research jobs and monitors live in the Mini App automations "
-        "screen, always within granted scopes and budgets.",
-        reply_markup=mini_app_keyboard(get_settings()),
+    await _open_app(
+        message,
+        "Set up tasks that repeat on a schedule under Automations in XP. "
+        "You set a spending cap, and nothing is emailed without your OK.",
     )
+
+
+@router.message(Command("connections"))
+async def cmd_connections(message: Message) -> None:
+    await _open_app(message, "Connect your email under Connect in XP.")
 
 
 @router.message(F.text.startswith("/"))
 async def unknown_command(message: Message) -> None:
-    await message.answer("Unknown command - try /help.")
+    await message.answer("Sorry, I don't know that one. Send /help to see what I can do.")
 
 
 async def main() -> None:

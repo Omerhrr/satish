@@ -57,3 +57,18 @@ def test_missing_hash_rejected():
 def test_garbage_rejected():
     assert verify_telegram_init_data("not-a-valid-payload", BOT_TOKEN) is None
     assert verify_telegram_init_data("", BOT_TOKEN) is None
+
+
+def test_url_encoded_init_data_from_real_telegram_accepted():
+    """Real Telegram clients URL-encode initData (user=%7B%22id%22...)."""
+    from urllib.parse import urlencode
+
+    pairs = {
+        "user": '{"id": 222, "first_name": "Ada", "username": "ada"}',
+        "auth_date": str(int(time.time())),
+        "query_id": "AAF9tE0aAAAAAHXylnjAjw",
+        "signature": "abc-_123",
+    }
+    pairs["hash"] = _sign(pairs)
+    identity = verify_telegram_init_data(urlencode(pairs), BOT_TOKEN)
+    assert identity is not None and identity.telegram_user_id == 222

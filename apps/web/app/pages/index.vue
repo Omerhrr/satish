@@ -1,148 +1,131 @@
 <template>
   <div>
     <section class="hero">
-      <h1>XP Developer Console</h1>
+      <h1>{{ greeting }}</h1>
       <p class="tagline">
-        Phase 1 scaffold status - monorepo, API, worker, ledger, agent adapter and
-        Mini App wired end to end. Bitcoin + Lightning land after the phase-3
-        integration spikes.
+        Pay with bitcoin, get work done. Buy XP credits over Lightning, then let
+        the AI assistant research, compare and write reports for you.
       </p>
     </section>
 
-    <!-- service health -->
-    <div class="grid-2">
-      <div class="stat">
-        <span class="label"><span class="dot" :class="dotClass(health?.database.status)" /> Database</span>
-        <div class="value">{{ health?.database.status ?? "…" }}</div>
-        <div class="faint small">{{ health?.database.detail ?? "checking" }}</div>
-      </div>
-      <div class="stat">
-        <span class="label"><span class="dot" :class="dotClass(health?.queue.status)" /> Queue</span>
-        <div class="value">{{ health?.queue.status ?? "…" }}</div>
-        <div class="faint small">{{ health?.queue.detail ?? "checking" }}</div>
-      </div>
-      <div class="stat">
-        <span class="label"><span class="dot" :class="dotClass(health?.agent_runtime.status)" /> Agent runtime</span>
-        <div class="value">{{ health?.agent_runtime.status ?? "…" }}</div>
-        <div class="faint small">DSH revision: {{ health?.dsh_revision ?? "…" }}</div>
-      </div>
-      <div class="stat">
-        <span class="label">API</span>
-        <div class="value">v{{ health?.version ?? "…" }}</div>
-        <div class="faint small">env: {{ health?.env ?? "…" }} · overall {{ health?.status ?? "…" }}</div>
-      </div>
-    </div>
-
-    <div style="height: 14px" />
-
-    <!-- XP quick card -->
-    <section class="card">
-      <h2>⚡ XP credits</h2>
-      <p class="sub">Internal usage credits - not Bitcoin, not a token. Rate: 1 sat = {{ balance?.xp_per_sat ?? "…" }} XP.</p>
-      <div class="balance-big">{{ balance ? balance.balance_xp.toLocaleString() + " XP" : "…" }}</div>
-      <div style="display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap">
-        <button class="btn primary sensitive-action" :disabled="granting" @click="grant(1000)">
-          <span v-if="granting" class="spinner" /> Seed +1,000 XP
-        </button>
-        <button class="btn sensitive-action" :disabled="granting" @click="grant(10000)">Seed +10,000 XP</button>
-        <NuxtLink class="btn ghost" to="/xp">Open ledger →</NuxtLink>
-      </div>
-      <div class="notice small">
-        Dev grants are enabled because the API runs in DEV_MODE. In staging and
-        production, XP is credited only from verified settled payments.
-      </div>
-    </section>
-
-    <!-- WeasyPrint demo -->
-    <section class="card">
-      <h2>📄 Artifact pipeline demo</h2>
+    <section v-if="signedOut" class="card">
+      <h2>Open XP from Telegram</h2>
       <p class="sub">
-        POST /artifacts/demo-pdf → worker job → WeasyPrint render → private storage →
-        authorized download.
+        You're not signed in. Open the XP bot in Telegram and tap <b>Open</b> to
+        sign in with your Telegram account.
       </p>
-      <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center">
-        <button class="btn primary" :disabled="pdfPending" @click="makePdf">
-          <span v-if="pdfPending" class="spinner" /> Generate demo report
-        </button>
-        <a
-          v-if="latestPdf && latestPdf.status === 'ready'"
-          class="btn"
-          :href="api.artifactDownloadUrl(latestPdf)"
-          target="_blank"
-        >
-          Download PDF ({{ formatBytes(latestPdf.size_bytes) }})
-        </a>
-        <span v-if="latestPdf" class="badge" :class="latestPdf.status">{{ latestPdf.status }}</span>
-      </div>
-      <p v-if="pdfError" class="small" style="color: var(--red); margin-top: 10px">{{ pdfError }}</p>
     </section>
 
-    <!-- capabilities honesty card -->
-    <section class="card">
-      <h2>🧭 Capability surface</h2>
-      <p class="sub">What is real today - the product never overclaims.</p>
-      <div class="table-wrap">
-        <table class="ledger">
-          <thead>
-            <tr><th>Capability</th><th>Status</th></tr>
-          </thead>
-          <tbody>
-            <tr><td>Wallets (on-chain self-custody)</td><td>{{ caps?.wallets ?? "…" }}</td></tr>
-            <tr><td>Lightning</td><td>{{ caps?.lightning ?? "…" }}</td></tr>
-            <tr><td>Agent runtime (DSH)</td><td>{{ caps?.agent_runtime ?? "…" }}</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <ul class="small dim" style="margin-top: 12px; padding-left: 18px">
-        <li v-for="(n, i) in caps?.notes ?? []" :key="i" style="margin-bottom: 4px">{{ n }}</li>
-      </ul>
-    </section>
+    <template v-else>
+      <section class="card">
+        <h2>⚡ Your balance</h2>
+        <div class="balance-big">
+          <span v-if="balance">{{ balance.balance_xp.toLocaleString() }} XP</span>
+          <span v-else-if="balanceError" class="small dim">Couldn't load your balance. <a href="#" @click.prevent="load">Try again</a></span>
+          <span v-else class="spinner" />
+        </div>
+        <p v-if="balance" class="sub">
+          1 sat = {{ balance.xp_per_sat }} XP · about
+          {{ Math.floor(balance.balance_xp / balance.xp_per_sat).toLocaleString() }} sats of work
+        </p>
+        <div class="actions">
+          <NuxtLink class="btn primary" to="/billing">Buy XP</NuxtLink>
+          <NuxtLink class="btn" to="/tasks">Start a task</NuxtLink>
+          <NuxtLink class="btn ghost" to="/xp">History →</NuxtLink>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>What you can do</h2>
+        <div class="features">
+          <NuxtLink to="/tasks" class="feature">
+            <b>🔎 Research &amp; reports</b>
+            <span class="small dim">Ask a question, set a budget, get a cited PDF report.</span>
+          </NuxtLink>
+          <NuxtLink to="/automations" class="feature">
+            <b>⏱ Automations</b>
+            <span class="small dim">Repeat a task on a schedule with a spending cap.</span>
+          </NuxtLink>
+          <NuxtLink to="/connections" class="feature">
+            <b>✉️ Email</b>
+            <span class="small dim">Let the assistant draft emails; nothing sends without your OK.</span>
+          </NuxtLink>
+          <NuxtLink to="/wallet" class="feature">
+            <b>₿ Wallet</b>
+            <span class="small dim">Your bitcoin, your keys.</span>
+          </NuxtLink>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>📄 Try a sample report</h2>
+        <p class="sub">See what an XP report looks like. Free, takes a few seconds.</p>
+        <div class="actions">
+          <button class="btn primary" :disabled="pdfPending" @click="makePdf">
+            <span v-if="pdfPending" class="spinner" /> Create sample report
+          </button>
+          <button v-if="latestPdf && latestPdf.status === 'ready'" class="btn" @click="download(latestPdf)">
+            Download PDF
+          </button>
+        </div>
+        <p v-if="pdfError" class="small" style="color: var(--red); margin-top: 10px">{{ pdfError }}</p>
+      </section>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import type { ArtifactOut, BalanceOut, CapabilitiesOut, HealthOut } from "@xp/shared-types";
+import type { ArtifactOut, BalanceOut } from "@xp/shared-types";
 
 const api = useXpApi();
-const health = ref<HealthOut | null>(null);
-const caps = ref<CapabilitiesOut | null>(null);
 const balance = ref<BalanceOut | null>(null);
+const balanceError = ref(false);
+const signedOut = ref(false);
 const artifacts = ref<ArtifactOut[]>([]);
-const granting = ref(false);
 const pdfPending = ref(false);
 const pdfError = ref("");
-
 const latestPdf = computed(() => artifacts.value[0] ?? null);
 
-function dotClass(status?: string) {
-  return status === "ok" ? "ok" : status === "error" ? "error" : "not_configured";
+const greeting = computed(() => {
+  const name = (window as any).Telegram?.WebApp?.initDataUnsafe?.user?.first_name;
+  return name ? `Welcome, ${name}` : "Welcome to XP";
+});
+
+function isAuthError(e: unknown) {
+  return /not signed in/i.test(String(e instanceof Error ? e.message : e));
 }
 
-function formatBytes(n: number) {
-  return n > 1024 * 1024 ? (n / 1024 / 1024).toFixed(1) + " MB" : Math.round(n / 1024) + " KB";
-}
-
-async function refreshAll() {
+async function load() {
+  balanceError.value = false;
+  // Each piece loads on its own so one failure never blanks the page.
   try {
-    [health.value, caps.value, balance.value, artifacts.value] = await Promise.all([
-      api.health(),
-      api.capabilities(),
-      api.balance(),
-      api.listArtifacts(),
-    ]);
+    balance.value = await api.balance();
   } catch (e) {
-    console.error("console refresh failed", e);
+    if (isAuthError(e)) signedOut.value = true;
+    else balanceError.value = true;
+  }
+  try {
+    artifacts.value = await api.listArtifacts();
+  } catch {
+    /* optional */
   }
 }
 
-async function grant(amount: number) {
-  granting.value = true;
+async function download(a: ArtifactOut) {
   try {
-    balance.value = await api.devGrant({ amount_xp: amount, reason: "console seed grant" });
+    const token = sessionStorage.getItem("xp_session_token") ?? localStorage.getItem("xp_session_token");
+    const res = await fetch(api.artifactDownloadUrl(a), {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new Error(`download failed (${res.status})`);
+    const url = URL.createObjectURL(await res.blob());
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "xp-report.pdf";
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
   } catch (e) {
-    alert(String(e));
-  } finally {
-    granting.value = false;
+    pdfError.value = "Couldn't download the report. Please try again.";
   }
 }
 
@@ -151,22 +134,29 @@ async function makePdf() {
   pdfError.value = "";
   try {
     const artifact = await api.createDemoPdf({
-      title: "XP Scaffold Demo Report",
-      sections: ["Executive Summary", "Market Findings", "Sources"],
+      title: "XP Sample Report",
+      sections: ["Summary", "Findings", "Sources"],
     });
-    // inline dev execution completes synchronously; poll briefly anyway
-    for (let i = 0; i < 6 && artifact.status !== "ready"; i++) {
-      await new Promise((r) => setTimeout(r, 500));
+    for (let i = 0; i < 20 && artifact.status !== "ready"; i++) {
+      await new Promise((r) => setTimeout(r, 750));
       const list = await api.listArtifacts();
       Object.assign(artifact, list.find((a) => a.id === artifact.id) ?? artifact);
     }
     artifacts.value = await api.listArtifacts();
+    if (artifact.status !== "ready") pdfError.value = "Still working on it. Check back in a moment.";
   } catch (e) {
-    pdfError.value = String(e);
+    pdfError.value = isAuthError(e) ? "Please open XP from Telegram to sign in." : "Couldn't create the report. Please try again.";
   } finally {
     pdfPending.value = false;
   }
 }
 
-onMounted(refreshAll);
+onMounted(load);
 </script>
+
+<style scoped>
+.actions { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+.features { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-top: 10px; }
+.feature { display: flex; flex-direction: column; gap: 4px; padding: 12px; border: 1px solid var(--border); border-radius: 10px; text-decoration: none; color: inherit; }
+.feature:hover { border-color: var(--orange); }
+</style>

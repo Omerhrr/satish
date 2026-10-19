@@ -107,6 +107,19 @@ export interface XpClient {
   closeAccount: (confirm: "CLOSE") => Promise<AccountClosureOut>;
 }
 
+/** Plain-language error text for people, not developers. */
+export function friendlyError(status: number, detail: string): string {
+  if (status === 401) return "You're not signed in. Please open XP from the Telegram bot.";
+  if (status === 403) return "That isn't available on your account.";
+  if (status === 404) return "We couldn't find that. It may have been removed.";
+  if (status === 429) return "You're going a bit fast. Please wait a moment and try again.";
+  if (status >= 500) return "Something went wrong on our side. Please try again shortly.";
+  if (/insufficient|balance/i.test(detail)) return "You don't have enough XP for that. Buy more XP and try again.";
+  // 400/409/422: the server's reason is usually meaningful; keep it short.
+  const text = detail.replace(/^[A-Z_]+:\s*/, "").trim();
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : "That didn't work. Please try again.";
+}
+
 export function createXpClient(config: XpClientConfig = {}): XpClient {
   const doFetch = config.fetchImpl ?? fetch;
 
@@ -151,7 +164,7 @@ export function createXpClient(config: XpClientConfig = {}): XpClient {
       } catch {
         /* keep statusText */
       }
-      throw new Error(`XP API ${res.status}: ${detail}`);
+      throw new Error(friendlyError(res.status, detail));
     }
     return (await res.json()) as T;
   }

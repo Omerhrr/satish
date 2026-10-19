@@ -17,6 +17,7 @@ import json
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from urllib.parse import parse_qsl
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -48,10 +49,10 @@ def verify_telegram_init_data(
 
     Returns a typed identity, or None when the payload is forged or stale.
     """
+    # Telegram sends initData URL-encoded; the signature covers the DECODED
+    # values (official algorithm), so decode before building the check string.
     try:
-        pairs = dict(
-            item.split("=", 1) for item in init_data.split("&") if "=" in item
-        )
+        pairs = dict(parse_qsl(init_data, keep_blank_values=True, strict_parsing=True))
     except ValueError:
         return None
 

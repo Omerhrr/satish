@@ -1,17 +1,17 @@
 <template>
   <div>
-    <h1 class="page-title">🗂 Agent tasks</h1>
+    <h1 class="page-title">🗂 Tasks</h1>
     <p class="page-sub">
-      Submit an objective, approve an XP budget, and the reservation is held
-      atomically until the work settles or is cancelled.
+      Tell the assistant what you need and set a budget. XP is held while it
+      works; you only pay for what it uses, and the rest comes back.
     </p>
 
     <section class="card">
       <h2>New task</h2>
-      <p class="sub">Budget approval is required before execution (task_charge_flow).</p>
+      <p class="sub">Nothing runs until you approve the budget.</p>
       <form @submit.prevent="submit">
         <label class="field">
-          Objective
+          What do you need?
           <textarea
             v-model="objective"
             rows="3"
@@ -22,11 +22,11 @@
           />
         </label>
         <label class="field">
-          Budget (XP, reserved atomically)
+          Budget (XP)
           <input v-model.number="budget" type="number" min="1" max="100000" required />
         </label>
         <button class="btn primary" type="submit" :disabled="creating">
-          <span v-if="creating" class="spinner" /> Create &amp; reserve budget
+          <span v-if="creating" class="spinner" /> Create task
         </button>
         <span v-if="createError" class="small" style="color: var(--red); margin-left: 10px">{{ createError }}</span>
       </form>
@@ -39,10 +39,10 @@
           <thead>
             <tr>
               <th>Created</th>
-              <th>Objective</th>
+              <th>Task</th>
               <th>Status</th>
               <th style="text-align: right">Budget</th>
-              <th style="text-align: right">Actual</th>
+              <th style="text-align: right">Spent</th>
               <th />
             </tr>
           </thead>
@@ -56,7 +56,7 @@
             <tr v-for="t in tasks" :key="t.id">
               <td class="mono small">{{ shortTime(t.created_at) }}</td>
               <td class="small" style="max-width: 280px">{{ t.objective }}</td>
-              <td><span class="badge" :class="t.status">{{ t.status.replace("_", " ") }}</span></td>
+              <td><span class="badge" :class="t.status">{{ human(t.status) }}</span></td>
               <td class="mono" style="text-align: right">{{ t.budget_xp.toLocaleString() }}</td>
               <td class="mono" style="text-align: right">{{ t.actual_xp.toLocaleString() }}</td>
               <td style="white-space: nowrap">
@@ -70,7 +70,7 @@
                   {{ t.status === "awaiting_approval" ? "Resume" : "Run" }}
                 </button>
                 <button v-if="['planned', 'running'].includes(t.status)" class="btn small" @click="showEvents(t.id)">
-                  Events
+                  Progress
                 </button>
                 <button
                   v-if="['completed', 'failed', 'cancelled'].includes(t.status)"
@@ -92,24 +92,23 @@
         </table>
       </div>
       <div class="notice small">
-        Execution runs through the DSH agent runtime: plan → typed allowlisted
-        tools → evaluation → transparent report. Budget cap, tool timeouts, and
-        approvals are enforced by deterministic backend code; pending tool
-        approvals pause the run until you resume them here.
+        The assistant plans the work, uses only approved tools, and never goes
+        over your budget. If it needs your OK for something (like sending an
+        email), it pauses here until you approve.
       </div>
     </section>
 
     <section v-if="eventTask" class="card">
-      <h2>Event stream <span class="dim small">task {{ eventTask.slice(0, 8) }} · {{ eventStatus }}</span></h2>
+      <h2>Progress <span class="dim small">{{ human(eventStatus) }}</span></h2>
       <div class="table-wrap" style="margin-top: 10px">
         <table class="ledger">
           <thead>
-            <tr><th>#</th><th>Event</th><th>Detail</th></tr>
+            <tr><th>#</th><th>Step</th><th>Details</th></tr>
           </thead>
           <tbody>
             <tr v-for="e in events" :key="e.seq">
               <td class="mono small">{{ e.seq }}</td>
-              <td class="mono small">{{ e.event_type }}</td>
+              <td class="small">{{ human(e.event_type) }}</td>
               <td class="mono small dim" style="max-width: 480px; overflow-wrap: anywhere">{{ compact(e.payload) }}</td>
             </tr>
           </tbody>
@@ -126,59 +125,56 @@
     </section>
 
     <section v-if="result" class="card">
-      <h2>Result <span class="dim small">task {{ result.task_id.slice(0, 8) }}</span></h2>
+      <h2>Result</h2>
       <p class="small" style="margin: 6px 0">
-        <strong>Deliverable:</strong> {{ result.deliverable || "-" }}
+        <strong>Answer:</strong> {{ result.deliverable || "-" }}
       </p>
 
-      <h3 class="small" style="margin: 14px 0 4px">Artifacts (validated, private)</h3>
+      <h3 class="small" style="margin: 14px 0 4px">Your files (private)</h3>
       <ul class="small">
         <li v-for="a in result.artifacts" :key="a.id">
           <a :href="artifactHref(a.download_url)" target="_blank" rel="noopener">{{ a.filename }}</a>
-          · {{ a.content_type }} · {{ (a.size_bytes / 1024).toFixed(1) }} KB
-          · sha256 {{ (a.sha256 || "").slice(0, 12) }}…
+          · {{ (a.size_bytes / 1024).toFixed(1) }} KB
         </li>
-        <li v-if="result.artifacts.length === 0" class="dim">No artifacts were produced.</li>
+        <li v-if="result.artifacts.length === 0" class="dim">No files were created.</li>
       </ul>
 
-      <h3 class="small" style="margin: 14px 0 4px">Sources &amp; provenance</h3>
+      <h3 class="small" style="margin: 14px 0 4px">Sources</h3>
       <ul class="small">
         <li v-for="(s, i) in result.sources" :key="i">
           [{{ i + 1 }}] <span class="badge" :class="s.status">{{ s.status }}</span>
           {{ s.title || "(untitled)" }} - <span class="mono small">{{ s.url }}</span>
-          · {{ s.fact_count }} facts · {{ s.retrieval_mode }}
-          · <span class="dim">freshness {{ s.freshness }}</span>
-          · <span class="dim">confidence {{ s.confidence }}</span>
+          · <span class="dim">{{ human(s.confidence) }} confidence</span>
         </li>
-        <li v-if="result.sources.length === 0" class="dim">No sources were collected.</li>
+        <li v-if="result.sources.length === 0" class="dim">No sources were used.</li>
       </ul>
 
       <div v-if="result.conflicts.length" class="notice small" style="border-left-color: var(--red)">
-        <strong>Conflicts between sources</strong>
+        <strong>Where sources disagree</strong>
         <div v-for="(c, i) in result.conflicts" :key="i">{{ c.subject }} - {{ c.detail }}</div>
       </div>
       <div v-if="result.gaps.length" class="notice small">
-        <strong>Coverage gaps:</strong> {{ result.gaps.join(", ") }}
+        <strong>What we couldn't find:</strong> {{ result.gaps.join(", ") }}
       </div>
 
       <div v-if="result.scored" class="notice small">
-        <strong>Commerce score: {{ result.scored.product }} - {{ result.scored.score }} / 100</strong>
+        <strong>{{ result.scored.product }}: {{ result.scored.score }} / 100</strong>
         <div class="dim small" style="margin: 4px 0">
-          Structural signals only - this score does not measure demand, ad
-          performance, or availability. Factors and weights are operator-configured:
+          A guide based on listing details. It doesn't measure real demand or
+          stock. How the score was built:
         </div>
         <table class="small" style="width: 100%; border-collapse: collapse; margin-top: 4px">
           <thead>
             <tr style="text-align: left">
-              <th style="padding: 2px 6px 2px 0">factor</th>
-              <th style="padding: 2px 6px">weight</th>
-              <th style="padding: 2px 6px">signal</th>
-              <th style="padding: 2px 6px">normalized</th>
+              <th style="padding: 2px 6px 2px 0">What we looked at</th>
+              <th style="padding: 2px 6px">Importance</th>
+              <th style="padding: 2px 6px">Found</th>
+              <th style="padding: 2px 6px">Score</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="f in result.scored.factors" :key="f.name" :class="{ dim: !f.included }">
-              <td style="padding: 2px 6px 2px 0">{{ f.name }}<span v-if="!f.included"> (excluded)</span></td>
+              <td style="padding: 2px 6px 2px 0">{{ f.name }}<span v-if="!f.included"> (not counted)</span></td>
               <td style="padding: 2px 6px">{{ f.weight }}</td>
               <td style="padding: 2px 6px">{{ f.signal }}</td>
               <td style="padding: 2px 6px">{{ f.normalized ?? "-" }}</td>
@@ -188,12 +184,12 @@
         <div v-for="(d, i) in result.scored.disclosures" :key="i" class="dim small">• {{ d }}</div>
       </div>
 
-      <h3 class="small" style="margin: 14px 0 4px">Limitations</h3>
+      <h3 class="small" style="margin: 14px 0 4px">Good to know</h3>
       <ul class="small dim">
         <li v-for="(l, i) in result.limitations" :key="i">{{ l }}</li>
       </ul>
 
-      <h3 class="small" style="margin: 14px 0 4px">XP receipt</h3>
+      <h3 class="small" style="margin: 14px 0 4px">XP used</h3>
       <p class="small mono">
         {{ receiptLine }}
       </p>
@@ -258,7 +254,7 @@ async function run(id: string) {
     await refresh();
     if (eventTask.value === id) await loadEvents(id);
   } catch (e) {
-    alert(String(e).replace("XP API ", ""));
+    alert(e instanceof Error ? e.message : String(e));
   } finally {
     running.value = null;
   }
@@ -280,7 +276,7 @@ async function showResult(id: string) {
   try {
     result.value = await api.taskResult(id);
   } catch (e) {
-    alert(String(e).replace("XP API ", ""));
+    alert(e instanceof Error ? e.message : String(e));
   }
 }
 
@@ -311,7 +307,7 @@ async function cancel(id: string) {
     await api.cancelTask(id);
     await refresh();
   } catch (e) {
-    alert(String(e));
+    alert(e instanceof Error ? e.message : String(e));
   }
 }
 

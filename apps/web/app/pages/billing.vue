@@ -1,10 +1,10 @@
 <template>
   <div>
     <header>
-      <h1 class="page-title">XP Billing</h1>
+      <h1 class="page-title">Buy XP</h1>
       <p class="page-sub">
-        Packs, purchases, and receipts. XP is an internal usage credit - not Bitcoin,
-        not a token. Rate: 1 sat = {{ rate?.xp_per_sat ?? "…" }} XP
+        XP are credits you spend on tasks. Pay in sats over Lightning.
+        1 sat = {{ rate?.xp_per_sat ?? "…" }} XP
         <span v-if="rate" class="env-chip">{{ rate.can_change ? "rate may change" : "fixed" }}</span>
       </p>
     </header>
@@ -20,8 +20,8 @@
     <section class="card">
       <h2>Buy XP</h2>
       <p class="dim small">
-        Choosing a pack creates a Lightning invoice. XP credits only after the
-        payment settles - verified by the backend, never by a client claim.
+        Pick a pack to get a Lightning invoice. Your XP arrives as soon as the
+        payment is confirmed.
       </p>
       <div class="packs">
         <button
@@ -51,14 +51,14 @@
             <td>{{ p.amount_sats.toLocaleString() }}</td>
             <td>+{{ p.xp_amount.toLocaleString() }}</td>
             <td>
-              <span class="chip" :class="p.status">{{ p.status }}</span>
+              <span class="chip" :class="p.status">{{ human(p.status) }}</span>
               <button
                 v-if="p.status === 'pending'"
                 class="btn small sensitive-action"
                 :disabled="settling !== null"
                 @click="settle(p)"
               >
-                <span v-if="settling === p.id" class="spinner" /> Settle (dev)
+                <span v-if="settling === p.id" class="spinner" /> Confirm payment
               </button>
             </td>
             <td>
@@ -76,9 +76,8 @@
         </tbody>
       </table></div>
       <p class="dim small">
-        Settlement in dev uses the canned Lightning provider (backend pulls the
-        preimage itself); in production the node's invoice stream supplies it and
-        the backend verifies it before crediting.
+        Demo mode: payments are simulated, so no real bitcoin moves. Tap
+        "Confirm payment" to complete a purchase.
       </p>
     </section>
   </div>

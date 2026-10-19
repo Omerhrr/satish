@@ -5,14 +5,13 @@
         <span class="brand-badge">X</span>
         <span>XP</span>
       </div>
-      <span class="env-chip">{{ envLabel }}</span>
     </header>
 
     <nav class="tabbar" aria-label="Primary">
-      <NuxtLink to="/">Console</NuxtLink>
+      <NuxtLink to="/">Home</NuxtLink>
       <NuxtLink to="/wallet">Wallet</NuxtLink>
-      <NuxtLink to="/billing">Billing</NuxtLink>
-      <NuxtLink to="/xp">XP</NuxtLink>
+      <NuxtLink to="/billing">Buy XP</NuxtLink>
+      <NuxtLink to="/xp">History</NuxtLink>
       <NuxtLink to="/tasks">Tasks</NuxtLink>
       <NuxtLink to="/automations">Automations</NuxtLink>
       <NuxtLink to="/connections">Connect</NuxtLink>
@@ -24,15 +23,11 @@
     </main>
 
     <footer class="site-footer">
-      XP · Bitcoin-native AI workforce · Phase 1 scaffold - self-custody is real:
-      your keys, your bitcoin, never stored by this service.
+      XP · AI work, paid in bitcoin
     </footer>
   </div>
 </template>
 
 <script setup lang="ts">
-const { isInsideTelegram } = useTelegram();
-const envLabel = computed(() =>
-  isInsideTelegram.value ? "telegram mini app" : "dev preview"
-);
+useTelegram();
 </script>

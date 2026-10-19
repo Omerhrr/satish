@@ -1,35 +1,32 @@
 <template>
   <div>
-    <h1 class="page-title">⚡ XP Ledger</h1>
+    <h1 class="page-title">⚡ XP history</h1>
     <p class="page-sub">
-      Append-only accounting. Balance always equals the sum of entries - every
-      credit, reservation, charge and refund is a visible line.
+      Every XP you buy, reserve, spend or get back, line by line.
     </p>
 
     <section class="card">
       <div style="display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap">
         <div class="balance-big">{{ balance ? balance.balance_xp.toLocaleString() + " XP" : "…" }}</div>
-        <div class="dim small" v-if="balance">≈ {{ Math.ceil(balance.balance_xp / balance.xp_per_sat).toLocaleString() }} sats equivalent spend capacity · rate 1 sat = {{ balance.xp_per_sat }} XP</div>
+        <div class="dim small" v-if="balance">about {{ Math.floor(balance.balance_xp / balance.xp_per_sat).toLocaleString() }} sats of work · 1 sat = {{ balance.xp_per_sat }} XP</div>
       </div>
       <div style="margin-top: 12px; display: flex; gap: 10px; flex-wrap: wrap">
-        <button class="btn primary small" :disabled="granting" @click="grant(1000)">
-          <span v-if="granting" class="spinner" /> +1,000 XP (dev)
-        </button>
+        <NuxtLink class="btn primary small" to="/billing">Buy XP</NuxtLink>
         <button class="btn small" @click="refresh">Refresh</button>
       </div>
     </section>
 
     <section class="card">
-      <h2>Ledger entries <span class="dim">({{ ledger?.total ?? 0 }})</span></h2>
+      <h2>Activity <span class="dim">({{ ledger?.total ?? 0 }})</span></h2>
       <div class="table-wrap" style="margin-top: 10px">
         <table class="ledger">
           <thead>
             <tr>
               <th>When</th>
               <th>Type</th>
-              <th style="text-align: right">Δ XP</th>
+              <th style="text-align: right">XP</th>
               <th style="text-align: right">Balance</th>
-              <th>Reference</th>
+              <th>For</th>
               <th>Note</th>
             </tr>
           </thead>
@@ -38,16 +35,16 @@
               <td colspan="6"><span class="spinner" /> Loading…</td>
             </tr>
             <tr v-else-if="ledger.items.length === 0">
-              <td colspan="6" class="dim">No entries yet - seed some XP to see the ledger move.</td>
+              <td colspan="6" class="dim">Nothing yet. Buy XP to get started.</td>
             </tr>
             <tr v-for="e in ledger?.items ?? []" :key="e.id">
               <td class="mono small">{{ shortTime(e.created_at) }}</td>
-              <td><span class="badge" :class="badgeClass(e.entry_type)">{{ e.entry_type }}</span></td>
+              <td><span class="badge" :class="badgeClass(e.entry_type)">{{ human(e.entry_type) }}</span></td>
               <td style="text-align: right" :class="e.amount >= 0 ? 'amount-pos' : 'amount-neg'">
                 {{ e.amount >= 0 ? "+" : "" }}{{ e.amount.toLocaleString() }}
               </td>
               <td class="mono" style="text-align: right">{{ e.balance_after.toLocaleString() }}</td>
-              <td class="mono small dim">{{ e.reference_type || "-" }}<template v-if="e.reference_id"> · {{ e.reference_id.slice(0, 8) }}</template></td>
+              <td class="small dim">{{ human(e.reference_type) || "-" }}</td>
               <td class="small dim">{{ e.note ?? "-" }}</td>
             </tr>
           </tbody>
@@ -56,9 +53,8 @@
     </section>
 
     <div class="notice small">
-      XP is an internal usage-credit unit. It is not Bitcoin, not a blockchain
-      token, and not a claim on funds. Purchases require a verified settled
-      payment, credited exactly once.
+      XP are credits for using this app. They aren't bitcoin and can't be
+      withdrawn. Each payment adds XP once, only after it's confirmed.
     </div>
   </div>
 </template>

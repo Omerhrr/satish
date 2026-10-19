@@ -1,41 +1,39 @@
 <template>
   <div>
     <h1 class="page-title">🛡 Security &amp; recovery</h1>
-    <p class="page-sub">Security, recovery, and transparent limitations are release requirements - not post-launch additions.</p>
+    <p class="page-sub">How XP keeps your account and money safe.</p>
 
     <section class="card">
-      <h2>Standing rules</h2>
+      <h2>Our promises</h2>
       <ul class="small dim" style="padding-left: 18px; line-height: 2">
-        <li>The bot will <b>never</b> ask for a seed phrase or private key in chat.</li>
-        <li>The AI agent never receives seed material or signing authority.</li>
-        <li>Every sensitive action requires explicit, fresh user approval.</li>
-        <li>Telegram init data is validated server-side; forged or stale payloads are rejected.</li>
-        <li>Generated artifacts are private by default with authorized delivery.</li>
+        <li>The bot will <b>never</b> ask for your recovery phrase or private keys.</li>
+        <li>The AI assistant can never see your recovery phrase or move your bitcoin.</li>
+        <li>Anything important, like sending an email, waits for your OK.</li>
+        <li>Your Telegram sign-in is checked on our server every time.</li>
+        <li>Your reports are private; only you can download them.</li>
       </ul>
     </section>
 
     <section class="card">
-      <h2>Session</h2>
+      <h2>Sign out</h2>
       <p class="sub">
-        Sessions are short-lived ({{ ttlNote }}), stored server-side as a hash only, and
-        revocation takes effect immediately - logout kills the session on the server, not
-        just in this webview.
+        Sign-ins last {{ ttlNote }}. Logging out ends this sign-in everywhere,
+        straight away.
       </p>
       <button
         class="btn sensitive-action"
         :disabled="loggingOut"
         @click="logout"
       >
-        <span v-if="loggingOut" class="spinner" /> ⚠️ Log out (revoke this session)
+        <span v-if="loggingOut" class="spinner" /> Log out
       </button>
       <span class="small dim" style="margin-left: 10px">{{ sessionNote }}</span>
     </section>
 
     <section class="card">
-      <h2>Active sessions</h2>
+      <h2>Where you're signed in</h2>
       <p class="small dim">
-        Every live bearer session issued for your account. Revoke anything you do not
-        recognise - revocation is instant and permanent for that token.
+        Sign out of anything you don't recognise. It takes effect immediately.
       </p>
       <p v-if="sessionsError" class="small" style="color: #f59e0b">{{ sessionsError }}</p>
       <p v-else-if="!sessions.length" class="small dim">
@@ -45,12 +43,11 @@
         <div v-for="s in sessions" :key="s.id" class="session-row">
           <div>
             <div class="small">
-              <b>{{ s.created_via }}</b> · created {{ fmt(s.created_at) }} · expires
+              <b>{{ human(s.created_via) }}</b> · signed in {{ fmt(s.created_at) }} · expires
               {{ fmt(s.expires_at) }}
             </div>
             <div class="small dim">
-              last used: {{ s.last_used_at ? fmt(s.last_used_at) : "never" }} ·
-              <code class="sid">{{ s.id.slice(0, 8) }}</code>
+              last used: {{ s.last_used_at ? fmt(s.last_used_at) : "never" }}
             </div>
           </div>
           <button
@@ -58,48 +55,40 @@
             :disabled="revokingId === s.id"
             @click="revoke(s.id)"
           >
-            <span v-if="revokingId === s.id" class="spinner" /> Revoke
+            <span v-if="revokingId === s.id" class="spinner" /> Sign out
           </button>
         </div>
       </div>
     </section>
 
     <section class="card">
-      <h2>Recovery guidance (preview)</h2>
+      <h2>Recovering your wallet</h2>
       <p class="small dim">
-        On-chain recovery requires your seed phrase created at wallet setup
-        (phase 3). Lightning additionally requires channel-state backups - a
-        seed phrase alone will not restore channels. Recovery steps will be
-        shown privately in the Mini App and verified during onboarding.
+        Your recovery phrase (shown once when you create a wallet) is the only
+        way to restore your bitcoin. Write it down and keep it offline. We
+        can't recover it for you.
       </p>
     </section>
 
     <section class="card">
-      <h2>Custody, data &amp; retention (phase 10)</h2>
+      <h2>What we keep, and for how long</h2>
       <p class="small dim">
-        <strong>Custody:</strong> you hold your keys - wallets are
-        self-custodial, the server stores public descriptors only, and the
-        agent can never sign or ask for seeds. <strong>Your XP ledger is
-        append-only</strong> and is never auto-deleted; the same applies to
-        payment records, task evidence, and the audit trail.
-        <strong>What does expire:</strong> revoked/expired login sessions
-        (7 days), read notifications (30 days; unread 90), finished
-        automation runs (180 days), sent email drafts (30 days). Deliverables
-        (PDFs, research artifacts) are kept until you delete them. Full
-        policy: privacy &amp; retention docs; known limitations are published
-        in the project's limitations register.
+        Payment and XP records are kept permanently so your balance can
+        always be checked. Old sign-ins are removed after 7 days, read
+        notifications after 30 days (unread after 90), finished automation
+        runs after 180 days, and sent email drafts after 30 days. Your reports
+        stay until you delete them.
       </p>
     </section>
 
     <section class="card">
       <h2>Your data</h2>
       <p class="small dim">
-        Export downloads everything this system stores about your account as
-        one JSON document - session token hashes and connected-service
-        credentials are never included, and the document itself says so.
+        Download a copy of everything XP stores about you. Passwords and
+        sign-in secrets are never included.
       </p>
       <button class="btn" :disabled="exporting" @click="exportData">
-        <span v-if="exporting" class="spinner" /> Download my data (JSON)
+        <span v-if="exporting" class="spinner" /> Download my data
       </button>
       <span class="small dim" style="margin-left: 10px">{{ exportNote }}</span>
     </section>
@@ -107,13 +96,10 @@
     <section class="card">
       <h2>Close account</h2>
       <p class="small dim">
-        Permanent and ledger-aware: closure refuses while anything is in
-        flight (running tasks, pending approvals, open payments, nonzero XP
-        balance), requires clean reconciliation, then erases your content,
-        deletes your Telegram linkage, and keeps only the anonymous
-        money/evidence trail. Your bitcoin stays yours - your recovery
-        phrase is untouched and remains the only control over your funds.
-        This cannot be undone.
+        This permanently deletes your account and content. You'll need to
+        finish any running tasks, open payments and spend or clear your XP
+        first. Your bitcoin is not affected: your recovery phrase still
+        controls it. This can't be undone.
       </p>
       <button class="btn sensitive-action" :disabled="closing" @click="closeAccount">
         <span v-if="closing" class="spinner" /> ⚠️ Close my account permanently
@@ -121,13 +107,6 @@
       <p v-if="closureNote" class="small" style="margin-top: 8px">{{ closureNote }}</p>
     </section>
 
-    <section class="card">
-      <h2>Environment</h2>
-      <p class="small dim">
-        Current build: phase 10 operational readiness · DEV_MODE grants are
-        enabled · no production secrets exist in this environment.
-      </p>
-    </section>
   </div>
 </template>
 
@@ -147,8 +126,7 @@ const closureNote = ref("");
 
 const ttlNote = "24h";
 const noSessionsNote =
-  "No user-issued session found in this webview. The app may be running on the DEV_MODE " +
-  "fallback user (no stored token) - open the app fresh from Telegram to issue a real session.";
+  "You're not signed in here. Open XP from the Telegram bot to sign in.";
 
 function fmt(iso: string): string {
   try {
@@ -173,14 +151,14 @@ async function loadSessions() {
 }
 
 async function logout() {
-  if (!window.confirm("Log out and revoke this session on the server?")) return;
+  if (!window.confirm("Log out of XP?")) return;
   loggingOut.value = true;
   try {
     await api.logout();
     for (const store of [window.localStorage, window.sessionStorage]) {
       store.removeItem("xp_session_token");
     }
-    note("server-side revocation confirmed");
+    note("Logged out");
     await loadSessions();
   } catch (err) {
     note(String(err instanceof Error ? err.message : err));
@@ -190,7 +168,7 @@ async function logout() {
 }
 
 async function revoke(sessionId: string) {
-  if (!window.confirm(`Revoke session ${sessionId.slice(0, 8)}? Devices using it are logged out immediately.`)) return;
+  if (!window.confirm("Sign this device out? It will be logged out straight away.")) return;
   revokingId.value = sessionId;
   try {
     await api.revokeSession(sessionId);
@@ -215,7 +193,7 @@ async function exportData() {
     a.download = `xp-account-export-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    exportNote.value = "download started";
+    exportNote.value = "Download started";
   } catch (err) {
     exportNote.value = String(err instanceof Error ? err.message : err);
   } finally {
@@ -226,20 +204,20 @@ async function exportData() {
 async function closeAccount() {
   if (
     !window.confirm(
-      "Close your account permanently? Your content is erased, your Telegram linkage is deleted, and this cannot be undone."
+      "Close your account permanently? Your content is erased, your Telegram link is removed, and this cannot be undone."
     )
   )
     return;
   const typed = window.prompt('This is permanent. Type CLOSE to confirm.');
   if (typed !== "CLOSE") {
-    closureNote.value = "confirmation did not match - nothing happened";
+    closureNote.value = "That didn't match, so nothing was changed.";
     return;
   }
   closing.value = true;
   closureNote.value = "";
   try {
     const result = await api.closeAccount("CLOSE");
-    closureNote.value = `account closed at ${result.closed_at}. Your funds remain under your recovery phrase.`;
+    closureNote.value = "Your account is closed. Your bitcoin is still yours, controlled by your recovery phrase.";
     for (const store of [window.localStorage, window.sessionStorage]) {
       store.removeItem("xp_session_token");
     }

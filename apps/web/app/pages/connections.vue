@@ -1,29 +1,27 @@
 <template>
   <div>
-    <h1 class="page-title">🔗 Connected services</h1>
+    <h1 class="page-title">🔗 Connect your email</h1>
     <p class="page-sub">
-      Link an email service so the agent can draft and - only after you approve the
-      exact content - send. Credentials are encrypted at rest and never shown again,
-      not even here.
+      Let the assistant write emails for you. Nothing is sent until you approve
+      it. Your password is stored encrypted and never shown again.
     </p>
 
     <section class="card">
-      <h2>Link SMTP email service</h2>
+      <h2>Connect your email</h2>
       <p class="small dim">
-        The connection grants the <code>email:draft</code> and <code>email:send</code>
-        scopes. Sending additionally requires your explicit approval of each message
-        (bound to its content digest and a time window). Revoking deletes the stored
-        credential immediately.
+        The assistant can write drafts, but every email needs your approval
+        before it's sent. Disconnect at any time and your password is deleted
+        immediately.
       </p>
       <div class="form-grid">
-        <label>SMTP host<input v-model="form.host" placeholder="smtp.example.com" /></label>
+        <label>Mail server<input v-model="form.host" placeholder="smtp.example.com" /></label>
         <label>Port<input v-model="form.port" inputmode="numeric" placeholder="587" /></label>
-        <label>Username (sender)<input v-model="form.username" placeholder="you@example.com" /></label>
+        <label>Your email address<input v-model="form.username" placeholder="you@example.com" /></label>
         <label>Password<input v-model="form.password" type="password" placeholder="app password" /></label>
-        <label class="check"><input v-model="form.starttls" type="checkbox" /> Use STARTTLS</label>
+        <label class="check"><input v-model="form.starttls" type="checkbox" /> Secure connection (recommended)</label>
       </div>
       <button class="btn" :disabled="linking || !form.host || !form.username" @click="link">
-        <span v-if="linking" class="spinner" /> Link service
+        <span v-if="linking" class="spinner" /> Connect
       </button>
       <span v-if="note" class="small" style="margin-left: 10px">{{ note }}</span>
       <p v-if="error" class="small" style="color: #f59e0b">{{ error }}</p>
@@ -33,17 +31,17 @@
       <h2>Your connections</h2>
       <p v-if="loadError" class="small" style="color: #f59e0b">{{ loadError }}</p>
       <p v-else-if="!connections.length" class="small dim">
-        No services linked yet. Without a connection, email drafts stay preview-only -
-        the agent cannot send anything.
+        No email connected yet. The assistant can still write drafts, but it
+        can't send anything.
       </p>
       <div v-for="c in connections" :key="c.id" class="row-list">
         <div>
           <div class="small">
-            <b>{{ c.provider }}</b> · {{ c.status }} · scopes: {{ c.scopes.join(", ") }}
+            <b>Email</b> · {{ human(c.status) }}
           </div>
           <div class="small dim">
             linked {{ fmt(c.created_at) }}
-            <span v-if="c.disclosure"> · {{ c.disclosure }}</span>
+            
           </div>
         </div>
         <button
@@ -52,29 +50,28 @@
           :disabled="revokingId === c.id"
           @click="revoke(c.id)"
         >
-          <span v-if="revokingId === c.id" class="spinner" /> Revoke
+          <span v-if="revokingId === c.id" class="spinner" /> Disconnect
         </button>
       </div>
     </section>
 
     <section class="card">
-      <h2>Email drafts (preview)</h2>
+      <h2>Email drafts</h2>
       <p class="small dim">
-        Every draft the agent prepared. Status shows the honest send outcome:
-        <code>sent</code>, <code>failed</code> (definite refusal - safe to retry),
-        or <code>unknown_outcome</code> (the server may have accepted it; the system
-        never retries automatically - a resend requires a new draft and a new approval).
+        Emails the assistant wrote for you. "Failed" means it wasn't sent, so you
+        can try again. "Not sure if sent" means it may have gone out; we never
+        resend on our own, so check your sent folder first.
       </p>
       <p v-if="!drafts.length" class="small dim">No drafts yet.</p>
       <div v-for="d in drafts" :key="d.id" class="row-list">
         <div>
           <div class="small">
             <b>{{ d.subject }}</b> → {{ d.to_address }}
-            <span class="badge" :data-status="d.status">{{ d.status }}</span>
+            <span class="badge" :data-status="d.status">{{ human(d.status) }}</span>
           </div>
           <div class="small dim">
             {{ fmt(d.created_at) }}
-            <span v-if="d.provider_mode"> · via {{ d.provider_mode }}</span>
+            
             <span v-if="d.error"> · {{ d.error }}</span>
           </div>
           <pre class="draft-body">{{ d.body }}</pre>
@@ -154,7 +151,7 @@ async function link() {
 }
 
 async function revoke(id: string) {
-  if (!window.confirm("Revoke this connection? The stored credential is deleted immediately.")) {
+  if (!window.confirm("Disconnect this email? Your saved password is deleted straight away.")) {
     return;
   }
   revokingId.value = id;
