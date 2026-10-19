@@ -9,6 +9,7 @@ dependencies = [
     "uvicorn[standard]>=0.32",
     "orjson>=3.10",
     "redis>=5.2",
+    "alembic>=1.14",
 ]
 
 [build-system]

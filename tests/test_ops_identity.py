@@ -191,3 +191,13 @@ async def test_dev_grant_still_dev_only_even_with_operator_credential(
     )
     assert resp.status_code == 403
     assert "dev grants are disabled" in resp.json()["detail"]
+
+
+def test_dev_mode_refused_in_prod_and_off_by_default(monkeypatch):
+    import pytest as _pytest
+    from xp_core.config import Settings
+
+    monkeypatch.delenv("XP_DEV_MODE", raising=False)
+    assert Settings(_env_file=None).dev_mode is False
+    with _pytest.raises(ValueError):
+        Settings(_env_file=None, env="prod", dev_mode=True)

@@ -38,3 +38,4 @@ dist/
 
 # Wallet tooling (50MB+ bitcoind binary + regtest state; fetch via make or docs)
 .tools/
+!deploy/.env.example

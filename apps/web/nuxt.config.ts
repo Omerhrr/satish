@@ -31,6 +31,7 @@ export default defineNuxtConfig({
             "Self-custody Bitcoin wallet + AI work platform, native to Telegram. Pay for research and documents in sats via XP credits."
         }
       ],
+      script: [{ src: "https://telegram.org/js/telegram-web-app.js" }],
       link: [
         {
           rel: "icon",

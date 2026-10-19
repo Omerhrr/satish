@@ -191,7 +191,7 @@ async def settle_invoice_dev(
     production settlement arrives exclusively from the node's stream."""
     from lightning_adapter import CannedLightningProvider
 
-    if not settings.dev_mode:
+    if not (settings.dev_mode or settings.demo_lightning_settle):
         raise HTTPException(status_code=403, detail="dev settle is disabled outside DEV_MODE")
     provider = svc.get_provider(settings)
     if not isinstance(provider, CannedLightningProvider):

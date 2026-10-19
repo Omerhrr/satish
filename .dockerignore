@@ -1,0 +1,10 @@
+.git
+**/.venv
+**/node_modules
+**/.nuxt
+**/.output
+**/__pycache__
+**/*.pyc
+data
+deploy/.env
+.env

@@ -1,0 +1,15 @@
+# Add to the VPS Caddyfile, then: sudo systemctl reload caddy
+satish.rogan.live {
+	encode zstd gzip
+
+	# API (FastAPI) - same origin as the Mini App, so no CORS juggling
+	@api path /api/* /healthz
+	handle @api {
+		reverse_proxy 127.0.0.1:18431
+	}
+
+	# Telegram Mini App (Nuxt)
+	handle {
+		reverse_proxy 127.0.0.1:18432
+	}
+}

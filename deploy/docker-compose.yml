@@ -1,0 +1,89 @@
+# XP on a shared VPS. Only two ports are published, both on 127.0.0.1,
+# so nothing is reachable from the internet except through host Caddy.
+#   api -> 127.0.0.1:18431   web -> 127.0.0.1:18432
+#
+#   cd deploy && cp .env.example .env && nano .env
+#   docker compose up -d --build
+name: satish
+
+x-env: &env
+  XP_DATABASE_URL: sqlite+aiosqlite:////data/xp.db
+  XP_REDIS_URL: redis://redis:6379/0
+  XP_ARTIFACT_DIR: /data/artifacts
+  XP_PDF_STORAGE_DIR: /data/artifacts
+  XP_WALLET_DATA_DIR: /data/wallets
+
+x-python: &python
+  build:
+    context: ..
+    dockerfile: deploy/Dockerfile.python
+  image: satish-python:latest
+  env_file: .env
+  environment: *env
+  volumes:
+    - xp_data:/data
+  restart: unless-stopped
+
+services:
+  api:
+    <<: *python
+    working_dir: /app/services/api
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8001
+             --proxy-headers --forwarded-allow-ips='*'"
+    ports:
+      - "127.0.0.1:18431:8001"
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/healthz')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  worker:
+    <<: *python
+    working_dir: /app/services/worker
+    command: ["arq", "worker.settings.WorkerSettings"]
+    depends_on:
+      api:
+        condition: service_healthy
+
+  bot:
+    <<: *python
+    working_dir: /app/apps/bot
+    command: ["python", "-m", "bot.main"]
+    environment:
+      <<: *env
+      XP_BOT_API_URL: http://api:8001/api/v1
+    depends_on:
+      api:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.web
+    environment:
+      NUXT_PUBLIC_API_BASE: ${PUBLIC_URL}
+    ports:
+      - "127.0.0.1:18432:3000"
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  xp_data:
+  redis_data:

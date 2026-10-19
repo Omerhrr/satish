@@ -10,6 +10,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Literal
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -24,7 +25,12 @@ class Settings(BaseSettings):
     # environment
     env: Literal["dev", "regtest", "testnet", "staging", "prod"] = "dev"
     log_level: str = "INFO"
-    dev_mode: bool = True  # relaxes auth for local/sandbox development only
+    # Relaxes auth for local/sandbox development only. Defaults OFF so a
+    # deployment that forgets to configure it fails closed, not open.
+    dev_mode: bool = False
+    # Demo seam: allow the canned-Lightning "settle-dev" button with real
+    # Telegram auth (dev_mode off). Only honoured with lightning_mode=canned.
+    demo_lightning_settle: bool = False
 
     # Operator credential for /ops/* (KL-11). Constant-time compared, never
     # logged, never echoed back. When set it is REQUIRED for every ops
@@ -205,6 +211,15 @@ class Settings(BaseSettings):
     retention_notifications_unread_days: int = 90
     retention_automation_runs_days: int = 180
     retention_email_drafts_sent_days: int = 30
+
+    @model_validator(mode="after")
+    def _refuse_dev_mode_in_shared_envs(self) -> Settings:
+        if self.dev_mode and self.env in ("staging", "prod"):
+            raise ValueError(
+                f"XP_DEV_MODE=true is refused when XP_ENV={self.env}: dev mode "
+                "disables authentication"
+            )
+        return self
 
     @property
     def is_sqlite(self) -> bool:

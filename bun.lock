@@ -8,8 +8,8 @@
     "apps/web": {
       "name": "@xp/web",
       "dependencies": {
-        "@xp/api-client": "*",
-        "@xp/shared-types": "*",
+        "@xp/api-client": "workspace:*",
+        "@xp/shared-types": "workspace:*",
       },
       "devDependencies": {
         "nuxt": "^4.2.2",
@@ -23,7 +23,7 @@
       "name": "@xp/api-client",
       "version": "0.1.0",
       "dependencies": {
-        "@xp/shared-types": "*",
+        "@xp/shared-types": "workspace:*",
       },
     },
     "packages/shared-types": {

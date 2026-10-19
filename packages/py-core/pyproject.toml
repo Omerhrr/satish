@@ -8,6 +8,10 @@ dependencies = [
     "pydantic-settings>=2.6",
     "sqlalchemy[asyncio]>=2.0.36",
     "structlog>=24.4",
+    "cryptography>=43",
+    "aiosqlite>=0.20",
+    "asyncpg>=0.30",
+    "openpyxl>=3.1",
 ]
 
 [build-system]

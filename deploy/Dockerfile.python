@@ -1,0 +1,23 @@
+# One image for api, worker and bot (same code, different command).
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
+# WeasyPrint (PDF reports) needs Pango + a font.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends libpango-1.0-0 libpangoft2-1.0-0 fonts-dejavu-core \
+ && rm -rf /var/lib/apt/lists/* \
+ && pip install uv
+
+WORKDIR /app
+COPY packages/py-core packages/py-core
+COPY services services
+COPY apps/bot apps/bot
+COPY tests/data tests/data
+RUN uv pip install --system \
+      -e packages/py-core -e services/api -e services/worker \
+      -e services/agent-adapter -e services/wallet-adapter -e services/lightning-adapter \
+      -e services/research-adapter -e services/commerce-adapter -e services/email-adapter \
+      -e services/telegram-adapter -e apps/bot
+
+RUN useradd --create-home --uid 10001 xp && mkdir -p /data && chown xp:xp /data
+USER xp
