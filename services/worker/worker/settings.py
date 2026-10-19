@@ -72,6 +72,14 @@ def _build_cron_jobs() -> tuple:
     )
 
 
+def _redis_settings():
+    """Point arq at XP_REDIS_URL (arq otherwise assumes localhost:6379)."""
+    from arq.connections import RedisSettings
+
+    url = get_settings().redis_url
+    return RedisSettings.from_dsn(url) if url else RedisSettings()
+
+
 class WorkerSettings:
     """arq configuration; functions are the allowlisted job surface."""
 
@@ -83,6 +91,7 @@ class WorkerSettings:
         relay_notifications_job,
         run_retention_sweep_job,
     )
+    redis_settings = _redis_settings()
     cron_jobs = _build_cron_jobs()
     on_startup = startup
     on_shutdown = shutdown
