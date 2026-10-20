@@ -27,6 +27,9 @@
         <p v-if="balance" class="sub">
           1 sat = {{ balance.xp_per_sat }} XP · about
           {{ Math.floor(balance.balance_xp / balance.xp_per_sat).toLocaleString() }} sats of work
+          <template v-if="naira(Math.floor(balance.balance_xp / balance.xp_per_sat))">
+            ({{ naira(Math.floor(balance.balance_xp / balance.xp_per_sat)) }})
+          </template>
         </p>
         <div class="actions">
           <NuxtLink class="btn primary" to="/billing">Buy XP</NuxtLink>
@@ -78,6 +81,7 @@
 import type { ArtifactOut, BalanceOut } from "@xp/shared-types";
 
 const api = useXpApi();
+const { naira } = usePrice();
 const balance = ref<BalanceOut | null>(null);
 const balanceError = ref(false);
 const signedOut = ref(false);

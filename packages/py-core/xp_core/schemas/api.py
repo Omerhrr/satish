@@ -120,6 +120,10 @@ class PurchaseOut(BaseModel):
     ledger_entry_id: str | None = None
     balance_after: int | None = None
     created_at: datetime
+    payment_method: str = "lightning"  # lightning | onchain
+    address: str | None = None  # on-chain: where to pay
+    network: str | None = None  # on-chain: mainnet | testnet
+    seen_sats: int | None = None  # on-chain: amount seen so far (incl. unconfirmed)
 
 
 class ReconcileReportOut(BaseModel):

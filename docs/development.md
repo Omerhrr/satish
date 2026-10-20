@@ -11,7 +11,7 @@
 ```bash
 python3 -m venv .venv
 uv pip install --python .venv/bin/python -e packages/py-core -e services/api \
-  -e services/worker -e services/agent-adapter -e services/wallet-adapter \
+  -e services/worker -e services/agent-adapter \
   -e services/lightning-adapter -e services/research-adapter -e apps/bot
 bun install
 

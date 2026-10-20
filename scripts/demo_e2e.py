@@ -23,8 +23,8 @@ Honesty (plan phase-11: "real supported flows, not mocked financial
 claims"): the money path above is the REAL settlement code (CAS +
 idempotency + 1:1 reconciliation) against CANNED Lightning/wallet
 providers - every canned surface labels itself as such in API responses.
-The real-Bitcoin proofs are separate live drills: `make wallet-regtest`
-(BDK + bitcoind) and `make lightning-drill` (two-node lnd v0.21.4-beta),
+The wallet is on-device (apps/web/tests); the Lightning proof is the live
+drill `make lightning-drill` (two-node lnd v0.21.4-beta),
 both committed and runnable on a healthy host. This demo never claims
 otherwise.
 
@@ -36,7 +36,6 @@ from __future__ import annotations
 
 import asyncio
 import os
-import sys
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -52,11 +51,10 @@ async def run_demo(log) -> dict[str, Any]:
         os.environ["XP_DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
         os.environ.setdefault("XP_DEV_MODE", "true")
 
+        import xp_core.models.entities  # noqa: F401  (register metadata before create_all)
         from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
         from sqlalchemy.pool import StaticPool
-
         from xp_core.db import Base, set_session_factory
-        import xp_core.models.entities  # noqa: F401  (register metadata before create_all)
 
         engine = create_async_engine(
             "sqlite+aiosqlite:///:memory:",
@@ -68,9 +66,8 @@ async def run_demo(log) -> dict[str, Any]:
         factory = async_sessionmaker(engine, expire_on_commit=False)
         set_session_factory(factory)
 
-        from httpx import ASGITransport, AsyncClient
-
         from app.main import app
+        from httpx import ASGITransport, AsyncClient
 
         report: dict[str, Any] = {"demo": "xp_end_to_end", "steps": [], "ok": True}
 
@@ -99,19 +96,11 @@ async def run_demo(log) -> dict[str, Any]:
             assert r.status_code == 200
             step("xp_grant", balance=r.json()["balance_xp"])
 
-            # 4 self-custody wallet
-            r = await c.post("/api/v1/wallets", json={"label": "demo"})
-            assert r.status_code == 201, r.text
-            wallet = r.json()
-            assert len(wallet["mnemonic_once"].split()) == 24
-            assert "tprv" not in wallet["public_descriptor"]
-            step(
-                "wallet_create",
-                provider="canned/regtest-offline",
-                words=24,
-                first_address=wallet["first_address"][:12] + "…",
-                seed_stored_server_side=False,
-            )
+            # 4 self-custody wallet: lives on the user's device (apps/web/app/lib/wallet-core.ts);
+            # the server has no wallet endpoints at all - nothing to call, nothing to leak.
+            r = await c.get("/api/v1/wallets")
+            assert r.status_code == 404
+            step("wallet_self_custody", server_wallet_api="none", keys_on_server=False)
 
             # 5 payments: purchase -> invoice -> settle
             r = await c.post("/api/v1/xp/purchases", json={"pack_id": "pack_1000sats"})
@@ -193,12 +182,12 @@ async def run_demo(log) -> dict[str, Any]:
 
         report["ok"] = True
         report["honesty_notes"] = [
-            "Wallet/Lightning providers here are the canned, deterministic ones; "
+            "The Lightning provider here is the canned, deterministic one; "
             "every API response labels canned surfaces as canned.",
             "The settlement path IS the production code path (CAS + ledger "
             "idempotency + 1:1 reconciliation) - replay refusal is structural.",
-            "Real-Bitcoin proofs are separate committed drills: make wallet-regtest, "
-            "make lightning-drill (need a healthy host).",
+            "The bitcoin wallet runs on the user's device (tested in apps/web/tests); "
+            "the Lightning proof is the committed drill make lightning-drill (needs a healthy host).",
             "The agent ran in stub mode because no DeepSeek key is configured; "
             "make dsh-verify proves the pinned revision live once a key exists.",
         ]

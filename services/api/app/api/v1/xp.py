@@ -15,6 +15,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import func, select
 from xp_core.config import get_settings
 from xp_core.jobs.reconciliation import reconcile_all
+from xp_core.logging import get_logger
 from xp_core.models.entities import Artifact, AuditEvent, XpLedgerEntry
 from xp_core.pricing import rate_disclosure
 from xp_core.schemas.api import (
@@ -29,10 +30,12 @@ from xp_core.schemas.api import (
     ReconcileReportOut,
 )
 from xp_core.services import ledger
+from xp_core.services.onchain import OnchainConfigError
 
 from app.deps import CurrentUser, DbSession
 from app.services import xp_service
 
+log = get_logger(__name__)
 router = APIRouter(prefix="/xp", tags=["xp"])
 
 
@@ -114,10 +117,16 @@ async def create_purchase(
         )
     except xp_service.UnknownPack as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except OnchainConfigError as exc:
+        log.error("onchain_misconfigured", error=str(exc))
+        raise HTTPException(status_code=503, detail="Payments are temporarily unavailable.") from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     await session.commit()
-    return PurchaseOut(**xp_service.purchase_out(row))
+    out = xp_service.purchase_out(row)
+    if out["payment_method"] == "onchain":
+        out["network"] = settings.onchain_network
+    return PurchaseOut(**out)
 
 
 @router.get("/purchases", response_model=list[PurchaseOut])
@@ -133,8 +142,23 @@ async def list_purchases(
 
 @router.get("/purchases/{purchase_id}", response_model=PurchaseOut)
 async def get_purchase(purchase_id: str, user: CurrentUser, session: DbSession) -> PurchaseOut:
+    """Read a purchase. On-chain requests are checked against the chain on
+    each read so the app sees the credit as soon as the payment lands."""
+    from xp_core.services import onchain
+
     row = await xp_service.get_owned_purchase(session, user, purchase_id)
-    return PurchaseOut(**await xp_service.purchase_view(session, row))
+    seen = None
+    if onchain.is_onchain(row) and row.status != "settled":
+        try:
+            check = await onchain.settle_if_paid(session, row, get_settings())
+            seen = check.seen_sats if check else None
+        except Exception as exc:
+            log.warning("onchain_check_failed", intent_id=row.id, error=str(exc))
+    out = await xp_service.purchase_view(session, row)
+    if onchain.is_onchain(row):
+        out["network"] = get_settings().onchain_network
+        out["seen_sats"] = seen
+    return PurchaseOut(**out)
 
 
 @router.post("/purchases/{purchase_id}/receipt.pdf", status_code=status.HTTP_202_ACCEPTED)

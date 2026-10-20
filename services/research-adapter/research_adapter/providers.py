@@ -10,12 +10,15 @@ Two transports, one honest contract:
   resolve-then-verify DNS, global-routability requirement, size and
   content-type caps).
 
-A live *search* provider needs a third-party search API key; none is
-configured, so search is canned-only for now and says so verbatim.
+- ``brave`` (search): live web search through the Brave Search API
+  (independent index, free tier). Needs XP_BRAVE_SEARCH_API_KEY; pair it with
+  fetch mode ``http`` so the agent can read the pages it finds.
 """
 
 from __future__ import annotations
 
+import html
+import re
 import socket
 from dataclasses import dataclass, field
 from typing import Any, Protocol
@@ -108,6 +111,52 @@ class CannedSearchProvider:
                 "corpus - results are fixed research fixtures, not live web listings"
             ),
         )
+
+
+BRAVE_ENDPOINT = "https://api.search.brave.com/res/v1/web/search"
+_TAG = re.compile(r"<[^>]+>")
+
+
+def _plain(text: str) -> str:
+    return html.unescape(_TAG.sub("", text or "")).strip()
+
+
+class BraveSearchProvider:
+    """Live web search via the Brave Search API.
+
+    Results are listings only (title, URL, snippet); the agent still has to
+    fetch each page through the FetchPolicy wall before citing it. Failures
+    return zero results with an honest disclosure, never filler.
+    """
+
+    def __init__(self, api_key: str, *, transport: httpx.AsyncBaseTransport | None = None, country: str = "") -> None:
+        if not api_key:
+            raise ValueError("brave search needs XP_BRAVE_SEARCH_API_KEY")
+        self.api_key = api_key
+        self.transport = transport
+        self.country = country
+
+    async def search(self, query: str, limit: int = 5) -> SearchOutcome:
+        params: dict[str, Any] = {"q": query[:400], "count": max(1, min(limit, 20)), "safesearch": "moderate"}
+        if self.country:
+            params["country"] = self.country
+        headers = {"Accept": "application/json", "X-Subscription-Token": self.api_key}
+        try:
+            async with httpx.AsyncClient(timeout=10, transport=self.transport) as client:
+                resp = await client.get(BRAVE_ENDPOINT, params=params, headers=headers)
+            if resp.status_code != 200:
+                log.warning("brave_search_failed", status=resp.status_code)
+                return SearchOutcome(mode="brave", disclosure=f"live search failed (HTTP {resp.status_code}); no results used")
+            items = (resp.json().get("web") or {}).get("results") or []
+        except (httpx.HTTPError, ValueError) as exc:
+            log.warning("brave_search_failed", error=str(exc))
+            return SearchOutcome(mode="brave", disclosure="live search was unreachable; no results used")
+        results = [
+            SearchListing(url=str(i["url"]), title=_plain(i.get("title", "")), snippet=_plain(i.get("description", ""))[:300])
+            for i in items
+            if str(i.get("url", "")).startswith(("http://", "https://"))
+        ][: max(1, limit)]
+        return SearchOutcome(mode="brave", results=results, disclosure="live web search results from Brave Search")
 
 
 # fetch
@@ -275,13 +324,17 @@ def _default_resolver(host: str) -> list[Any]:
     return socket.getaddrinfo(host, None)
 
 
-def make_search_provider(mode: str, corpus: list[dict[str, Any]]) -> SearchProvider:
-    if mode != "canned":
-        raise ValueError(
-            f"search mode {mode!r} is not available: no live search provider is "
-            "configured (a search API key would be required); use 'canned'"
-        )
-    return CannedSearchProvider(corpus)
+def make_search_provider(
+    mode: str, corpus: list[dict[str, Any]], *, api_key: str | None = None, **kwargs: Any
+) -> SearchProvider:
+    if mode == "canned":
+        return CannedSearchProvider(corpus)
+    if mode == "brave":
+        if not api_key:
+            log.warning("brave_search_key_missing", fallback="canned")
+            return CannedSearchProvider(corpus)
+        return BraveSearchProvider(api_key, **kwargs)
+    raise ValueError(f"search mode {mode!r} must be 'canned' or 'brave'")
 
 
 def make_fetch_provider(
@@ -295,6 +348,7 @@ def make_fetch_provider(
 
 
 __all__ = [
+    "BraveSearchProvider",
     "CannedFetchProvider",
     "CannedSearchProvider",
     "FetchOutcome",

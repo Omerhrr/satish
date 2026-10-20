@@ -17,6 +17,16 @@ cd deploy && cp .env.example .env && nano .env
 python3 -c "import secrets; print(secrets.token_urlsafe(32))"   # run twice, for the two keys
 ```
 
+## 2b. Feature keys (all optional, each switches one thing on)
+
+| Setting | What it does | Where to get it |
+|---|---|---|
+| `XP_ONCHAIN_XPUB` | Real XP payments in bitcoin to **your** wallet | `python3 deploy/make_payment_wallet.py testnet` on your own computer. Keep the 12 words offline; only the public key goes on the server |
+| `XP_DEEPSEEK_API_KEY` | Real AI answers | platform.deepseek.com |
+| `XP_BRAVE_SEARCH_API_KEY` | Real web research | api-search.brave.com (free tier) |
+| `XP_ONRAMPER_API_KEY` + `XP_ONRAMPER_SIGNING_KEY` | Buy bitcoin with naira in the app (mainnet) | onramper.com; `python3 deploy/onramper_keys.py` makes the signing key |
+| `BITCOIN_NETWORK` | `testnet` (free test coins) or `mainnet` (real bitcoin) | set `XP_ONCHAIN_NETWORK` to match |
+
 ## 3. Start
 ```bash
 docker compose up -d --build

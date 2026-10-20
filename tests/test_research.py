@@ -558,3 +558,31 @@ def test_untrusted_wrapper_contract():
 
     wrapped = wrap_untrusted("<script>steal</script>")
     assert wrapped.startswith(UNTRUSTED_OPEN) and wrapped.endswith(UNTRUSTED_CLOSE)
+
+
+async def test_brave_search_provider_parses_and_fails_honestly():
+    import httpx
+    from research_adapter.providers import BraveSearchProvider, make_search_provider
+
+    seen = {}
+
+    def ok(request: httpx.Request) -> httpx.Response:
+        seen["token"] = request.headers.get("X-Subscription-Token")
+        seen["q"] = request.url.params.get("q")
+        return httpx.Response(200, json={"web": {"results": [
+            {"title": "Solar <strong>inverter</strong> prices", "url": "https://example.ng/inverters", "description": "Compare &amp; save"},
+            {"title": "bad", "url": "javascript:alert(1)", "description": "x"},
+        ]}})
+
+    p = BraveSearchProvider("key123", transport=httpx.MockTransport(ok))
+    out = await p.search("solar inverter prices Nigeria", limit=5)
+    assert seen == {"token": "key123", "q": "solar inverter prices Nigeria"}
+    assert out.mode == "brave" and len(out.results) == 1
+    assert out.results[0].title == "Solar inverter prices" and out.results[0].snippet == "Compare & save"
+
+    down = BraveSearchProvider("k", transport=httpx.MockTransport(lambda r: httpx.Response(429)))
+    out = await down.search("x")
+    assert out.results == [] and "429" in out.disclosure
+
+    from research_adapter.providers import CannedSearchProvider
+    assert isinstance(make_search_provider("brave", [], api_key=None), CannedSearchProvider)

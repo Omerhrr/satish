@@ -14,7 +14,11 @@ export default defineNuxtConfig({
       apiPort: process.env.NUXT_PUBLIC_API_PORT || "",
       // Direct mode (local dev on your machine): full API origin.
       apiBase: process.env.NUXT_PUBLIC_API_BASE || "http://127.0.0.1:8001",
-      appName: "XP"
+      appName: "XP",
+      // Wallet network: "testnet" (default, free test coins) or "mainnet".
+      bitcoinNetwork: process.env.NUXT_PUBLIC_BITCOIN_NETWORK || "testnet",
+      // Optional custom Esplora API; defaults to mempool.space for the network.
+      esploraUrl: process.env.NUXT_PUBLIC_ESPLORA_URL || ""
     }
   },
   app: {

@@ -20,6 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from xp_core.config import Settings
 from xp_core.models.entities import PaymentIntent, User, XpLedgerEntry
+from xp_core.services import onchain
 
 
 class PurchaseError(Exception):
@@ -73,6 +74,8 @@ async def create_purchase(
     lifecycle stays single-sourced. Nothing is credited here.
     """
     sats = resolve_pack_sats(settings, pack_id=pack_id, amount_sats=amount_sats)
+    if settings.payment_mode == "onchain":
+        return await onchain.create_intent(session, user=user, settings=settings, amount_sats=sats)
     return await lightning_service.create_receive_intent(
         session,
         user=user,
@@ -110,6 +113,9 @@ def purchase_out(row: PaymentIntent) -> dict:
         "created_at": row.created_at,
         "ledger_entry_id": None,
         "balance_after": None,
+        "payment_method": "onchain" if onchain.is_onchain(row) else "lightning",
+        "address": onchain.intent_address(row),
+        "network": None,
     }
 
 

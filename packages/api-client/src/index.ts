@@ -105,6 +105,9 @@ export interface XpClient {
   markNotificationRead: (notificationId: string) => Promise<NotificationOut>;
   exportAccount: () => Promise<Response>;
   closeAccount: (confirm: "CLOSE") => Promise<AccountClosureOut>;
+  btcPrice: () => Promise<{ btc_ngn: number; btc_usd: number | null; updated_at: number; source: string }>;
+  onrampStatus: () => Promise<{ enabled: boolean; default_fiat: string }>;
+  onrampLink: (body: { address: string; fiat?: string; amount?: number }) => Promise<{ url: string; expires_at: string }>;
 }
 
 /** Plain-language error text for people, not developers. */
@@ -289,6 +292,9 @@ export function createXpClient(config: XpClientConfig = {}): XpClient {
         method: "POST",
       }),
     exportAccount: () => requestRaw("/api/v1/account/export"),
+    btcPrice: () => request("/api/v1/price/btc"),
+    onrampStatus: () => request("/api/v1/onramp/status"),
+    onrampLink: (body) => request("/api/v1/onramp/link", { method: "POST", body: JSON.stringify(body) }),
     closeAccount: (confirm) =>
       request<AccountClosureOut>("/api/v1/account/closure", {
         method: "POST",

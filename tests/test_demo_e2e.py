@@ -25,7 +25,7 @@ async def test_demo_e2e_passes_and_stays_honest():
         "health",
         "session",
         "xp_grant",
-        "wallet_create",
+        "wallet_self_custody",
         "purchase",
         "settlement",
         "task_created",
@@ -42,5 +42,5 @@ async def test_demo_e2e_passes_and_stays_honest():
     # anti-overclaim: the demo must keep disclosing its canned surfaces
     notes = " ".join(report["honesty_notes"])
     assert "canned" in notes
-    assert "wallet-regtest" in notes and "lightning-drill" in notes
+    assert "lightning-drill" in notes and "device" in notes
     assert "stub mode" in notes

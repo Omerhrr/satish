@@ -1,109 +1,84 @@
-# Btrust Technical Proposal - XP: a Bitcoin-native AI workforce (phase 11)
+# XP: a self-custodial Bitcoin wallet that pays for AI work, inside Telegram
 
-*Audience: Btrust (BitMEX founder Arthur Hayes' bitcoin-focused grant
-program) reviewers and any funder evaluating Bitcoin utility projects.*
+*Proposal for Btrust, prepared for the Btrust Build-A-thon at DevFest Kaduna City '26.*
 
-## 1. The Bitcoin utility thesis
+## 1. Why Btrust
 
-AI assistance is rapidly becoming a purchasable commodity - research,
-document drafting, monitoring, and approved automation. Today that
-commodity is sold through custodial intermediaries: card processors,
-subscription rails, and platforms that hold the user's money (and data)
-until the service is consumed. That model fails three ways for
-Bitcoin-native users: it excludes people who hold sats rather than cards,
-it re-introduces custodial risk for money that users deliberately hold
-self-custodially, and it gives the AI platform irreversible control over
-both payment and execution.
+Btrust was set up by Jack Dorsey and Jay-Z, seeded with 500 BTC, to fund
+Bitcoin development with a focus on developers in Africa and India, mainly
+through grants. Through the Btrust Builders Programme it trains African Bitcoin
+and Lightning engineers. XP is built in Kaduna by African developers, it is
+fully open source (MIT), and it is aimed at the users Btrust exists to reach.
 
-XP's answer is to make **Bitcoin the settlement layer and self-custody the
-default**: users pay for work in sats over Lightning and on-chain, the
-application credits (XP) are an append-only ledger derived from verified
-payments, and the user's keys never leave the user. The platform can be
-evaluated, operated, and abandoned without anyone granting maintainers
-custody of funds - that is a deliberate acceptance criterion of the plan
-and it is testable today (`make demo`, `make wallet-regtest`).
+## 2. The problem
 
-## 2. Target users
+For most Nigerians, Telegram is already part of daily life, and AI tools are
+becoming useful for work: research, comparing prices and suppliers, writing
+documents. But paying for them means a foreign card, a subscription and a
+custodial account, and the cards often fail. Meanwhile, the people who already
+hold bitcoin are asked to hand it to an exchange or app before they can use it.
 
-- **Bitcoin-holding individuals** who want AI labor (research, vehicle and
-  product intelligence, document generation, approved email/automation)
-  without opening a custodial account anywhere.
-- **Telegram communities** in regions where Telegram is the primary
-  internet surface - the Mini App + bot pattern meets users where they
-  already are, with no app-store gatekeeper.
-- **Operators of small AI-work businesses** who need auditable,
-  budget-capped agent execution with human approval gates - not an
-  autonomous agent with a blank check.
-- **Open-source auditors and funders** who need every claim in this
-  document to be reproducible from the repository, not taken on faith.
+## 3. What XP is
 
-## 3. Architecture (summary)
+A Telegram bot and Mini App with two halves that work together:
 
-- **Telegram is the interface, never a key vault.** Identity is a
-  Telegram initData HMAC exchange producing 24-hour server-side sessions
-  with revocation; the bot cannot ask for seeds and the UI cannot paste
-  them anywhere.
-- **Self-custody wallets** via BDK with public-descriptor-only persistence;
-  the signing vault is rebuilt in memory from the user's phrase at unlock
-  and expires with inactivity. Lightning runs on lnd v0.21.4-beta behind an
-  adapter protocol with a deterministic canned twin for hermetic testing.
-- **XP economy**: one published sats→XP conversion; purchases become
-  payment intents; settlement is verified through a double gate
-  (preimage-hash binding + CAS row transition + ledger idempotency key)
-  proven structurally incapable of double-crediting (6x replay tests).
-- **Agent execution** (DeepSeek via a pinned-revision DSH adapter) is
-  budget-capped, tool-allowlisted, scope-walled, approval-gated for
-  consequential actions, and fully event-audited. Untrusted web content is
-  wrapped so prompt injection cannot reach authorization.
-- **Operational readiness**: rate limiting, reconciliation alert queue
-  with operator lifecycle, daily retention sweep that structurally cannot
-  touch money/audit trails, backup/restore drills, dependency audits, and
-  incident runbooks (R1-R6).
+- **A real, self-custodial Bitcoin wallet.** The 12-word recovery phrase is
+  created on the user's phone and never leaves it; the XP server has no wallet
+  endpoints at all. Users can receive (QR), send (with fee choice and a full
+  review), keep an address book of named contacts, buy bitcoin with naira
+  through licensed partners that deliver straight to their own address, see
+  values in naira, and back the wallet up to their own Telegram, encrypted
+  with their password.
+- **An AI assistant you pay with bitcoin.** Users buy XP credits in sats,
+  paid in one tap from the in-app wallet to the operator's own wallet, then
+  ask for research, comparisons and PDF reports with sources. Every task has
+  a budget the user approves; unused XP comes back; anything consequential
+  (like sending an email) waits for the user's OK.
 
-Full detail: `docs/architecture.md`, `docs/threat-model.md`,
-`docs/decisions.md` (D1-D17).
+The full loop, all in Telegram: **buy sats → pay for work → get the report**,
+without anyone taking custody of the user's money.
 
-## 4. Security posture (summary)
+## 4. How it stays honest about money
 
-Threat-model-driven from phase 0: assets, adversaries, and mitigations are
-written down, then tests pin each mitigation (initData forgery, scope-wall
-bypass attempts, SSRF hops, settlement replay, credential-vault paths).
-The current build's known gaps are registered publicly (KL-01…KL-15), and
-the one unresolved release-gate item - **independent external security
-review** - is explicitly marked as pending rather than implied (KL-15).
-No uncompleted feature is represented as production-ready anywhere in the
-documentation, and canned/offline surfaces label themselves at the API
-layer, not just in prose.
+- **Self-custody is structural:** keys only on the device; phrase encrypted at
+  rest (PBKDF2-SHA256 + AES-256-GCM); the AI agent is not in the signing path.
+- **The operator never holds user funds either:** XP payments go to a
+  watch-only address derived from the operator's public key; the server can
+  watch but never spend.
+- **XP is credited exactly once:** each payment is checked on-chain, a
+  compare-and-set marks it settled, and the ledger entry is keyed per payment,
+  so replays and duplicate checks cannot double-credit. The XP ledger is
+  append-only and reconciled against payments.
+- **No silent failure modes:** dev shortcuts are off by default and refused in
+  production; operator tools need a credential and are audited.
 
-## 5. Open-source maintenance plan
+## 5. Evidence a reviewer can run
 
-- **Repository**: single open-source monorepo (permissive license to be
-  finalized with the phase-0 license review; no proprietary holdbacks
-  exist in the tree), conventional commits per phase, every phase's
-  acceptance criteria traceable to tests and docs.
-- **Quality gates**: `make test` (266 cases), `make lint`,
-  `make audit` (dependency/container pin gates), `make backup-drill`,
-  `make demo` (end-to-end golden path) - all runnable by a new contributor
-  in under ten minutes with zero external services.
-- **Honesty as governance**: the known-limitations register and the
-  roadmap's implemented/planned split are part of the review surface; PRs
-  that overclaim are treated as defects, matching the project's core
-  principle that a wallet's trustworthiness is only as good as its
-  accuracy about itself.
-- **Maintainership**: initial ownership map in `CONTRIBUTING.md`
-  (maintainer: @Omerhrr; module owners listed per area). External
-  contributions flow through the same quality gates; security reports via
-  `SECURITY.md` (responsible disclosure, 90-day window).
-- **What funding would accelerate**: the pending live proofs (DeepSeek key,
-  lnd drill host, Postgres restore rehearsal), the Redis-backed multi-worker
-  rate-limit backend, the operator identity layer for `/ops`, and the
-  independent security review - each already scoped in `docs/roadmap.md`.
+| What | Where |
+|---|---|
+| ~300 server tests (ledger, payments, auth, security walls) | `make test` |
+| Wallet tests: official BIP84 vectors, signing, coin selection, backup | `cd apps/web && bun test tests` |
+| End-to-end demo with no external services | `make demo` |
+| Live deployment | Telegram Mini App at `satish.rogan.live` (testnet4) |
 
-## 6. Why this is evaluable without custody
+Known gaps are listed openly in `docs/known-limitations.md` (for example:
+no independent security review yet, Lightning still uses the demo provider).
 
-Every dollar-equivalent flow can be exercised on regtest
-(`make wallet-regtest`, `make lightning-drill`) or on the canned twin
-(`make demo`) without mainnet funds, without a custodial account, and
-without giving maintainers anything but public repository access. The
-wallet model has no server-side secret fields by construction - the data
-model itself is the audit.
+## 6. What support would let us do next
+
+1. **Independent security review** of the wallet and payment code before real
+   money at scale.
+2. **Lightning for small payments** (an lnd node), so a ₦500 task doesn't pay
+   an on-chain fee.
+3. **Our own Esplora/mempool server** so wallet lookups don't depend on a
+   third party (better privacy).
+4. **Local-first AI tasks** built with Nigerian users: market prices,
+   supplier comparison, document drafting in English, Hausa, Yoruba and Igbo.
+5. **Contributor onboarding** through the Btrust Builders community, with
+   good-first-issues in the wallet and the AI tools.
+
+## 7. Open source and maintenance
+
+MIT licensed, single repository, every feature covered by tests and
+documented decisions (`docs/decisions.md`). Security reports through
+`SECURITY.md`. Maintainer: @Omerhrr; module owners in `CONTRIBUTING.md`.

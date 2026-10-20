@@ -362,7 +362,12 @@ def build_product_registry(
     commerce_corpus = load_commerce_corpus(settings)
     corpus = corpus + commerce_corpus
     corpus_by_url = {str(e["url"]): e for e in corpus}
-    search_provider = make_search_provider(settings.research_search_mode, corpus)
+    search_provider = make_search_provider(
+        settings.research_search_mode,
+        corpus,
+        api_key=settings.brave_search_api_key,
+        country=settings.brave_search_country,
+    )
     fetch_provider = make_fetch_provider(settings.research_fetch_mode, corpus)
 
     async def web_search(query: str, limit: int = 5) -> dict[str, Any]:

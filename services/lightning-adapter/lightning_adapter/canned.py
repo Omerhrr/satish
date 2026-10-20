@@ -24,9 +24,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from wallet_adapter import Network
-from wallet_adapter.bdk_provider import authorization_digest
-
+from lightning_adapter.common import Network, authorization_digest
 from lightning_adapter.state import (
     InvalidTransition,
     InvoiceExpired,

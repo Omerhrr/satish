@@ -667,3 +667,60 @@ unusable-by-construction without one. Residual: the credential is a shared
 static secret (no per-operator identities, no VPN/mTLS integration) - the
 next hardening step for larger teams; manual reconcile and dev grants stay
 dev-only by design.
+
+## D22 - The wallet moves onto the user's device; the server wallet is retired (2026-10-20)
+
+**Context:** the server-side BDK wallet generated the phrase on the server and
+needed it back to unlock and sign. Whatever the TTL, that is server-assisted
+custody, and Bitcoin reviewers would rightly reject the "self-custody" claim.
+
+**Decision:** generate, store (password-encrypted) and sign entirely in the
+Mini App with `@scure/bip39`, `@scure/bip32` and `@scure/btc-signer`; read
+the chain and broadcast through Esplora (mempool.space). Delete the server
+wallet API, service and adapter. Keep the empty tables for migration safety.
+
+**Consequences:** the server holds nothing that can move user funds. Device
+loss is covered by the 12 words and the optional encrypted Telegram backup
+(D25). Privacy trade-off: the Esplora host sees queried addresses (KL-17).
+
+## D23 - XP is paid in real bitcoin to the operator's watch-only wallet (2026-10-20)
+
+**Context:** XP purchases used a simulated Lightning settle button.
+BTCPay Server was considered, but needs its own full node and its testnet4
+support was unclear, while the app wallet uses testnet4.
+
+**Decision:** `XP_PAYMENT_MODE=onchain`. Each purchase gets a fresh BIP84
+address derived from `XP_ONCHAIN_XPUB` (public key only; the operator's phrase
+stays offline, made with `deploy/make_payment_wallet.py`). The API and a
+one-minute worker sweep check the address via Esplora; when it has received
+at least the amount with `XP_ONCHAIN_MIN_CONF` confirmations, a CAS moves the
+intent to settled and the ledger credits `purchase:{intent_id}` exactly once.
+Late payments to an expired request are still credited for 7 days.
+
+**Consequences:** real money, no custody of user funds, no node to run.
+On mainnet, on-chain fees are large relative to the smallest pack (KL-16);
+Lightning remains the path for small payments.
+
+## D24 - Buying bitcoin goes through Onramper to the user's own address (2026-10-20)
+
+XP never sells bitcoin or touches fiat. The Buy screen asks the API to sign
+an Onramper widget URL (V2: Ed25519, canonical 8-line string) with the
+user's own receive address pre-filled; Onramper's licensed partners take the
+naira payment and deliver to that address. Mainnet addresses only; off until
+`XP_ONRAMPER_API_KEY` and `XP_ONRAMPER_SIGNING_KEY` are set, with a "buy on a
+Nigerian exchange and withdraw to your address" guide as the fallback.
+
+## D25 - Encrypted wallet backup in the user's Telegram Cloud Storage (2026-10-20)
+
+The phrase is stored there in the same password-encrypted box as on the
+device; a random backup key (itself password-encrypted) encrypts the address
+book so contacts can sync on every change without asking for the password.
+Neither Telegram nor XP can read it. Restore needs only the password; the
+user can turn it off (deletes it) or delete it when removing the wallet.
+
+## D26 - Dev mode fails closed (2026-10-19)
+
+`XP_DEV_MODE` defaults to false and is refused outright when `XP_ENV` is
+`staging` or `prod`, because dev mode disables authentication. The demo's
+canned Lightning button has its own flag (`XP_DEMO_LIGHTNING_SETTLE`) so
+demos never need dev mode on a public server.

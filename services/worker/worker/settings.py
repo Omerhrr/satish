@@ -40,6 +40,18 @@ async def scheduled_reconciliation(ctx: dict[str, Any]) -> dict[str, Any]:
         return await reconcile_all(session)
 
 
+async def onchain_payment_sweep(ctx: dict[str, Any]) -> dict[str, Any]:
+    """Credit XP for on-chain payments that arrived (XP_PAYMENT_MODE=onchain)."""
+    from xp_core.db import get_session_factory
+    from xp_core.services.onchain import sweep
+
+    settings = get_settings()
+    if settings.payment_mode != "onchain":
+        return {"skipped": "payment_mode is not onchain"}
+    async with get_session_factory()() as session:
+        return await sweep(session, settings)
+
+
 def _build_cron_jobs() -> tuple:
     """Cron built lazily so import never requires settings resolution."""
     from arq.cron import cron
@@ -67,6 +79,8 @@ def _build_cron_jobs() -> tuple:
             minute=set(range(0, 60, relay_minutes)) if relay_minutes < 60 else None,
             run_at_startup=True,
         ),
+        # On-chain XP payments: check open payment requests every minute.
+        cron(onchain_payment_sweep, minute=set(range(60)), run_at_startup=True),
         # Retention sweep (phase 10): privacy windows, daily at 03:17 UTC.
         cron(run_retention_sweep_job, minute=17, hour=3, run_at_startup=False),
     )

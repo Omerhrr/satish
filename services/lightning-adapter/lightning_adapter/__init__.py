@@ -14,8 +14,6 @@ from __future__ import annotations
 
 from typing import Any, Protocol
 
-from wallet_adapter import Network
-
 from lightning_adapter.canned import (
     AuthorizationMismatch,
     CannedLightningProvider,
@@ -31,6 +29,7 @@ from lightning_adapter.canned import (
     PreimageMismatch,
     PreparedPayment,
 )
+from lightning_adapter.common import Network
 from lightning_adapter.state import (
     INVOICE_STATES,
     INVOICE_TRANSITIONS,

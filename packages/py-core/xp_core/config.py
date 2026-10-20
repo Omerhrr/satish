@@ -130,9 +130,11 @@ class Settings(BaseSettings):
     agent_max_budget_xp: int = 100_000
 
     # research tools
-    # search: canned only (a live provider needs a search API key - none is
-    # configured, and pretending otherwise would fabricate results).
+    # search: canned (offline eval corpus) or brave (live Brave Search API;
+    # needs brave_search_api_key, use with research_fetch_mode=http).
     research_search_mode: str = "canned"
+    brave_search_api_key: str | None = None  # never logged
+    brave_search_country: str = ""  # e.g. "NG" to favour Nigerian results
     # fetch: canned (offline eval corpus) or http (real retrieval behind the
     # FetchPolicy wall: http/https only, ports 80/443, public IPs only,
     # size + content-type caps, per-hop redirect re-checks).
@@ -163,6 +165,26 @@ class Settings(BaseSettings):
     # discloses that fallback; non-dev environments refuse to link connections
     # until an operator key is configured.
     connections_credential_key: str | None = None
+
+    # Buy bitcoin (Onramper). The API key is public; the signing key is an
+    # Ed25519 private key (PEM) used to sign widget links server-side so the
+    # user's own wallet address can be pre-filled safely. Never logged.
+    onramper_api_key: str | None = None
+    onramper_signing_key: str | None = None
+    onramper_default_fiat: str = "NGN"
+    onramper_widget_url: str = "https://buy.onramper.com"
+    coingecko_api_key: str | None = None  # optional free "demo" key, raises rate limits
+
+    # How XP purchases are paid: "lightning" (built-in demo/lnd flow) or
+    # "onchain" (real bitcoin to the operator's watch-only wallet).
+    payment_mode: str = "lightning"
+    # Operator's BIP84 account PUBLIC key (xpub/tpub/zpub/vpub). The server
+    # can derive and watch addresses but never spend. Keep the phrase offline.
+    onchain_xpub: str | None = None
+    onchain_network: Literal["mainnet", "testnet"] = "testnet"  # testnet = testnet4
+    onchain_esplora_url: str | None = None  # default: mempool.space for the network
+    onchain_min_conf: int = 1  # 0 accepts unconfirmed payments (demo only)
+    onchain_request_ttl_minutes: int = 60
     # email.send delivery mode: "canned" (deterministic, no network - the
     # receipt says so) or "smtp" (real delivery via the connection's stored
     # credentials, with an honest definite-vs-unknown outcome taxonomy).

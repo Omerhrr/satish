@@ -64,9 +64,10 @@
     <section class="card">
       <h2>Recovering your wallet</h2>
       <p class="small dim">
-        Your recovery phrase (shown once when you create a wallet) is the only
-        way to restore your bitcoin. Write it down and keep it offline. We
-        can't recover it for you.
+        Your 12-word recovery phrase is the only way to restore your bitcoin.
+        It lives only on your phone, protected by your wallet password; XP never
+        sees it and can't recover it for you. You can view it again under
+        Wallet → Show recovery phrase. Keep a paper copy somewhere safe.
       </p>
     </section>
 

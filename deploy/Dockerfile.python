@@ -15,7 +15,7 @@ COPY apps/bot apps/bot
 COPY tests/data tests/data
 RUN uv pip install --system \
       -e packages/py-core -e services/api -e services/worker \
-      -e services/agent-adapter -e services/wallet-adapter -e services/lightning-adapter \
+      -e services/agent-adapter -e services/lightning-adapter \
       -e services/research-adapter -e services/commerce-adapter -e services/email-adapter \
       -e services/telegram-adapter -e apps/bot
 

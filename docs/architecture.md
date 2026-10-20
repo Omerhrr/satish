@@ -21,10 +21,14 @@
                  └──────┬───────┘  └──────────┘  └───┬────────────┘
                         │                            │ typed allowlisted tools
                  ┌──────▼───────┐           ┌────────▼─────────┐
-                 │ Object store │           │ wallet-adapter / │
-                 │ (private)    │           │ lightning-adapter│
+                 │ Object store │           │ lightning-adapter│
+                 │ (private)    │           │ (wallet: device) │
                  └──────────────┘           └──────────────────┘
 ```
+
+> **2026-10-20:** the Bitcoin wallet now runs entirely in the Mini App on the
+> user's device (D22); the server holds no wallet keys and has no wallet API.
+> XP payments go to the operator's watch-only wallet (D23).
 
 ## Trust boundaries (plan: architecture.trust_boundaries)
 

@@ -305,6 +305,10 @@ export interface PurchaseOut {
   ledger_entry_id?: string | null;
   balance_after?: number | null;
   created_at: string;
+  payment_method?: "lightning" | "onchain";
+  address?: string | null;
+  network?: "mainnet" | "testnet" | null;
+  seen_sats?: number | null;
 }
 
 export interface TaskEstimateOut {

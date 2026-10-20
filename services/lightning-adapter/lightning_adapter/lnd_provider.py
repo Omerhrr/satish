@@ -21,8 +21,6 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from wallet_adapter import Network
-
 from lightning_adapter.canned import (
     Invoice as ProviderInvoice,
 )
@@ -39,6 +37,7 @@ from lightning_adapter.canned import (
 from lightning_adapter.canned import (
     PaymentStatus as ProviderPaymentStatus,
 )
+from lightning_adapter.common import Network
 from lightning_adapter.state import InvoiceExpired
 
 LND_VERSION = "v0.21.4-beta"
@@ -274,7 +273,7 @@ class LndLightningProvider:
         fee_limit = min(estimate, self.max_fee_msat)
         import secrets as _s
 
-        from wallet_adapter.bdk_provider import authorization_digest
+        from lightning_adapter.common import authorization_digest
 
         payment_id = "lp_" + _s.token_hex(12)
         digest = authorization_digest(

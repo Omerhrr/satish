@@ -68,6 +68,8 @@ services:
       dockerfile: deploy/Dockerfile.web
     environment:
       NUXT_PUBLIC_API_BASE: ${PUBLIC_URL}
+      # Wallet network: testnet (free test coins) or mainnet (real bitcoin)
+      NUXT_PUBLIC_BITCOIN_NETWORK: ${BITCOIN_NETWORK:-testnet}
     ports:
       - "127.0.0.1:18432:3000"
     restart: unless-stopped

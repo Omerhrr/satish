@@ -20,10 +20,10 @@ from lightning_adapter import (
     PreimageMismatch,
     make_lightning_provider,
 )
+from lightning_adapter.common import Network
 from lightning_adapter.lnd_provider import LndConfigError, LndLightningProvider
 from lightning_adapter.state import next_invoice_state, next_payment_state
 from sqlalchemy import func, select
-from wallet_adapter import Network
 from xp_core.models.entities import XpLedgerEntry
 
 # fixtures

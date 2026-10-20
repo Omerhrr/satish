@@ -14,9 +14,10 @@ from app.api.v1 import (
     health,
     lightning,
     notifications,
+    onramp,
     ops,
+    price,
     tasks,
-    wallets,
     xp,
 )
 
@@ -27,10 +28,11 @@ api_router.include_router(account.router)
 api_router.include_router(xp.router)
 api_router.include_router(tasks.router)
 api_router.include_router(artifacts.router)
-api_router.include_router(wallets.router)
 api_router.include_router(lightning.router)
 api_router.include_router(connections.router)
 api_router.include_router(drafts.router)
 api_router.include_router(automation.router)
 api_router.include_router(notifications.router)
+api_router.include_router(onramp.router)
 api_router.include_router(ops.router)
+api_router.include_router(price.router)

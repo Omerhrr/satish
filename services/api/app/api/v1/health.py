@@ -58,7 +58,7 @@ async def health(session: DbSession) -> HealthOut:
 async def capabilities() -> CapabilitiesOut:
     """Honest capability surface - what is real today vs. pending spikes."""
     return CapabilitiesOut(
-        wallets="pending_integration_spike (phase 3)",
+        wallets="self-custodial, on the user's device (BIP84); the server holds no wallet keys",
         lightning="pending_implementation_poc (phase 3+)",
         agent_runtime="adapter scaffolded; DSH revision unpinned (phase 0 spike)",
         notes=[

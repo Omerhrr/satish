@@ -46,7 +46,7 @@ async def client(session, dev_user):
     """ASGI client with a clock-controlled canned provider injected."""
     from app.main import app
     from lightning_adapter import CannedLightningProvider
-    from wallet_adapter import Network
+    from lightning_adapter.common import Network
 
     clock = FakeClock()
 
