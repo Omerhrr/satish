@@ -3,7 +3,7 @@ VENV := .venv
 PY := $(VENV)/bin/python
 API_URL := sqlite+aiosqlite:////$(CURDIR)/data/xp-dev.db
 
-.PHONY: help install migrate run-api run-worker run-bot run-web test lint dsh-verify research-eval commerce-eval wallet-regtest lightning-drill backup-drill audit demo compose-up compose-down
+.PHONY: help install migrate run-api run-worker run-bot run-web test lint dsh-verify research-eval commerce-eval lightning-drill backup-drill audit demo compose-up compose-down
 
 help:
 	@echo "install      - install python (uv) + node (bun) dependencies"
@@ -13,7 +13,6 @@ help:
 	@echo "dsh-verify   - live-verify the pinned DSH revision (needs XP_DEEPSEEK_API_KEY)"
 	@echo "research-eval - run the committed research evaluation set (phase 7)"
 	@echo "commerce-eval - run the committed commerce evaluation set (phase 8)"
-	@echo "wallet-regtest - end-to-end BDK+bitcoind regtest proof (spawns its own node)"
 	@echo "lightning-drill - two-node lnd regtest drill (invoice/payment/recovery; needs healthy zmq)"
 	@echo "backup-drill - backup/restore roundtrip drill with ledger re-verification (phase 10)"
 	@echo "audit        - dependency + container audit gates (phase 10)"
@@ -25,14 +24,14 @@ help:
 
 install:
 	uv pip install --python $(PY) -e packages/py-core -e services/api -e services/worker \
-	        -e services/agent-adapter -e services/wallet-adapter -e services/lightning-adapter -e services/research-adapter -e services/commerce-adapter -e services/email-adapter -e services/telegram-adapter -e apps/bot
+	        -e services/agent-adapter -e services/lightning-adapter -e services/research-adapter -e services/commerce-adapter -e services/email-adapter -e services/telegram-adapter -e apps/bot
 	bun install
 
 migrate:
 	cd services/api && XP_DATABASE_URL=$(API_URL) ../../$(VENV)/bin/alembic upgrade head
 
 run-api:
-	cd services/api && XP_DATABASE_URL=$(API_URL) ../../$(VENV)/bin/uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
+	cd services/api && XP_DEV_MODE=$${XP_DEV_MODE:-true} XP_DATABASE_URL=$(API_URL) ../../$(VENV)/bin/uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
 
 run-worker:
 	cd services/worker && ../../$(VENV)/bin/arq worker.settings.WorkerSettings
@@ -57,9 +56,6 @@ research-eval:
 
 commerce-eval:
 	$(PY) scripts/commerce_eval.py
-
-wallet-regtest:
-	$(PY) scripts/regtest_proof.py
 
 lightning-drill:
 	$(PY) scripts/lnd_regtest_drill.py

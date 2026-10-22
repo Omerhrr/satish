@@ -11,6 +11,7 @@ from app.api.v1 import (
     automation,
     connections,
     drafts,
+    handles,
     health,
     lightning,
     notifications,
@@ -18,11 +19,13 @@ from app.api.v1 import (
     ops,
     price,
     tasks,
+    wallet_alerts,
     xp,
 )
 
 api_router = APIRouter()
 api_router.include_router(health.router)
+api_router.include_router(handles.router)
 api_router.include_router(auth.router)
 api_router.include_router(account.router)
 api_router.include_router(xp.router)
@@ -36,3 +39,4 @@ api_router.include_router(notifications.router)
 api_router.include_router(onramp.router)
 api_router.include_router(ops.router)
 api_router.include_router(price.router)
+api_router.include_router(wallet_alerts.router)

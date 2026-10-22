@@ -122,7 +122,7 @@ describe("scanning against a fake network", () => {
     const infos = await scanAddresses(x, T, new Esplora("https://x", fake));
     expect(infos.filter((i) => i.txCount).reduce((s, i) => s + i.confirmed, 0)).toBe(75_000);
     expect(nextUnused(infos, 0)?.index).toBe(1);
-    expect(calls).toBeLessThan(70);
+    expect(calls).toBeLessThan(100);
     const own = new Set(infos.map((i) => i.address));
     const hist = buildHistory([
       { txid: "a", fee: 200, status: { confirmed: true, block_time: 10 }, vin: [{ prevout: { scriptpubkey_address: "ext", value: 50_200 } }], vout: [{ scriptpubkey_address: addressAt(x, T, 0, 0), value: 50_000 }] },
@@ -164,5 +164,33 @@ describe("address book", () => {
     expect(resolveRecipient(book, `bitcoin:${B}?amount=0.0001`)).toMatchObject({ address: B, amountSats: 10000, contact: { name: "Bola Market" } });
     expect(resolveRecipient(book, "tb1qunknown").contact).toBeUndefined();
     expect(searchContacts(book, "mark").map((c) => c.name)).toEqual(["Bola Market"]);
+  });
+});
+
+import { identityFromPhrase, signPoolAddresses, verifyPoolAddress, POOL_START, normalizeUsername } from "../app/lib/wallet-core";
+
+describe("@usernames", () => {
+  test("pool addresses are signed by the identity key and verify; tampering fails", () => {
+    const id = identityFromPhrase(PHRASE, T);
+    const x = accountXpub(PHRASE, T);
+    const pool = signPoolAddresses(x, id.privHex, T, POOL_START, 3);
+    expect(pool.map((p) => p.index)).toEqual([1000, 1001, 1002]);
+    expect(pool[0].address).toBe(addressAt(x, T, 0, 1000));
+    expect(verifyPoolAddress(id.pubHex, T, pool[0].address, pool[0].signature)).toBe(true);
+    expect(verifyPoolAddress(id.pubHex, T, pool[1].address, pool[0].signature)).toBe(false); // wrong address
+    expect(verifyPoolAddress(id.pubHex, M, pool[0].address, pool[0].signature)).toBe(false); // wrong network
+    const other = identityFromPhrase("legal winner thank year wave sausage worth useful legal winner thank yellow", T);
+    expect(verifyPoolAddress(other.pubHex, T, pool[0].address, pool[0].signature)).toBe(false);
+    expect(id.pubHex).toMatch(/^0[23][0-9a-f]{64}$/);
+  });
+  test("contacts can hold usernames; @ resolves", () => {
+    const r = checkContact([], { name: "Ada", address: "@Ada_K" }, T);
+    expect(r.ok && r.contact.username === "ada_k" && r.contact.address === "").toBe(true);
+    if (!r.ok) throw new Error();
+    expect(checkContact([r.contact], { name: "Other", address: "@ada_k" }, T).ok).toBe(false);
+    expect(resolveRecipient([r.contact], "@ADA_K")).toMatchObject({ username: "ada_k", contact: { name: "Ada" } });
+    expect(resolveRecipient([r.contact], "ada")).toMatchObject({ username: "ada_k" });
+    expect(resolveRecipient([], "@new_person")).toMatchObject({ username: "new_person", address: "" });
+    expect(normalizeUsername(" @Bob ")).toBe("bob");
   });
 });

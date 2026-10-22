@@ -52,7 +52,7 @@ class SessionInfoOut(BaseModel):
     expires_at: datetime
 
 
-# XP
+# TK
 
 
 class BalanceOut(BaseModel):
@@ -103,11 +103,11 @@ class PurchaseCreateIn(BaseModel):
 
     pack_id: str | None = Field(default=None, max_length=64)
     amount_sats: int | None = Field(default=None, ge=100, le=100_000_000)
-    description: str = Field(default="XP purchase", max_length=500)
+    description: str = Field(default="TK purchase", max_length=500)
 
 
 class PurchaseOut(BaseModel):
-    """A purchase = receive-direction payment intent + XP credit view."""
+    """A purchase = receive-direction payment intent + TK credit view."""
 
     id: str
     payment_hash: str | None
@@ -178,6 +178,7 @@ class TaskOut(BaseModel):
     started_at: datetime | None
     completed_at: datetime | None
     cancelled_at: datetime | None
+    error: str | None = None  # plain-language reason when status == failed
 
 
 # task events / approvals

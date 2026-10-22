@@ -1,7 +1,7 @@
 <template>
   <div>
     <h1 class="page-title">🛡 Security &amp; recovery</h1>
-    <p class="page-sub">How XP keeps your account and money safe.</p>
+    <p class="page-sub">How Satish keeps your account and money safe.</p>
 
     <section class="card">
       <h2>Our promises</h2>
@@ -65,7 +65,7 @@
       <h2>Recovering your wallet</h2>
       <p class="small dim">
         Your 12-word recovery phrase is the only way to restore your bitcoin.
-        It lives only on your phone, protected by your wallet password; XP never
+        It lives only on your phone, protected by your wallet password; Satish never
         sees it and can't recover it for you. You can view it again under
         Wallet → Show recovery phrase. Keep a paper copy somewhere safe.
       </p>
@@ -74,7 +74,7 @@
     <section class="card">
       <h2>What we keep, and for how long</h2>
       <p class="small dim">
-        Payment and XP records are kept permanently so your balance can
+        Payment and TK records are kept permanently so your balance can
         always be checked. Old sign-ins are removed after 7 days, read
         notifications after 30 days (unread after 90), finished automation
         runs after 180 days, and sent email drafts after 30 days. Your reports
@@ -85,7 +85,7 @@
     <section class="card">
       <h2>Your data</h2>
       <p class="small dim">
-        Download a copy of everything XP stores about you. Passwords and
+        Download a copy of everything Satish stores about you. Passwords and
         sign-in secrets are never included.
       </p>
       <button class="btn" :disabled="exporting" @click="exportData">
@@ -98,7 +98,7 @@
       <h2>Close account</h2>
       <p class="small dim">
         This permanently deletes your account and content. You'll need to
-        finish any running tasks, open payments and spend or clear your XP
+        finish any running tasks, open payments and spend or clear your TK
         first. Your bitcoin is not affected: your recovery phrase still
         controls it. This can't be undone.
       </p>
@@ -127,7 +127,7 @@ const closureNote = ref("");
 
 const ttlNote = "24h";
 const noSessionsNote =
-  "You're not signed in here. Open XP from the Telegram bot to sign in.";
+  "You're not signed in here. Open Satish from the Telegram bot to sign in.";
 
 function fmt(iso: string): string {
   try {
@@ -152,7 +152,7 @@ async function loadSessions() {
 }
 
 async function logout() {
-  if (!window.confirm("Log out of XP?")) return;
+  if (!window.confirm("Log out of Satish?")) return;
   loggingOut.value = true;
   try {
     await api.logout();

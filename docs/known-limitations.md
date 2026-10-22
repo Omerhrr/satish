@@ -26,7 +26,12 @@ release-facing rollup (plan phase-11: "Open issues and known limitations").
 | KL-16 | On-chain fees vs small XP packs | On mainnet an on-chain payment can cost a few hundred sats in fees, large next to the 1,000-sat pack; fine for testnet and larger packs | Lightning payments for small amounts (lnd path, KL-02) or larger packs |
 | KL-17 | Wallet privacy: the Esplora host sees queried addresses | mempool.space (default) can link a user's addresses together | `NUXT_PUBLIC_ESPLORA_URL` pointing at your own Esplora/mempool instance |
 | KL-18 | In-app buying not yet live | Onramper needs an account, API key and registered signing key; BTC-for-NGN availability across its Nigerian providers is unconfirmed | Onramper dashboard; exchange-withdrawal guide shown meanwhile |
-| KL-19 | XP payments over Lightning are still the canned demo provider | Real XP payments use on-chain mode (D23) | `make lightning-drill` host, then lightning mode |
+| KL-20 | Stuck incoming payments can't be sped up by the receiver (no CPFP yet) | Only the sender can speed up an incoming payment; Satish tells the user to ask them | child-pays-for-parent from the receive side |
+| KL-21 | Payment alerts check every minute through public Esplora | Messages can lag a minute or two; heavy use could hit mempool.space rate limits | own Esplora/mempool instance (KL-17) or a ZMQ/webhook feed |
+| KL-22 | Lightning (Breez SDK, Spark) has not made a live payment from the build environment | Its network can't reach Spark operators; the integration is unit-tested and browser-tested against a stand-in SDK built to the real type definitions | open Lightning on the deployed app (regtest, no key) and receive from the Lightspark faucet; then mainnet with a Breez API key and small amounts |
+| KL-23 | Lightning trust model: Spark operators | Transfers are co-signed by independent Spark operators; funds can't be moved by them alone and users can exit on-chain unilaterally, but this is a weaker guarantee than a plain on-chain wallet | disclosed in the app and D29; keep larger savings on-chain |
+| KL-24 | Lightning on regtest can't send to real Lightning invoices | Spark's regtest is a private test network; real Lightning routing only works on mainnet | test Lightning-to-Lightning on mainnet with small amounts |
+| KL-19 | TK payments over Lightning are still the canned demo provider | Real XP payments use on-chain mode (D23) | `make lightning-drill` host, then lightning mode |
 
 Anything claiming production readiness must first clear: KL-01 (agent
 claims), KL-02/KL-04/KL-05 (money claims), KL-15 (release gate).

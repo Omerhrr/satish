@@ -2,7 +2,7 @@
   <div>
     <h1 class="page-title">🗂 Tasks</h1>
     <p class="page-sub">
-      Tell the assistant what you need and set a budget. XP is held while it
+      Tell the assistant what you need and set a budget. TK is held while it
       works; you only pay for what it uses, and the rest comes back.
     </p>
 
@@ -22,7 +22,7 @@
           />
         </label>
         <label class="field">
-          Budget (XP)
+          Budget (TK)
           <input v-model.number="budget" type="number" min="1" max="100000" required />
         </label>
         <button class="btn primary" type="submit" :disabled="creating">
@@ -55,7 +55,11 @@
             </tr>
             <tr v-for="t in tasks" :key="t.id">
               <td class="mono small">{{ shortTime(t.created_at) }}</td>
-              <td class="small" style="max-width: 280px">{{ t.objective }}</td>
+              <td class="small" style="max-width: 280px">
+                {{ t.objective }}
+                <div v-if="t.status === 'running'" class="small working"><span class="spinner" /> Working on it…</div>
+                <div v-if="t.error" class="small task-err">{{ t.error }}</div>
+              </td>
               <td><span class="badge" :class="t.status">{{ human(t.status) }}</span></td>
               <td class="mono" style="text-align: right">{{ t.budget_xp.toLocaleString() }}</td>
               <td class="mono" style="text-align: right">{{ t.actual_xp.toLocaleString() }}</td>
@@ -133,7 +137,7 @@
       <h3 class="small" style="margin: 14px 0 4px">Your files (private)</h3>
       <ul class="small">
         <li v-for="a in result.artifacts" :key="a.id">
-          <a :href="artifactHref(a.download_url)" target="_blank" rel="noopener">{{ a.filename }}</a>
+          <a href="#" @click.prevent="download(a.download_url, a.filename)">{{ a.filename }}</a>
           · {{ (a.size_bytes / 1024).toFixed(1) }} KB
         </li>
         <li v-if="result.artifacts.length === 0" class="dim">No files were created.</li>
@@ -189,7 +193,7 @@
         <li v-for="(l, i) in result.limitations" :key="i">{{ l }}</li>
       </ul>
 
-      <h3 class="small" style="margin: 14px 0 4px">XP used</h3>
+      <h3 class="small" style="margin: 14px 0 4px">TK used</h3>
       <p class="small mono">
         {{ receiptLine }}
       </p>
@@ -224,12 +228,52 @@ function compact(payload: Record<string, unknown>): string {
   return JSON.stringify(payload).slice(0, 220);
 }
 
+let poller: ReturnType<typeof setTimeout> | null = null;
+
 async function refresh() {
   loading.value = true;
   try {
     tasks.value = await api.listTasks();
   } finally {
     loading.value = false;
+  }
+  schedulePoll();
+}
+
+/** Tasks run in the background: keep checking while any is still working. */
+function schedulePoll() {
+  if (poller) clearTimeout(poller);
+  poller = null;
+  if (!tasks.value.some((t) => t.status === "running")) return;
+  poller = setTimeout(async () => {
+    try {
+      const before = new Map(tasks.value.map((t) => [t.id, t.status]));
+      tasks.value = await api.listTasks();
+      if (eventTask.value) await loadEvents(eventTask.value);
+      const finished = tasks.value.find((t) => before.get(t.id) === "running" && t.status === "completed");
+      if (finished) await showResult(finished.id);
+    } catch {
+      /* try again next tick */
+    }
+    schedulePoll();
+  }, 3000);
+}
+
+async function download(url: string, filename: string) {
+  try {
+    const token = sessionStorage.getItem("xp_session_token") ?? localStorage.getItem("xp_session_token");
+    const res = await fetch(api.artifactDownloadUrl({ id: url.split("/").slice(-2)[0] } as any), {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new Error();
+    const href = URL.createObjectURL(await res.blob());
+    const link = document.createElement("a");
+    link.href = href;
+    link.download = filename || "report.pdf";
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(href), 10_000);
+  } catch {
+    alert("Couldn't download that file. Please try again.");
   }
 }
 
@@ -241,7 +285,7 @@ async function submit() {
     objective.value = "";
     await refresh();
   } catch (e) {
-    createError.value = String(e).replace("XP API ", "");
+    createError.value = String(e);
   } finally {
     creating.value = false;
   }
@@ -280,17 +324,12 @@ async function showResult(id: string) {
   }
 }
 
-function artifactHref(url: string): string {
-  // download_url is already a same-origin API path; auth rides the session cookie
-  // in gateway mode or the token query in direct mode (api-client buildUrl).
-  return url;
-}
 
 const receiptLine = computed(() => {
   const r = result.value?.xp_receipt;
   if (!r) return "";
-  const base = `budget ${r.budget_xp.toLocaleString()} XP · charged ${r.actual_xp.toLocaleString()} XP · released ${r.released_xp.toLocaleString()} XP · ${r.status.replace("_", " ")}`;
-  const balance = r.balance_after !== null ? ` · balance after ${r.balance_after.toLocaleString()} XP` : "";
+  const base = `budget ${r.budget_xp.toLocaleString()} TK · charged ${r.actual_xp.toLocaleString()} TK · released ${r.released_xp.toLocaleString()} TK · ${r.status.replace("_", " ")}`;
+  const balance = r.balance_after !== null ? ` · balance after ${r.balance_after.toLocaleString()} TK` : "";
   const entry = r.charge_entry_id ? ` · entry ${r.charge_entry_id.slice(0, 8)}…` : "";
   return base + balance + entry;
 });
@@ -312,4 +351,10 @@ async function cancel(id: string) {
 }
 
 onMounted(refresh);
+onBeforeUnmount(() => poller && clearTimeout(poller));
 </script>
+
+<style scoped>
+.working { color: var(--orange); display: flex; gap: 6px; align-items: center; margin-top: 4px; }
+.task-err { color: var(--red); margin-top: 4px; }
+</style>

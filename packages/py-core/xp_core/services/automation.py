@@ -2,7 +2,7 @@
 
 Deliverables: "Scheduled jobs", "Condition-based notifications", "Pause,
 resume, cancel, and failure handling", "Automation run history", plus the
-XP-limit acceptance: "Recurring jobs enforce per-run XP limits and total
+TK-limit acceptance: "Recurring jobs enforce per-run TK limits and total
 limits where configured" and "Failed jobs do not silently repeat
 consequential actions".
 
@@ -519,7 +519,7 @@ async def process_job(
                 status="skipped_total_budget",
                 xp_budget_per_run=job.budget_per_run_xp,
                 error=(
-                    f"total budget exhausted ({job.total_spent_xp}/{job.budget_total_xp} XP); "
+                    f"total budget exhausted ({job.total_spent_xp}/{job.budget_total_xp} TK); "
                     "job auto-paused"
                 ),
                 started_at=now,
@@ -561,7 +561,7 @@ async def process_job(
             status="skipped_budget",
             xp_budget_per_run=budget,
             error=(
-                f"insufficient XP balance ({balance} < {budget} required); "
+                f"insufficient TK balance ({balance} < {budget} required); "
                 "job stays scheduled and will retry next sweep"
             ),
             started_at=now,

@@ -71,24 +71,37 @@ def render_notification_text(row: Notification, job_name: str | None) -> str:
     payload = row.payload or {}
     label = f" for \"{job_name}\"" if job_name else ""
     if row.kind == "automation.run_succeeded":
-        return f"XP automation{label}: run succeeded."
+        return f"Satish automation{label}: run succeeded."
     if row.kind == "automation.run_failed":
         error = payload.get("error") or "unknown error"
-        return f"XP automation{label}: run failed - {error}"
+        return f"Satish automation{label}: run failed - {error}"
     if row.kind == "automation.auto_paused":
         reason = payload.get("reason") or "policy"
         return (
-            f"XP automation{label}: paused automatically ({reason}). "
+            f"Satish automation{label}: paused automatically ({reason}). "
             "Review it in the Mini App before resuming."
         )
     if row.kind == "automation.balance_below":
         balance = payload.get("balance")
         threshold = payload.get("threshold")
         return (
-            f"XP automation{label}: balance fell below threshold "
-            f"({balance} XP < {threshold} XP). Fund XP credits to keep it running."
+            f"Satish automation{label}: balance fell below threshold "
+            f"({balance} TK < {threshold} TK). Fund TK credits to keep it running."
         )
-    return f"XP notification ({row.kind})."
+    if row.kind == "request.paid":
+        amount = payload.get("amount_sats") or 0
+        note = payload.get("note")
+        what = f" for \"{note}\"" if note else ""
+        return f"Payment received: {amount:,} sats{what}. It's in your Satish wallet."
+    if row.kind in ("wallet.received", "wallet.confirmed"):
+        amount = int(payload.get("amount_sats") or 0)
+        test = " (test coins)" if payload.get("network") == "testnet" else ""
+        if row.kind == "wallet.confirmed":
+            return f"✅ The {amount:,} sats{test} you received are now confirmed. They're safe in your Satish wallet."
+        if payload.get("confirmed"):
+            return f"📥 You received {amount:,} sats{test}. It's confirmed and in your Satish wallet."
+        return f"📥 You're receiving {amount:,} sats{test}. It's waiting to confirm; we'll tell you when it does."
+    return f"Satish notification ({row.kind})."
 
 
 async def relay_pending_notifications(

@@ -1,4 +1,4 @@
-"""On-chain XP payments to the operator's own watch-only wallet.
+"""On-chain TK payments to the operator's own watch-only wallet.
 
 Each purchase gets a fresh BIP84 (native SegWit) address derived from the
 operator's account xpub. The server can derive and watch addresses but can
@@ -69,7 +69,7 @@ def derive_address(xpub: str, network: str, index: int) -> str:
     return script.p2wpkh(account.derive([0, index])).address(_net(network))
 
 
-def bip21(address: str, amount_sats: int, label: str = "XP credits") -> str:
+def bip21(address: str, amount_sats: int, label: str = "TK credits") -> str:
     btc = f"{amount_sats / 1e8:.8f}".rstrip("0").rstrip(".")
     return f"bitcoin:{address}?amount={btc}&label={label.replace(' ', '%20')}"
 
@@ -155,7 +155,7 @@ async def settle_if_paid(
     *,
     client: httpx.AsyncClient | None = None,
 ) -> PaymentCheck | None:
-    """Check the chain and credit XP once if paid. Returns what was seen."""
+    """Check the chain and credit TK once if paid. Returns what was seen."""
     if not is_onchain(row) or row.status == "settled":
         return None
     address = intent_address(row)

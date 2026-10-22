@@ -1,4 +1,4 @@
-"""XP purchase receipt PDF (phase 5, deliverable: Receipts and billing UI).
+"""TK purchase receipt PDF (phase 5, deliverable: Receipts and billing UI).
 
 Renders the receipt from DB-owned data only (the purchase intent row and
 its ledger purchase entry) - never from client input - so a receipt can
@@ -27,7 +27,7 @@ _RECEIPT_SHELL = """<!DOCTYPE html>
 <meta charset="utf-8">
 <style>
   @page {{ size: A5; margin: 1.6cm;
-    @bottom-center {{ content: "XP receipt {purchase_id_short} - page " counter(page);
+    @bottom-center {{ content: "TK receipt {purchase_id_short} - page " counter(page);
                       font-size: 8px; color: #8a8f98; }} }}
   body {{ font-family: "DejaVu Sans", sans-serif; color: #14181f; line-height: 1.5; }}
   .brand {{ color: #f7931a; font-weight: 700; letter-spacing: 2px; font-size: 11px; }}
@@ -43,21 +43,21 @@ _RECEIPT_SHELL = """<!DOCTYPE html>
 </style>
 </head>
 <body>
-  <div class="brand">XP · RECEIPT</div>
-  <h1>XP purchase receipt</h1>
+  <div class="brand">SATISH · RECEIPT</div>
+  <h1>TK purchase receipt</h1>
   <div class="meta">Purchase {purchase_id} · rendered {rendered_at}</div>
   <table>
     <tr><td class="k">Status</td><td class="v">{status}</td></tr>
     <tr><td class="k">Amount paid</td><td class="v">{amount_sats} sats</td></tr>
-    <tr><td class="k">Conversion (published, may change)</td><td class="v">1 sat = {xp_per_sat} XP</td></tr>
+    <tr><td class="k">Conversion (published, may change)</td><td class="v">1 sat = {xp_per_sat} TK</td></tr>
     <tr><td class="k">Payment hash</td><td class="v">{payment_hash}</td></tr>
     <tr><td class="k">Ledger entry</td><td class="v">{ledger_entry_id}</td></tr>
-    <tr><td class="k">Balance after credit</td><td class="v">{balance_after} XP</td></tr>
-    <tr class="total"><td class="k">XP credited</td><td class="v">+{xp_amount} XP</td></tr>
+    <tr><td class="k">Balance after credit</td><td class="v">{balance_after} TK</td></tr>
+    <tr class="total"><td class="k">TK credited</td><td class="v">+{xp_amount} TK</td></tr>
   </table>
   <div class="disclaimer">
-    XP is an internal usage credit - it is not Bitcoin, not a blockchain token,
-    and not a claim on funds. This receipt summarizes the append-only XP ledger
+    TK is an internal usage credit - it is not Bitcoin, not a blockchain token,
+    and not a claim on funds. This receipt summarizes the append-only TK ledger
     entry created when the payment settled; the ledger is the source of truth.
   </div>
 </body>

@@ -1,10 +1,10 @@
-"""XP purchase + receipt service (phase 5, billing_flow).
+"""TK purchase + receipt service (phase 5, billing_flow).
 
-A purchase IS a receive-direction PaymentIntent viewed through the XP
-economy: the plan's XP group exposes it as POST /xp/purchases ->
+A purchase IS a receive-direction PaymentIntent viewed through the TK
+economy: the plan's TK group exposes it as POST /xp/purchases ->
 GET /xp/purchases/{purchase_id} (api_contract). Credit still happens only
 through lightning_service.settle's double gate - this service never moves
-XP itself, so there is exactly one settlement processor in the system.
+TK itself, so there is exactly one settlement processor in the system.
 
 Receipts are DERIVED VIEWS over (payment intent, ledger purchase entry),
 not a new table - the 16-table data model stays intact and a receipt can
@@ -81,7 +81,7 @@ async def create_purchase(
         user=user,
         settings=settings,
         amount_sats=sats,
-        description=description or "XP purchase",
+        description=description or "TK purchase",
     )
 
 

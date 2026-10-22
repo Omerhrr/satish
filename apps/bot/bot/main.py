@@ -8,11 +8,13 @@ into the Nuxt Mini App rather than handling keys in chat.
 from __future__ import annotations
 
 import os
+import re
+from urllib.parse import quote
 
 import httpx
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.enums import ParseMode
-from aiogram.filters import Command, CommandStart
+from aiogram.filters import Command, CommandObject, CommandStart
 from aiogram.types import (
     Message,
     WebAppInfo,
@@ -33,7 +35,7 @@ SECURITY_NOTE = (
 def mini_app_keyboard(settings=None):
     settings = settings or get_settings()
     builder = InlineKeyboardBuilder()
-    builder.button(text="⚡ Open XP", web_app=WebAppInfo(url=settings.mini_app_url))
+    builder.button(text="⚡ Open Satish", web_app=WebAppInfo(url=settings.mini_app_url))
     return builder.as_markup()
 
 
@@ -56,17 +58,58 @@ async def _open_app(message: Message, text: str) -> None:
     await message.answer(text, reply_markup=mini_app_keyboard(get_settings()))
 
 
+def _app_button(text: str, path: str):
+    settings = get_settings()
+    base = settings.mini_app_url.rstrip("/")
+    builder = InlineKeyboardBuilder()
+    builder.button(text=text, web_app=WebAppInfo(url=f"{base}{path}"))
+    return builder.as_markup()
+
+
+_REQUEST_ID = re.compile(r"^[A-Za-z0-9_-]{6,24}$")
+
+
+@router.message(CommandStart(deep_link=True))
+async def cmd_start_deep_link(message: Message, command: CommandObject) -> None:
+    """t.me/<bot>?start=pay_<id> from a shared payment link."""
+    arg = (command.args or "").strip()
+    if arg.startswith("pay_") and _REQUEST_ID.match(arg[4:]):
+        await message.answer(
+            "Someone sent you a payment request. Tap below to check it and pay from your Satish wallet.",
+            reply_markup=_app_button("⚡ Review and pay", f"/?pay={arg[4:]}"),
+        )
+        return
+    await cmd_start(message)
+
+
+@router.message(Command("request"))
+async def cmd_request(message: Message, command: CommandObject) -> None:
+    """/request 5000 rice -> opens the request screen pre-filled."""
+    parts = (command.args or "").split(maxsplit=1)
+    query = "?request=1"
+    if parts and parts[0].replace(",", "").isdigit():
+        query += f"&amount={parts[0].replace(',', '')}"
+        if len(parts) > 1:
+            query += "&note=" + quote(parts[1][:140])
+    elif parts:
+        query += "&note=" + quote(" ".join(parts)[:140])
+    await message.answer(
+        "Create a payment link you can share on WhatsApp or anywhere. Anyone can pay it with bitcoin.",
+        reply_markup=_app_button("⇄ Create payment link", f"/{query}"),
+    )
+
+
 @router.message(CommandStart())
 async def cmd_start(message: Message) -> None:
     await message.answer(
-        "Welcome to <b>XP</b> 👋\n\n"
-        "Get research, reports and everyday work done by an AI assistant, "
-        "and pay for it in bitcoin.\n\n"
-        "1. Buy XP credits with sats over Lightning\n"
-        "2. Tell the assistant what you need and set a budget\n"
-        "3. Get your answer or PDF report. Unused XP comes back to you\n\n"
+        "Welcome to <b>Satish</b> 👋\n\n"
+        "Your own bitcoin wallet, right here in Telegram. Only you hold the keys.\n\n"
+        "• Send and receive bitcoin, and see it in naira\n"
+        "• Get a @username so friends can pay you by name\n"
+        "• Share payment links on WhatsApp, payable from any wallet\n"
+        "• Pay an AI assistant for research and reports with TK credits\n\n"
         f"{SECURITY_NOTE}\n\n"
-        "Tap <b>Open XP</b> to get started, or send /help.",
+        "Tap <b>Open Satish</b> to get started, or send /help.",
         reply_markup=mini_app_keyboard(get_settings()),
         parse_mode=ParseMode.HTML,
     )
@@ -76,13 +119,14 @@ async def cmd_start(message: Message) -> None:
 async def cmd_help(message: Message) -> None:
     await message.answer(
         "<b>What I can do</b>\n"
-        "/xp - check your XP balance\n"
-        "/fund - buy XP with bitcoin\n"
-        "/research - ask the assistant to research something\n"
+        "/wallet - your bitcoin wallet\n"
+        "/request 5000 rice - make a payment link to share\n"
+        "/research - ask the AI assistant to research something\n"
+        "/tk - your TK credits for the AI assistant\n"
+        "/fund - buy TK credits with bitcoin\n"
         "/tasks - see your tasks and reports\n"
         "/automations - tasks that repeat on a schedule\n"
         "/connections - connect your email\n"
-        "/wallet - your bitcoin wallet\n"
         "/settings - security and your account\n\n"
         f"{SECURITY_NOTE}",
         parse_mode=ParseMode.HTML,
@@ -92,25 +136,25 @@ async def cmd_help(message: Message) -> None:
 
 @router.message(Command("wallet", "receive", "send", "addresses", "history", "balance"))
 async def cmd_wallet(message: Message) -> None:
-    await _open_app(message, "Your wallet opens inside XP, so nothing sensitive ends up in this chat.")
+    await _open_app(message, "Your wallet opens inside Satish, so nothing sensitive ends up in this chat.")
 
 
 @router.message(Command("settings"))
 async def cmd_settings(message: Message) -> None:
-    await _open_app(message, "Security, sign-ins and your data are under Security in XP.")
+    await _open_app(message, "Security, sign-ins and your data are under Security in Satish.")
 
 
-@router.message(Command("xp"))
+@router.message(Command("tk", "xp"))
 async def cmd_xp(message: Message) -> None:
-    await _open_app(message, "⚡ Your XP balance and history are on the XP home screen.")
+    await _open_app(message, "⚡ Your TK credits and history are under AI assistant in Satish.")
 
 
 @router.message(Command("fund"))
 async def cmd_fund(message: Message) -> None:
     await _open_app(
         message,
-        "Open XP, go to Buy XP and pick a pack. Pay the Lightning invoice and "
-        "your XP arrives as soon as the payment is confirmed.",
+        "Open Satish, go to Buy TK and pick a pack. Pay from your Satish wallet "
+        "in one tap; your TK arrives as soon as the payment is seen.",
     )
 
 
@@ -118,7 +162,7 @@ async def cmd_fund(message: Message) -> None:
 async def cmd_research(message: Message) -> None:
     await _open_app(
         message,
-        "Open XP, go to Tasks and describe what you need: compare products, "
+        "Open Satish, go to Tasks and describe what you need: compare products, "
         "find suppliers, research a car, or any question. You approve the "
         "budget before anything starts.",
     )
@@ -126,21 +170,21 @@ async def cmd_research(message: Message) -> None:
 
 @router.message(Command("tasks"))
 async def cmd_tasks(message: Message) -> None:
-    await _open_app(message, "Your tasks, progress and reports are under Tasks in XP.")
+    await _open_app(message, "Your tasks, progress and reports are under Tasks in Satish.")
 
 
 @router.message(Command("automations"))
 async def cmd_automations(message: Message) -> None:
     await _open_app(
         message,
-        "Set up tasks that repeat on a schedule under Automations in XP. "
+        "Set up tasks that repeat on a schedule under Automations in Satish. "
         "You set a spending cap, and nothing is emailed without your OK.",
     )
 
 
 @router.message(Command("connections"))
 async def cmd_connections(message: Message) -> None:
-    await _open_app(message, "Connect your email under Connect in XP.")
+    await _open_app(message, "Connect your email under Connect in Satish.")
 
 
 @router.message(F.text.startswith("/"))

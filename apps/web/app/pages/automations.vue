@@ -12,8 +12,8 @@
       <div class="form-grid">
         <label>What should it do?<input v-model="form.objective" placeholder="Monitor supplier prices daily" /></label>
         <label>Schedule<input v-model="form.schedule" placeholder="every 1h · daily 09:30 · hourly" /></label>
-        <label>Budget per run (XP)<input v-model="form.budgetPerRun" inputmode="numeric" /></label>
-        <label>Total budget (XP, optional)<input v-model="form.budgetTotal" inputmode="numeric" placeholder="-" /></label>
+        <label>Budget per run (TK)<input v-model="form.budgetPerRun" inputmode="numeric" /></label>
+        <label>Total budget (TK, optional)<input v-model="form.budgetTotal" inputmode="numeric" placeholder="-" /></label>
       </div>
       <p class="small dim">
         Examples: <code>every 6h</code>, <code>daily 09:30</code> (UTC), <code>hourly</code>.
@@ -37,7 +37,7 @@
               {{ j.schedule }} · {{ human(j.status) }}
               <span v-if="j.auto_paused_reason"> (paused: {{ j.auto_paused_reason }})</span>
               · next: {{ fmt(j.next_run_at) }}
-              · spent {{ j.total_spent_xp }}/{{ j.budget_total_xp ?? "∞" }} XP
+              · spent {{ j.total_spent_xp }}/{{ j.budget_total_xp ?? "∞" }} TK
               · {{ j.run_count }} runs
             </div>
             <div v-if="j.last_run_status" class="small dim">
@@ -57,7 +57,7 @@
           <div v-for="r in runs" :key="r.id" class="small run-row">
             <span>Run {{ r.run_number }} · {{ human(r.trigger) }} ·
               <span class="badge" :data-status="r.status">{{ r.status }}</span>
-              · {{ r.xp_charged }}/{{ r.xp_budget_per_run }} XP
+              · {{ r.xp_charged }}/{{ r.xp_budget_per_run }} TK
             </span>
             <span class="dim"> {{ fmt(r.started_at) }}<span v-if="r.error"> · {{ r.error }}</span></span>
           </div>

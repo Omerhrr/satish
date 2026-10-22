@@ -105,14 +105,31 @@ export interface XpClient {
   markNotificationRead: (notificationId: string) => Promise<NotificationOut>;
   exportAccount: () => Promise<Response>;
   closeAccount: (confirm: "CLOSE") => Promise<AccountClosureOut>;
+  handleCheck: (username: string, network: string) => Promise<{ username: string; available: boolean; reason: string | null }>;
+  handleClaim: (body: HandleClaimIn) => Promise<HandleMeOut>;
+  handleMe: (network: string) => Promise<HandleMeOut>;
+  handleTopUp: (body: { network: string; identity_pubkey: string; addresses: SignedAddressIn[] }) => Promise<HandleMeOut>;
+  handleAddress: (username: string, network: string) => Promise<IssuedAddressOut>;
+  createRequest: (body: { network: string; amount_sats?: number; note?: string }) => Promise<PaymentRequestOut>;
+  listRequests: () => Promise<PaymentRequestOut[]>;
+  getRequest: (id: string) => Promise<PaymentRequestOut>;
+  cancelRequest: (id: string) => Promise<PaymentRequestOut>;
   btcPrice: () => Promise<{ btc_ngn: number; btc_usd: number | null; updated_at: number; source: string }>;
   onrampStatus: () => Promise<{ enabled: boolean; default_fiat: string }>;
   onrampLink: (body: { address: string; fiat?: string; amount?: number }) => Promise<{ url: string; expires_at: string }>;
+  alertsStatus: (network: string) => Promise<WalletAlertsOut>;
+  alertsSet: (body: { network: string; enabled: boolean; addresses?: string[] }) => Promise<WalletAlertsOut>;
+  alertsWatch: (body: { network: string; addresses: string[] }) => Promise<WalletAlertsOut>;
+}
+
+export interface WalletAlertsOut {
+  enabled: boolean;
+  watched: number;
 }
 
 /** Plain-language error text for people, not developers. */
 export function friendlyError(status: number, detail: string): string {
-  if (status === 401) return "You're not signed in. Please open XP from the Telegram bot.";
+  if (status === 401) return "You're not signed in. Please open Satish from the Telegram bot.";
   if (status === 403) return "That isn't available on your account.";
   if (status === 404) return "We couldn't find that. It may have been removed.";
   if (status === 429) return "You're going a bit fast. Please wait a moment and try again.";
@@ -121,6 +138,47 @@ export function friendlyError(status: number, detail: string): string {
   // 400/409/422: the server's reason is usually meaningful; keep it short.
   const text = detail.replace(/^[A-Z_]+:\s*/, "").trim();
   return text ? text.charAt(0).toUpperCase() + text.slice(1) : "That didn't work. Please try again.";
+}
+
+export interface SignedAddressIn {
+  address: string;
+  index: number;
+  signature: string;
+}
+export interface HandleClaimIn {
+  network: string;
+  username: string;
+  identity_pubkey: string;
+  addresses: SignedAddressIn[];
+}
+export interface HandleMeOut {
+  username: string | null;
+  identity_pubkey: string | null;
+  available: number;
+  max_index: number;
+  issued_max_index: number;
+}
+export interface IssuedAddressOut {
+  username: string;
+  address: string;
+  signature: string;
+  identity_pubkey: string;
+  reused: boolean;
+}
+export interface PaymentRequestOut {
+  id: string;
+  url: string;
+  network: string;
+  username: string;
+  address: string;
+  signature: string;
+  identity_pubkey: string;
+  amount_sats: number | null;
+  note: string | null;
+  status: "open" | "paid" | "cancelled";
+  paid_sats: number;
+  created_at: string;
+  paid_at: string | null;
 }
 
 export function createXpClient(config: XpClientConfig = {}): XpClient {
@@ -292,9 +350,23 @@ export function createXpClient(config: XpClientConfig = {}): XpClient {
         method: "POST",
       }),
     exportAccount: () => requestRaw("/api/v1/account/export"),
+    handleCheck: (username, network) =>
+      request(`/api/v1/handles/check?username=${encodeURIComponent(username)}&network=${network}`),
+    handleClaim: (body) => request("/api/v1/handles/claim", { method: "POST", body: JSON.stringify(body) }),
+    handleMe: (network) => request(`/api/v1/handles/me?network=${network}`),
+    handleTopUp: (body) => request("/api/v1/handles/addresses", { method: "POST", body: JSON.stringify(body) }),
+    handleAddress: (username, network) =>
+      request(`/api/v1/handles/${encodeURIComponent(username)}/address?network=${network}`, { method: "POST" }),
+    createRequest: (body) => request("/api/v1/requests", { method: "POST", body: JSON.stringify(body) }),
+    listRequests: () => request("/api/v1/requests"),
+    getRequest: (id) => request(`/api/v1/requests/${encodeURIComponent(id)}`),
+    cancelRequest: (id) => request(`/api/v1/requests/${encodeURIComponent(id)}/cancel`, { method: "POST" }),
     btcPrice: () => request("/api/v1/price/btc"),
     onrampStatus: () => request("/api/v1/onramp/status"),
     onrampLink: (body) => request("/api/v1/onramp/link", { method: "POST", body: JSON.stringify(body) }),
+    alertsStatus: (network) => request(`/api/v1/wallet/alerts?network=${network}`),
+    alertsSet: (body) => request("/api/v1/wallet/alerts", { method: "PUT", body: JSON.stringify(body) }),
+    alertsWatch: (body) => request("/api/v1/wallet/alerts/addresses", { method: "POST", body: JSON.stringify(body) }),
     closeAccount: (confirm) =>
       request<AccountClosureOut>("/api/v1/account/closure", {
         method: "POST",

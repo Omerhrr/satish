@@ -724,3 +724,104 @@ user can turn it off (deletes it) or delete it when removing the wallet.
 `staging` or `prod`, because dev mode disables authentication. The demo's
 canned Lightning button has its own flag (`XP_DEMO_LIGHTNING_SETTLE`) so
 demos never need dev mode on a public server.
+
+## D27 - @usernames and shareable payment requests without giving up self-custody (2026-10-21)
+
+**Context:** users want to pay "@ada" instead of a long address, and to share
+"pay me" links on WhatsApp. The obvious design (give the server each user's
+xpub) would let XP see every balance and payment.
+
+**Decision:** the phone uploads a pool of its own receive addresses (index
+1000+ on the receive chain), each signed with a wallet identity key on a
+private chain (m/84'/coin'/0'/7/0; it can vouch for addresses but never spend).
+The server verifies every signature, hands out one unused address per payment,
+and never sees the xpub. Payers' phones re-verify the signature and pin the
+identity key on first payment (warning if it changes), so a compromised server
+can't substitute its own address. Payment requests reuse the pool: a public
+`/pay/<id>` page (works outside Telegram) shows the request and a verified
+address; the API and a worker sweep mark it paid and notify the owner through
+the existing Telegram relay. Names: 3-20 of `[a-z0-9_]`, reserved words
+blocked, released names held 30 days.
+
+**Consequences:** the server learns which payments went to which username
+(disclosed), but not balances or other activity. The identity key is stored
+unencrypted on the device so pools top up silently; it cannot move funds.
+
+## D28 - Full wallet life cycle: recovery, stuck payments, alerts, leaving (2026-10-22)
+
+**Context:** a wallet people trust with real money has to handle the bad days:
+a new phone, a forgotten password, a payment stuck for days, an incoming
+payment nobody noticed, and the day they want to leave.
+
+**Decisions:**
+- **Restore finds @username coins.** The receive pool (index 1000+) is always
+  gap-scanned, and the server's "issued up to" index is fetched even before
+  the wallet knows its username. A phone restored on a different Telegram
+  account still finds payments made to @username.
+- **Speed up / cancel (BIP125 RBF).** Every payment already signals
+  replaceability. A pending payment can be re-sent with a higher fee (same
+  recipients, fee from change or a spare confirmed coin) or cancelled (all
+  inputs back to a fresh change address). The new fee beats the old one by
+  at least 1 sat/vB of the new size, and the rate always goes up. Payments
+  whose change another pending payment already spends are not offered
+  (replacing them would invalidate the child).
+- **Payment alerts are opt-in and watch-only.** The phone shares only the
+  receive addresses it shows (never the xpub); the server also watches the
+  @username addresses it handed out, but skips payment-request addresses,
+  which already have their own message. First check records existing
+  history without messaging; afterwards each payment gets at most one
+  "receiving" and one "confirmed" message. Turning alerts off deletes the
+  watched addresses; account closure erases them.
+- **Safety prompts.** Paying an address not in contacts/@username, a payment
+  of half the balance or more, or a fee above 20% of the amount needs an
+  explicit "I've checked" tick. Optional app lock (password on open and after
+  5 minutes away), hide-balance toggle, plain "forgot password" path.
+- **Offline.** The last known balance and history are cached on the device
+  and shown with "last updated"; sending waits for fresh data.
+- **Leaving / inheritance.** Export of the public key and BIP84 descriptors
+  (watch in Sparrow etc.), "move everything" (send max), CSV history, and a
+  plain-language recovery and family guide (`/recovery`).
+- **Mainnet beta limit.** Above `NUXT_PUBLIC_WALLET_BETA_LIMIT_SATS`
+  (default 1,000,000) the wallet advises keeping only spending money here
+  until an independent review (KL-15). It never blocks the user's own funds.
+
+**Consequences:** with alerts on, the server learns the watched addresses and
+their incoming payments (disclosed on the opt-in screen). Payment notes are
+stored on the device and in the encrypted Telegram backup only.
+
+## D29 - Lightning on the phone with the Breez SDK (Spark) (2026-10-22)
+
+**Context:** on-chain fees make small everyday payments (a ₦500 top-up,
+lunch) uneconomic. Running our own Lightning node would mean holding
+liquidity and operating channels for every user, and a custodial Lightning
+account would break the "only you hold the keys" promise.
+
+**Decision:** add a Lightning wallet that runs on the user's phone using the
+Breez SDK on Spark (`@breeztech/breez-sdk-spark`, WebAssembly):
+- **Same 12 words.** The Lightning wallet is opened from the same recovery
+  phrase (decrypted with the wallet password once per session, never stored
+  in plain form). One backup covers savings and Lightning, and the funds can
+  also be restored in other Breez SDK (Spark) wallets.
+- **Self-custodial, with a disclosed trust assumption.** Keys stay on the
+  phone. Spark transfers are co-signed by a small set of independent
+  operators (Lightspark, Breez, Flashnet); they can't move funds alone, and
+  the user can always exit to the Bitcoin blockchain unilaterally.
+- **What users can do:** receive with an invoice (any Lightning wallet can
+  pay it) or a reusable Spark address, send to invoices, Lightning addresses,
+  LNURL-pay and Spark addresses (unified QR codes prefer Lightning), see
+  history, get `username@breez.tips` as a Lightning address on mainnet, and
+  move money between savings and Lightning in one tap on mainnet.
+- **Networks.** With the testnet wallet, Lightning runs on Spark's regtest
+  network (free coins from the Lightspark faucet, no API key). Because
+  testnet4 and regtest are different chains, moving between savings and
+  Lightning is mainnet-only, and the app says so. Mainnet needs a free Breez
+  API key (a client key, `BREEZ_API_KEY`).
+- **Performance.** The SDK (12 MB WebAssembly, 3.9 MB with brotli) is loaded
+  only when the user opens Lightning and is cached by the browser after.
+- **Locking.** The Lightning session is closed when the app locks or the
+  wallet is removed.
+
+**Consequences:** TK purchases are still paid on-chain to the operator's own
+wallet; paying TK from the Lightning balance needs the server to accept
+Lightning (next step). Spark's operator model is a weaker guarantee than a
+plain on-chain wallet and is disclosed as such.

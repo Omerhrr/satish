@@ -41,7 +41,7 @@ async def scheduled_reconciliation(ctx: dict[str, Any]) -> dict[str, Any]:
 
 
 async def onchain_payment_sweep(ctx: dict[str, Any]) -> dict[str, Any]:
-    """Credit XP for on-chain payments that arrived (XP_PAYMENT_MODE=onchain)."""
+    """Credit TK for on-chain payments that arrived (XP_PAYMENT_MODE=onchain)."""
     from xp_core.db import get_session_factory
     from xp_core.services.onchain import sweep
 
@@ -50,6 +50,32 @@ async def onchain_payment_sweep(ctx: dict[str, Any]) -> dict[str, Any]:
         return {"skipped": "payment_mode is not onchain"}
     async with get_session_factory()() as session:
         return await sweep(session, settings)
+
+
+async def payment_request_sweep(ctx: dict[str, Any]) -> dict[str, Any]:
+    """Mark shareable payment requests paid and notify their owners."""
+    from xp_core.db import get_session_factory
+    from xp_core.services.handles import sweep_requests
+
+    async with get_session_factory()() as session:
+        return await sweep_requests(session, get_settings())
+
+
+async def wallet_alert_sweep(ctx: dict[str, Any]) -> dict[str, Any]:
+    """Queue Telegram messages for bitcoin arriving at watched wallet addresses."""
+    from xp_core.db import get_session_factory
+    from xp_core.services.wallet_alerts import sweep
+
+    async with get_session_factory()() as session:
+        return await sweep(session, get_settings())
+
+
+async def stale_task_watchdog(ctx: dict[str, Any]) -> dict[str, Any]:
+    """Stop AI tasks stuck in 'running' (killed run) and return their TK."""
+    from app.services.agent_service import fail_stale_tasks
+    from xp_core.db import get_session_factory
+
+    return await fail_stale_tasks(get_session_factory(), get_settings())
 
 
 def _build_cron_jobs() -> tuple:
@@ -81,6 +107,9 @@ def _build_cron_jobs() -> tuple:
         ),
         # On-chain XP payments: check open payment requests every minute.
         cron(onchain_payment_sweep, minute=set(range(60)), run_at_startup=True),
+        cron(payment_request_sweep, minute=set(range(60)), run_at_startup=True),
+        cron(stale_task_watchdog, minute=set(range(60)), run_at_startup=True),
+        cron(wallet_alert_sweep, minute=set(range(60)), run_at_startup=True),
         # Retention sweep (phase 10): privacy windows, daily at 03:17 UTC.
         cron(run_retention_sweep_job, minute=17, hour=3, run_at_startup=False),
     )
@@ -110,6 +139,6 @@ class WorkerSettings:
     on_startup = startup
     on_shutdown = shutdown
     max_jobs = 4
-    job_timeout = 300  # bounded execution (dsh_integration requirements)
+    job_timeout = get_settings().agent_task_timeout_seconds  # bounded execution
     keep_result = 3600
     health_check_interval = 30

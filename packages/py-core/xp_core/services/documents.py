@@ -135,7 +135,7 @@ def render_report_html(spec: ReportSpec) -> str:
     doc = f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"><style>
   @page {{ size: A4; margin: 2cm 2.2cm;
-    @bottom-center {{ content: "XP research report - task {esc(spec.task_id)[:8]} - page " counter(page) " of " counter(pages); font-size: 9px; color: #8a8f98; }} }}
+    @bottom-center {{ content: "Satish research report - task {esc(spec.task_id)[:8]} - page " counter(page) " of " counter(pages); font-size: 9px; color: #8a8f98; }} }}
   body {{ font-family: "DejaVu Sans", sans-serif; color: #14181f; line-height: 1.5; font-size: 11px; }}
   .brand {{ color: #f7931a; font-weight: 700; letter-spacing: 2px; font-size: 12px; }}
   h1 {{ font-size: 21px; margin: 6px 0 2px; }}
@@ -154,7 +154,7 @@ def render_report_html(spec: ReportSpec) -> str:
             border-left: 3px solid #f7931a; }}
   .limit ul {{ margin: 6px 0 0; }}
 </style></head><body>
-  <div class="brand">XP · RESEARCH REPORT</div>
+  <div class="brand">SATISH · RESEARCH REPORT</div>
   <h1>{esc(spec.title)}</h1>
   <div class="meta">Goal: {esc(spec.goal)}<br>Generated {esc(spec.generated_at.strftime('%Y-%m-%d %H:%M UTC'))} · task {esc(spec.task_id)}</div>
 

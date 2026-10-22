@@ -1,4 +1,4 @@
-"""XP ledger engine enforcing the plan's ledger_invariants.
+"""TK ledger engine enforcing the plan's ledger_invariants.
 
 Design:
 - Every mutation happens in the caller's database transaction (invariant #1).
@@ -152,7 +152,7 @@ async def credit_purchase(
     payment_intent_id: str,
     idempotency_key: str | None = None,
 ) -> LedgerResult:
-    """Credit XP for exactly one verified settled payment (invariants #2, #3)."""
+    """Credit TK for exactly one verified settled payment (invariants #2, #3)."""
     if amount <= 0:
         raise LedgerError("purchase amount must be positive")
     key = idempotency_key or f"purchase:{payment_intent_id}"
@@ -164,7 +164,7 @@ async def credit_purchase(
         reference_type="payment_intent",
         reference_id=payment_intent_id,
         idempotency_key=key,
-        note="XP purchase credited from settled payment",
+        note="TK purchase credited from settled payment",
     )
     if not replay:
         await _apply_balance_delta(session, user_id=user_id, delta=amount, entry=entry)
@@ -222,7 +222,7 @@ async def release_reservation(
     amount: int,
     idempotency_key: str | None = None,
 ) -> LedgerResult:
-    """Return unused reserved XP to the available balance."""
+    """Return unused reserved TK to the available balance."""
     if amount <= 0:
         raise LedgerError("release amount must be positive")
     key = idempotency_key or f"release:{task_id}"

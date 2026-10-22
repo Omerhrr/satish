@@ -1,4 +1,4 @@
-"""XP FastAPI application entrypoint.
+"""TK FastAPI application entrypoint.
 
 Run: uvicorn app.main:app --host 0.0.0.0 --port 8001
 """
@@ -32,7 +32,7 @@ def create_app() -> FastAPI:
     log = structlog.get_logger("api")
 
     app = FastAPI(
-        title="XP API",
+        title="Satish API",
         version=VERSION,
         description=(
             "Bitcoin-native Telegram AI workforce platform. "

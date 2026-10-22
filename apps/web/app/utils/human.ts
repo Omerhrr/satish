@@ -1,7 +1,7 @@
 /** Turn internal status/event codes into words people understand. */
 const LABELS: Record<string, string> = {
-  purchase: "Bought XP",
-  purchase_credit: "Bought XP",
+  purchase: "Bought TK",
+  purchase_credit: "Bought TK",
   reserve: "Held for task",
   reservation: "Held for task",
   release: "Returned",

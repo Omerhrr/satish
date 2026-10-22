@@ -4,7 +4,7 @@
  * - BIP39 recovery phrase, BIP84 native SegWit (bc1q / tb1q) accounts.
  * - The phrase is only ever held in memory while signing, and stored on the
  *   device encrypted with the user's password (PBKDF2-SHA256 + AES-GCM).
- * - The XP server never receives the phrase, keys, or signed transactions.
+ * - The Satish server never receives the phrase, keys, or signed transactions.
  * - Chain data and broadcasting go through an Esplora API (mempool.space).
  *
  * Pure TypeScript with no Vue imports so it can be unit-tested directly.
@@ -15,6 +15,8 @@ import { HDKey } from "@scure/bip32";
 import * as bip39 from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
 import { hex } from "@scure/base";
+import { secp256k1 } from "@noble/curves/secp256k1";
+import { sha256 } from "@noble/hashes/sha256";
 
 export type NetworkName = "mainnet" | "testnet";
 
@@ -229,6 +231,7 @@ export interface HistoryItem {
   fee: number;
   confirmed: boolean;
   time?: number; // unix seconds
+  replaceable: boolean; // can still be sped up or cancelled (unconfirmed, RBF-signalling, all inputs ours)
 }
 
 export interface FeeRates {
@@ -276,6 +279,14 @@ export class Esplora {
     return { fast: f.fastestFee, normal: f.halfHourFee, slow: f.hourFee, minimum: f.minimumFee };
   }
 
+  async tx(txid: string) {
+    return this.get<EsploraTx>(`/tx/${txid}`);
+  }
+
+  async outspends(txid: string) {
+    return this.get<{ spent: boolean; status?: { confirmed: boolean } }[]>(`/tx/${txid}/outspends`);
+  }
+
   async broadcast(txHex: string): Promise<string> {
     const res = await this.fetchImpl(this.base + "/tx", { method: "POST", body: txHex });
     const text = (await res.text()).trim();
@@ -287,8 +298,9 @@ export class Esplora {
 export interface EsploraTx {
   txid: string;
   fee: number;
+  weight?: number;
   status: { confirmed: boolean; block_time?: number };
-  vin: { prevout: { scriptpubkey_address?: string; value: number } | null }[];
+  vin: { txid?: string; vout?: number; sequence?: number; prevout: { scriptpubkey_address?: string; value: number } | null }[];
   vout: { scriptpubkey_address?: string; value: number }[];
 }
 
@@ -297,12 +309,50 @@ function friendlyBroadcastError(text: string): string {
   if (/missing ?inputs|bad-txns-inputs-missingorspent|already spent/i.test(text))
     return "Some of these coins were already spent. Refresh your wallet and try again.";
   if (/dust/i.test(text)) return "That amount is too small to send.";
+  if (/insufficient fee|rejecting replacement|replacement/i.test(text))
+    return "The new fee isn't high enough to replace the old payment. Pick a faster fee.";
   return "The network didn't accept this transaction. Nothing was sent.";
 }
 
-/** Scan both address chains until GAP_LIMIT unused addresses in a row. */
-export async function scanAddresses(xpub: string, net: NetworkInfo, api: Esplora): Promise<AddressInfo[]> {
+/**
+ * Scan both address chains until GAP_LIMIT unused addresses in a row, plus
+ * the @username pool (receive index POOL_START and up). The pool is always
+ * gap-scanned, so a wallet restored on a new phone still finds coins paid to
+ * its @username even before it knows which pool addresses were handed out.
+ * `extra.to` (from the server, when known) makes sure the scan reaches at
+ * least the last address given to a payer.
+ */
+export async function scanAddresses(
+  xpub: string,
+  net: NetworkInfo,
+  api: Esplora,
+  extra?: { from: number; to: number },
+): Promise<AddressInfo[]> {
   const out: AddressInfo[] = [];
+  const lookup = async (change: 0 | 1, i: number): Promise<AddressInfo> => {
+    const address = addressAt(xpub, net, change, i);
+    const a = await api.address(address);
+    return {
+      address, change, index: i,
+      txCount: a.chain_stats.tx_count + a.mempool_stats.tx_count,
+      confirmed: a.chain_stats.funded_txo_sum - a.chain_stats.spent_txo_sum,
+      unconfirmed: a.mempool_stats.funded_txo_sum - a.mempool_stats.spent_txo_sum,
+    };
+  };
+  {
+    const mustReach = extra && extra.to >= POOL_START ? extra.to : POOL_START - 1;
+    let index = POOL_START;
+    let unusedRun = 0;
+    while (index <= mustReach || unusedRun < GAP_LIMIT) {
+      const batch = Array.from({ length: 10 }, (_, k) => index + k);
+      const infos = await Promise.all(batch.map((k) => lookup(0, k)));
+      for (const info of infos) {
+        out.push(info);
+        unusedRun = info.txCount === 0 ? unusedRun + 1 : 0;
+      }
+      index += batch.length;
+    }
+  }
   for (const change of [0, 1] as const) {
     let index = 0;
     let unusedRun = 0;
@@ -339,15 +389,25 @@ export function nextUnused(addresses: AddressInfo[], change: 0 | 1): AddressInfo
 
 export function buildHistory(txs: EsploraTx[], own: Set<string>): HistoryItem[] {
   const seen = new Map<string, HistoryItem>();
+  // A pending payment whose coins are already used by another pending payment
+  // can't be replaced on its own (the second one would become invalid).
+  const parents = new Set<string>();
+  for (const tx of txs) if (!tx.status.confirmed) for (const i of tx.vin) if (i.txid) parents.add(i.txid);
   for (const tx of txs) {
     if (seen.has(tx.txid)) continue;
     let delta = 0;
     for (const i of tx.vin) if (i.prevout?.scriptpubkey_address && own.has(i.prevout.scriptpubkey_address)) delta -= i.prevout.value;
     for (const o of tx.vout) if (o.scriptpubkey_address && own.has(o.scriptpubkey_address)) delta += o.value;
-    seen.set(tx.txid, { txid: tx.txid, amount: delta, fee: tx.fee, confirmed: tx.status.confirmed, time: tx.status.block_time });
+    const allOurs = tx.vin.length > 0 && tx.vin.every((i) => !!i.prevout?.scriptpubkey_address && own.has(i.prevout.scriptpubkey_address));
+    const rbf = tx.vin.some((i) => (i.sequence ?? 0xffffffff) < 0xfffffffe);
+    seen.set(tx.txid, {
+      txid: tx.txid, amount: delta, fee: tx.fee, confirmed: tx.status.confirmed, time: tx.status.block_time,
+      replaceable: !tx.status.confirmed && allOurs && rbf && !parents.has(tx.txid),
+    });
   }
   return [...seen.values()].sort((a, b) => {
     if (a.confirmed !== b.confirmed) return a.confirmed ? 1 : -1;
+    if (!a.confirmed) return Number(parents.has(a.txid)) - Number(parents.has(b.txid)); // newest (child) first
     return (b.time ?? 0) - (a.time ?? 0);
   });
 }
@@ -429,10 +489,22 @@ export interface SignedTx {
 
 /** Build and sign. The phrase is used only inside this call. */
 export function signPlan(plan: SendPlan, phrase: string, net: NetworkInfo, changeAddress: string): SignedTx {
+  const outputs = [{ address: plan.to, value: plan.amount }];
+  if (plan.change > 0) outputs.push({ address: changeAddress, value: plan.change });
+  return signTx(plan.inputs, outputs, plan.fee, phrase, net);
+}
+
+export function signTx(
+  inputs: Utxo[],
+  outputs: { address: string; value: number }[],
+  expectedFee: number,
+  phrase: string,
+  net: NetworkInfo,
+): SignedTx {
   const account = accountFromPhrase(phrase, net);
   const tx = new btc.Transaction({ allowUnknownOutputs: false });
   const keys: Uint8Array[] = [];
-  for (const u of plan.inputs) {
+  for (const u of inputs) {
     const node = account.deriveChild(u.change).deriveChild(u.index);
     const payment = btc.p2wpkh(node.publicKey!, net.btc);
     if (payment.address !== u.address) throw new SendError("Wallet keys don't match these coins. Nothing was sent.");
@@ -444,13 +516,142 @@ export function signPlan(plan: SendPlan, phrase: string, net: NetworkInfo, chang
     });
     keys.push(node.privateKey!);
   }
-  tx.addOutputAddress(plan.to, BigInt(plan.amount), net.btc);
-  if (plan.change > 0) tx.addOutputAddress(changeAddress, BigInt(plan.change), net.btc);
+  for (const o of outputs) tx.addOutputAddress(o.address, BigInt(o.value), net.btc);
   keys.forEach((k, i) => tx.signIdx(k, i));
   tx.finalize();
   const fee = Number(tx.fee);
-  if (fee !== plan.fee) throw new SendError("Fee check failed. Nothing was sent.");
+  if (fee !== expectedFee) throw new SendError("Fee check failed. Nothing was sent.");
   return { hex: tx.hex, txid: tx.id, vsize: tx.vsize, fee };
+}
+
+// ---------------------------------------------------------------- speed up / cancel (RBF)
+
+export interface BumpPlan {
+  kind: "speed" | "cancel";
+  replaces: string;
+  inputs: Utxo[];
+  outputs: { address: string; value: number }[];
+  fee: number;
+  oldFee: number;
+  feeRate: number;
+  oldFeeRate: number;
+  extraFee: number; // how much more this costs than the original
+}
+
+/**
+ * Replace an unconfirmed payment of ours with a higher-fee version (BIP125).
+ * - "speed": same recipients, higher fee taken from change (or extra coins).
+ * - "cancel": everything goes back to our own address, minus the higher fee.
+ * Rules: every input must be ours, the new fee must beat the old one by at
+ * least 1 sat/vB of the new size, and the fee rate must go up.
+ */
+export function planBump(
+  tx: EsploraTx,
+  kind: "speed" | "cancel",
+  wantRate: number,
+  addresses: AddressInfo[],
+  spare: Utxo[],
+  ownAddress: string,
+): BumpPlan {
+  if (tx.status.confirmed) throw new SendError("This payment is already confirmed.");
+  const own = new Map(addresses.map((a) => [a.address, a]));
+  const inputs: Utxo[] = tx.vin.map((i) => {
+    const addr = i.prevout?.scriptpubkey_address;
+    const info = addr ? own.get(addr) : undefined;
+    if (!info || !i.prevout || i.txid === undefined || i.vout === undefined) {
+      throw new SendError("This payment used coins from another wallet, so it can't be changed here.");
+    }
+    return { txid: i.txid, vout: i.vout, value: i.prevout.value, confirmed: false, address: addr!, change: info.change, index: info.index };
+  });
+  if (!tx.vin.some((i) => (i.sequence ?? 0xffffffff) < 0xfffffffe)) {
+    throw new SendError("This payment wasn't sent in a way that allows changing it. Wait for it to confirm.");
+  }
+  const oldVsize = Math.ceil((tx.weight ?? estimateVsize(tx.vin.length, tx.vout.length) * 4) / 4);
+  const oldFeeRate = tx.fee / oldVsize;
+  const rate = Math.max(Math.ceil(wantRate), Math.floor(oldFeeRate) + 1);
+  const minFee = (vsize: number) => Math.max(Math.ceil(vsize * rate), tx.fee + vsize);
+  const done = (outputs: { address: string; value: number }[], fee: number, used: Utxo[]): BumpPlan => ({
+    kind, replaces: tx.txid, inputs: used, outputs, fee, oldFee: tx.fee,
+    feeRate: Math.round((fee / estimateVsize(used.length, outputs.length)) * 10) / 10,
+    oldFeeRate: Math.round(oldFeeRate * 10) / 10, extraFee: fee - tx.fee,
+  });
+
+  const used = [...inputs];
+  const sum = () => used.reduce((s, u) => s + u.value, 0);
+
+  if (kind === "cancel") {
+    const fee = minFee(estimateVsize(used.length, 1));
+    const back = sum() - fee;
+    if (back < DUST_SATS) throw new SendError("This payment is too small to cancel: the fee would use it all.");
+    return done([{ address: ownAddress, value: back }], fee, used);
+  }
+
+  const recipients = tx.vout
+    .filter((o) => !(o.scriptpubkey_address && own.get(o.scriptpubkey_address)?.change === 1))
+    .map((o) => {
+      if (!o.scriptpubkey_address) throw new SendError("This payment has an output this wallet can't rebuild.");
+      return { address: o.scriptpubkey_address, value: o.value };
+    });
+  const changeAddr = tx.vout.find((o) => o.scriptpubkey_address && own.get(o.scriptpubkey_address)?.change === 1)?.scriptpubkey_address ?? ownAddress;
+  const paying = recipients.reduce((s, o) => s + o.value, 0);
+  const pool = spare
+    .filter((u) => u.confirmed && u.txid !== tx.txid && !used.some((x) => x.txid === u.txid && x.vout === u.vout))
+    .sort((a, b) => b.value - a.value);
+
+  for (;;) {
+    const withChange = minFee(estimateVsize(used.length, recipients.length + 1));
+    const change = sum() - paying - withChange;
+    if (change >= DUST_SATS) return done([...recipients, { address: changeAddr, value: change }], withChange, [...used]);
+    const noChange = minFee(estimateVsize(used.length, recipients.length));
+    if (sum() - paying >= noChange) return done(recipients, sum() - paying, [...used]);
+    const next = pool.shift();
+    if (!next) throw new SendError("You don't have enough spare bitcoin to pay the higher fee.");
+    used.push(next);
+  }
+}
+
+// ---------------------------------------------------------------- export
+
+/**
+ * Output descriptors so the same wallet can be watched or restored in
+ * Sparrow, BlueWallet, Nunchuk and others (BIP84, account 0).
+ */
+export function walletDescriptors(phrase: string, net: NetworkInfo): { receive: string; change: string; xpub: string; path: string; fingerprint: string } {
+  const seed = bip39.mnemonicToSeedSync(normalizePhrase(phrase));
+  const versions = net.coinType === 1 ? { private: 0x04358394, public: 0x043587cf } : undefined;
+  const master = HDKey.fromMasterSeed(seed, versions);
+  const account = master.derive(accountPath(net));
+  const fingerprint = master.fingerprint.toString(16).padStart(8, "0");
+  const origin = `[${fingerprint}/84h/${net.coinType}h/0h]`;
+  return {
+    receive: `wpkh(${origin}${account.publicExtendedKey}/0/*)`,
+    change: `wpkh(${origin}${account.publicExtendedKey}/1/*)`,
+    xpub: account.publicExtendedKey,
+    path: `m/84'/${net.coinType}'/0'`,
+    fingerprint,
+  };
+}
+
+function csvCell(v: string | number): string {
+  const t = String(v);
+  return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+}
+
+/** History as CSV (date, type, sats, fee, note, status, txid). */
+export function historyCsv(items: HistoryItem[], notes: Record<string, string> = {}): string {
+  const rows = [["date", "type", "amount_sats", "fee_sats", "note", "status", "txid"]];
+  for (const t of items) {
+    rows.push([
+      t.time ? new Date(t.time * 1000).toISOString() : "",
+      t.amount >= 0 ? "received" : "sent",
+      String(t.amount),
+      t.amount < 0 ? String(t.fee) : "0",
+      notes[t.txid] ?? "",
+      t.confirmed ? "confirmed" : "pending",
+      t.txid,
+    ]);
+  }
+  return rows.map((r) => r.map(csvCell).join(",")).join("\n") + "\n";
 }
 
 // ---------------------------------------------------------------- address book
@@ -458,7 +659,9 @@ export function signPlan(plan: SendPlan, phrase: string, net: NetworkInfo, chang
 export interface Contact {
   id: string;
   name: string;
-  address: string;
+  address: string; // "" for @username contacts (a fresh address is fetched per payment)
+  username?: string; // XP @username, without the @
+  identityPubkey?: string; // pinned the first time we paid them
   note?: string;
   createdAt: number;
 }
@@ -472,18 +675,37 @@ export function cleanName(name: string): string {
 /** Validate a new or edited contact against the book (unique name + address). */
 export function checkContact(
   book: Contact[],
-  input: { id?: string; name: string; address: string; note?: string },
+  input: { id?: string; name: string; address: string; note?: string; username?: string; identityPubkey?: string },
   net: NetworkInfo,
 ): ContactCheck {
   const name = cleanName(input.name);
   if (!name) return { ok: false, reason: "Give this address a name." };
   if (name.length > 40) return { ok: false, reason: "Keep the name under 40 characters." };
+  const others0 = book.filter((c) => c.id !== input.id);
+  const existing0 = book.find((c) => c.id === input.id);
+  const user = input.username ? normalizeUsername(input.username) : (/^@/.test(input.address.trim()) ? normalizeUsername(input.address) : "");
+  if (user) {
+    const problem = usernameProblem(user);
+    if (problem) return { ok: false, reason: problem };
+    const dupName = others0.find((c) => c.name.toLowerCase() === name.toLowerCase());
+    if (dupName) return { ok: false, reason: `You already have a contact called "${dupName.name}".` };
+    const dupUser = others0.find((c) => c.username === user);
+    if (dupUser) return { ok: false, reason: `@${user} is already saved as "${dupUser.name}".` };
+    return {
+      ok: true,
+      contact: {
+        id: input.id ?? randomId(), name, address: "", username: user,
+        identityPubkey: input.identityPubkey ?? existing0?.identityPubkey,
+        note: input.note?.trim() || undefined, createdAt: existing0?.createdAt ?? Date.now(),
+      },
+    };
+  }
   const addr = checkAddress(parsePaymentRequest(input.address).address, net);
   if (!addr.ok) return addr;
   const others = book.filter((c) => c.id !== input.id);
   const sameName = others.find((c) => c.name.toLowerCase() === name.toLowerCase());
   if (sameName) return { ok: false, reason: `You already have a contact called "${sameName.name}".` };
-  const sameAddr = others.find((c) => c.address === addr.address);
+  const sameAddr = others.find((c) => c.address && c.address === addr.address);
   if (sameAddr) return { ok: false, reason: `This address is already saved as "${sameAddr.name}".` };
   const existing = book.find((c) => c.id === input.id);
   return {
@@ -499,10 +721,17 @@ export function checkContact(
 }
 
 /** Resolve what the user typed in "To": a saved name, or an address/URI. */
-export function resolveRecipient(book: Contact[], text: string): { address: string; contact?: Contact; amountSats?: number } {
+export function resolveRecipient(
+  book: Contact[],
+  text: string,
+): { address: string; contact?: Contact; amountSats?: number; username?: string } {
   const t = text.trim();
+  if (t.startsWith("@")) {
+    const username = normalizeUsername(t);
+    return { address: "", username, contact: book.find((c) => c.username === username) };
+  }
   const byName = book.find((c) => c.name.toLowerCase() === cleanName(t).toLowerCase());
-  if (byName) return { address: byName.address, contact: byName };
+  if (byName) return { address: byName.address, contact: byName, username: byName.username };
   const req = parsePaymentRequest(t);
   const byAddr = book.find((c) => c.address === req.address);
   return { address: req.address, contact: byAddr, amountSats: req.amountSats };
@@ -512,9 +741,67 @@ export function searchContacts(book: Contact[], query: string): Contact[] {
   const q = query.trim().toLowerCase();
   const sorted = [...book].sort((a, b) => a.name.localeCompare(b.name));
   if (!q) return sorted;
-  return sorted.filter((c) => c.name.toLowerCase().includes(q) || c.address.toLowerCase().startsWith(q));
+  const qq = q.replace(/^@/, "");
+  return sorted.filter(
+    (c) => c.name.toLowerCase().includes(q) || (c.address && c.address.toLowerCase().startsWith(q)) || (c.username ?? "").includes(qq),
+  );
 }
 
 function randomId(): string {
   return hex.encode(crypto.getRandomValues(new Uint8Array(8)));
+}
+
+// ---------------------------------------------------------------- @usernames
+
+/**
+ * The wallet's identity key lives on a private chain (m/84'/coin'/0'/7/0).
+ * It can only vouch for receive addresses ("this address is mine"); it can't
+ * spend. Payers verify these signatures so even a compromised XP server
+ * can't swap in its own address for @username.
+ */
+
+export const IDENTITY_CHAIN = 7;
+export const POOL_START = 1000; // username addresses live at 0/1000+, away from the Receive screen's 0/0..
+
+export function identityFromPhrase(phrase: string, net: NetworkInfo): { privHex: string; pubHex: string } {
+  const node = accountFromPhrase(phrase, net).deriveChild(IDENTITY_CHAIN).deriveChild(0);
+  return { privHex: hex.encode(node.privateKey!), pubHex: hex.encode(node.publicKey!) };
+}
+
+export function addressMessage(net: NetworkInfo, address: string): Uint8Array {
+  return sha256(new TextEncoder().encode(`xp-handle-v1|${net.name}|${address}`));
+}
+
+export interface SignedPoolAddress {
+  address: string;
+  index: number;
+  signature: string;
+}
+
+/** Sign receive addresses (derived from the xpub) with the identity key. */
+export function signPoolAddresses(xpub: string, identityPrivHex: string, net: NetworkInfo, from: number, count: number): SignedPoolAddress[] {
+  const priv = hex.decode(identityPrivHex);
+  return Array.from({ length: count }, (_, i) => {
+    const index = from + i;
+    const address = addressAt(xpub, net, 0, index);
+    const signature = hex.encode(secp256k1.sign(addressMessage(net, address), priv).toDERRawBytes());
+    return { address, index, signature };
+  });
+}
+
+export function verifyPoolAddress(identityPubHex: string, net: NetworkInfo, address: string, signatureHex: string): boolean {
+  try {
+    return secp256k1.verify(hex.decode(signatureHex), addressMessage(net, address), hex.decode(identityPubHex), { format: "der" });
+  } catch {
+    return false;
+  }
+}
+
+export function normalizeUsername(raw: string): string {
+  return raw.trim().replace(/^@/, "").toLowerCase();
+}
+
+export function usernameProblem(name: string): string {
+  if (!/^[a-z0-9_]{3,20}$/.test(name)) return "Use 3-20 characters: lowercase letters, numbers and _.";
+  return "";
 }

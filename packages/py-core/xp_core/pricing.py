@@ -1,11 +1,11 @@
-"""Published XP pricing configuration (phase 5, pricing_requirements).
+"""Published TK pricing configuration (phase 5, pricing_requirements).
 
-One canonical conversion: ``xp_per_sat`` - XP credited per satoshi paid.
+One canonical conversion: ``xp_per_sat`` - TK credited per satoshi paid.
 It is the ONLY rate in the system; every surface (API, bot, Mini App)
 derives its display from it. The rate is published with ``can_change: true``
 so clients must never cache it (pricing_requirements #1).
 
-XP packs are the "choose a pack or enter an allowed amount" surface
+TK packs are the "choose a pack or enter an allowed amount" surface
 (billing_flow #1): a pack is a published satoshi amount; any custom sats
 amount within policy bounds is also allowed.
 
@@ -80,8 +80,8 @@ def rate_disclosure(settings: Settings) -> dict:
         "xp_per_sat": settings.xp_per_sat,
         "can_change": True,
         "note": (
-            "The sats-to-XP conversion is published as XP per satoshi and may "
-            "change; always re-check this rate before purchasing. XP is an "
+            "The sats-to-TK conversion is published as TK per satoshi and may "
+            "change; always re-check this rate before purchasing. TK is an "
             "internal usage credit - not Bitcoin, not a blockchain token, and "
             "not a claim on funds."
         ),

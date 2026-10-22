@@ -1,27 +1,27 @@
 <template>
   <div>
     <header>
-      <h1 class="page-title">Buy XP</h1>
+      <h1 class="page-title">Buy TK</h1>
       <p class="page-sub">
-        XP are credits you spend on tasks. You pay for them in bitcoin.
-        1 sat = {{ rate?.xp_per_sat ?? "…" }} XP
+        TK are credits you spend on AI tasks. You pay for them in bitcoin. TK can't be sent to anyone or turned back into sats.
+        1 sat = {{ rate?.xp_per_sat ?? "…" }} TK
         <span v-if="rate" class="env-chip">{{ rate.can_change ? "rate may change" : "fixed" }}</span>
       </p>
     </header>
 
     <section class="card">
       <h2>Balance</h2>
-      <div class="balance-big">{{ balance ? balance.balance_xp.toLocaleString() + " XP" : "…" }}</div>
+      <div class="balance-big">{{ balance ? balance.balance_xp.toLocaleString() + " TK" : "…" }}</div>
       <p class="dim small" v-if="balance">
         ≈ {{ Math.ceil(balance.balance_xp / balance.xp_per_sat).toLocaleString() }} sats equivalent
       </p>
     </section>
 
     <section class="card">
-      <h2>Buy XP</h2>
+      <h2>Buy TK</h2>
       <p class="dim small">
-        Pick a pack, then pay from your XP wallet in one tap (or any other
-        bitcoin wallet). Your XP arrives as soon as the payment is confirmed.
+        Pick a pack, then pay from your Satish wallet in one tap (or any other
+        bitcoin wallet). Your TK arrives as soon as the payment is confirmed.
       </p>
       <div class="packs">
         <button
@@ -33,7 +33,7 @@
         >
           <span v-if="buying === p.pack_id" class="spinner" />
           <strong>{{ p.amount_sats.toLocaleString() }} sats</strong>
-          <span class="dim">→ {{ p.xp_amount.toLocaleString() }} XP</span>
+          <span class="dim">→ {{ p.xp_amount.toLocaleString() }} TK</span>
           <span v-if="naira(p.amount_sats)" class="dim small">{{ naira(p.amount_sats) }}</span>
         </button>
       </div>
@@ -43,17 +43,17 @@
     <section v-if="paying" ref="payCard" class="card pay">
       <h2>Pay {{ paying.amount_sats.toLocaleString() }} sats <span v-if="naira(paying.amount_sats)" class="dim small">{{ naira(paying.amount_sats) }}</span></h2>
       <template v-if="paying.status === 'settled'">
-        <p class="paid">✅ Paid. +{{ paying.xp_amount.toLocaleString() }} XP added to your balance.</p>
+        <p class="paid">✅ Paid. +{{ paying.xp_amount.toLocaleString() }} TK added to your balance.</p>
         <button class="btn" @click="paying = null">Done</button>
       </template>
       <template v-else>
         <p class="sub">
-          You'll get <b>{{ paying.xp_amount.toLocaleString() }} XP</b> as soon as the payment arrives.
+          You'll get <b>{{ paying.xp_amount.toLocaleString() }} TK</b> as soon as the payment arrives.
           <template v-if="paying.network === 'testnet'"> (Test network: use test coins.)</template>
         </p>
 
         <div v-if="walletReady" class="from-wallet">
-          <b>Pay from my XP wallet</b>
+          <b>Pay from my Satish wallet</b>
           <span class="small dim">Balance: {{ w.spendable.value.toLocaleString() }} sats</span>
           <template v-if="feeRates && quote">
             <span class="small dim">Network fee about {{ quote.fee.toLocaleString() }} sats · total {{ (quote.amount + quote.fee).toLocaleString() }} sats</span>
@@ -91,7 +91,7 @@
       <p v-if="!purchases.length" class="dim small">No purchases yet.</p>
       <div v-else class="table-wrap"><table class="ledger">
         <thead>
-          <tr><th>Sats</th><th>XP</th><th>Status</th><th>Receipt</th></tr>
+          <tr><th>Sats</th><th>TK</th><th>Status</th><th>Receipt</th></tr>
         </thead>
         <tbody>
           <tr v-for="p in purchases" :key="p.id">
@@ -158,9 +158,9 @@ const walletReady = computed(
 );
 const walletNote = computed(() => {
   if (!paying.value) return "";
-  if (!w.state.stored) return "Tip: create a wallet under Wallet to pay in one tap.";
-  if (paying.value.network !== w.net.name) return "Your XP wallet is on a different network, so pay from another wallet.";
-  if (!w.spendable.value) return "Your XP wallet is empty. Top it up or pay from another wallet.";
+  if (!w.state.stored) return "Tip: create your Satish wallet to pay in one tap.";
+  if (paying.value.network !== w.net.name) return "Your Satish wallet is on a different network, so pay from another wallet.";
+  if (!w.spendable.value) return "Your Satish wallet is empty. Top it up or pay from another wallet.";
   return "";
 });
 const quote = computed<SendPlan | null>(() => {
@@ -269,7 +269,7 @@ async function buy(pack: PackOut) {
   buying.value = pack.pack_id;
   error.value = null;
   try {
-    const created = await api.createPurchase({ pack_id: pack.pack_id, description: `XP pack ${pack.label}` });
+    const created = await api.createPurchase({ pack_id: pack.pack_id, description: `TK pack ${pack.label}` });
     await refresh();
     if (created.payment_method === "onchain") await openPay(created);
   } catch (e) {

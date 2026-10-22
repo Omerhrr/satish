@@ -25,6 +25,7 @@ python3 -c "import secrets; print(secrets.token_urlsafe(32))"   # run twice, for
 | `XP_DEEPSEEK_API_KEY` | Real AI answers | platform.deepseek.com |
 | `XP_BRAVE_SEARCH_API_KEY` | Real web research | api-search.brave.com (free tier) |
 | `XP_ONRAMPER_API_KEY` + `XP_ONRAMPER_SIGNING_KEY` | Buy bitcoin with naira in the app (mainnet) | onramper.com; `python3 deploy/onramper_keys.py` makes the signing key |
+| `BOT_USERNAME` | "Pay with XP on Telegram" button on shared payment links | your bot's username, without @ |
 | `BITCOIN_NETWORK` | `testnet` (free test coins) or `mainnet` (real bitcoin) | set `XP_ONCHAIN_NETWORK` to match |
 
 ## 3. Start

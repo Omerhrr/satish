@@ -14,6 +14,7 @@ from typing import Any
 from sqlalchemy import (
     JSON,
     BigInteger,
+    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -513,6 +514,102 @@ class Notification(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
 
 
+class WalletHandle(Base):
+    """A public @username for a user's on-device wallet (per network).
+
+    The server never holds keys. It stores the username, the wallet's
+    identity PUBLIC key, and a pool of receive addresses each signed by that
+    key (HandleAddress), so payers' phones can verify an address really came
+    from @username even if this server were compromised.
+    status: active | released (old names stay reserved for a while).
+    """
+
+    __tablename__ = "wallet_handles"
+    __table_args__ = (UniqueConstraint("network", "username", name="uq_handle_network_username"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    network: Mapped[str] = mapped_column(String(16))
+    username: Mapped[str] = mapped_column(String(32))
+    identity_pubkey: Mapped[str] = mapped_column(String(66))
+    status: Mapped[str] = mapped_column(String(16), default="active")
+    released_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class HandleAddress(Base):
+    """One signed receive address in a user's pool. status: available | issued."""
+
+    __tablename__ = "handle_addresses"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    network: Mapped[str] = mapped_column(String(16), index=True)
+    identity_pubkey: Mapped[str] = mapped_column(String(66))
+    address: Mapped[str] = mapped_column(String(100), unique=True)
+    derivation_index: Mapped[int] = mapped_column(Integer)
+    signature: Mapped[str] = mapped_column(String(160))
+    status: Mapped[str] = mapped_column(String(16), default="available", index=True)
+    issued_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class PaymentRequest(Base):
+    """A shareable request to pay a user (link + QR). status: open | paid | cancelled."""
+
+    __tablename__ = "payment_requests"
+
+    id: Mapped[str] = mapped_column(String(24), primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    network: Mapped[str] = mapped_column(String(16))
+    username: Mapped[str] = mapped_column(String(32))
+    address: Mapped[str] = mapped_column(String(100))
+    signature: Mapped[str] = mapped_column(String(160))
+    identity_pubkey: Mapped[str] = mapped_column(String(66))
+    amount_sats: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    note: Mapped[str | None] = mapped_column(String(140), nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default="open", index=True)
+    paid_sats: Mapped[int] = mapped_column(BigInteger, default=0)
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    checked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class WalletAlertSetting(Base):
+    """A user's opt-in for Telegram messages when their wallet receives bitcoin."""
+
+    __tablename__ = "wallet_alert_settings"
+    __table_args__ = (UniqueConstraint("user_id", "network", name="uq_wallet_alert_user_network"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    network: Mapped[str] = mapped_column(String(16))
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class WatchedAddress(Base):
+    """A receive address the user asked us to watch for incoming payments.
+
+    Watch-only: an address, never a key. ``seen`` maps txid -> "p" (pending)
+    or "c" (confirmed) so each payment produces at most one "received" and one
+    "confirmed" message. The first check only records existing payments
+    (``baseline``), so turning alerts on never replays old history.
+    """
+
+    __tablename__ = "watched_addresses"
+    __table_args__ = (UniqueConstraint("user_id", "address", name="uq_watched_user_address"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    network: Mapped[str] = mapped_column(String(16), index=True)
+    address: Mapped[str] = mapped_column(String(100))
+    seen: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    baseline: Mapped[bool] = mapped_column(Boolean, default=False)
+    checked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
 ALL_TABLES = [
     User,
     TelegramAccount,
@@ -537,4 +634,9 @@ ALL_TABLES = [
     Notification,
     ReconciliationAlert,
     AuditEvent,
+    WalletHandle,
+    HandleAddress,
+    PaymentRequest,
+    WalletAlertSetting,
+    WatchedAddress,
 ]

@@ -48,7 +48,17 @@ def _task_out(t: Task) -> TaskOut:
         started_at=t.started_at,
         completed_at=t.completed_at,
         cancelled_at=t.cancelled_at,
+        error=_friendly_error(t),
     )
+
+
+def _friendly_error(t: Task) -> str | None:
+    """People see a plain reason; the technical one stays in the logs/events."""
+    if t.status != "failed" or not t.error:
+        return None
+    if t.error.startswith("This task"):
+        return t.error
+    return "Something went wrong while working on this task. Any unused TK was returned; please try again."
 
 
 @router.post("/estimate", response_model=TaskEstimateOut)
@@ -62,7 +72,7 @@ async def estimate(payload: TaskCreateIn) -> TaskEstimateOut:
 async def create_task(
     payload: TaskCreateIn, user: CurrentUser, session: DbSession
 ) -> TaskOut:
-    """Create a task and atomically reserve its XP budget (task_charge_flow #2-3)."""
+    """Create a task and atomically reserve its TK budget (task_charge_flow #2-3)."""
     task = Task(
         user_id=user.id,
         objective=payload.objective,
@@ -151,7 +161,7 @@ async def task_result(
 ) -> TaskResultOut:
     """Explicit result for a finished task (phase-7 acceptance #4): the
     deliverable, validated artifacts, source provenance, conflicts and gaps,
-    limitations, and the XP receipt from the ledger trail."""
+    limitations, and the TK receipt from the ledger trail."""
     result: TaskResultOut = await task_service.build_task_result(
         session, user_id=user.id, task_id=task_id
     )

@@ -128,6 +128,9 @@ class Settings(BaseSettings):
     agent_max_steps: int = 12
     agent_default_tool_timeout_seconds: int = 30
     agent_max_budget_xp: int = 100_000
+    # Hard limit for one task run on the worker. Anything still "running"
+    # STALE_GRACE seconds after this is stopped by the watchdog and refunded.
+    agent_task_timeout_seconds: int = 600
 
     # research tools
     # search: canned (offline eval corpus) or brave (live Brave Search API;

@@ -19,7 +19,7 @@ sees typed, allowlisted tools - but the handlers now do the real work:
                     matching the approved content; honest definite-vs-unknown
                     outcome taxonomy (never silently retries)
 - automation.schedule creates a budget-capped scheduled job (validated
-                    schedule grammar, operator XP caps, whitelist conditions)
+                    schedule grammar, operator TK caps, whitelist conditions)
 
 Unchanged invariants: scope wall, budget gate, timeouts, audit records,
 and NO key material anywhere.
@@ -988,12 +988,12 @@ def build_product_registry(
                     "budget_per_run_xp": {
                         "type": "integer",
                         "minimum": 1,
-                        "description": "max XP charged per run (operator-capped)",
+                        "description": "max TK charged per run (operator-capped)",
                     },
                     "budget_total_xp": {
                         "type": "integer",
                         "minimum": 1,
-                        "description": "optional lifetime XP cap; exhausted => auto-pause",
+                        "description": "optional lifetime TK cap; exhausted => auto-pause",
                     },
                     "conditions": {
                         "type": "object",

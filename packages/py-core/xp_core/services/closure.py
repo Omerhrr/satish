@@ -9,7 +9,7 @@ NEVER exported - the response discloses that.
 ``close_account`` - the documented ledger-aware erasure flow:
 1. preconditions are checked first and closure REFUSES with precise reasons
    while anything is in flight (running tasks, pending approvals, money in
-   motion, nonzero XP balance - there is no fabricated "forfeit" ledger
+   motion, nonzero TK balance - there is no fabricated "forfeit" ledger
    entry; balance must reach zero through real economic events);
 2. reconciliation must be clean (balance == sum of ledger entries) before
    any erasure - the documented "reconcile the immutable ledger before
@@ -48,8 +48,10 @@ from xp_core.models.entities import (
     AutomationRun,
     ConnectedService,
     EmailDraft,
+    HandleAddress,
     Notification,
     PaymentIntent,
+    PaymentRequest,
     ResearchSource,
     ScheduledJob,
     ServiceCredential,
@@ -61,7 +63,10 @@ from xp_core.models.entities import (
     User,
     Wallet,
     WalletAddress,
+    WalletAlertSetting,
+    WalletHandle,
     WalletTransaction,
+    WatchedAddress,
     XpAccount,
     XpLedgerEntry,
 )
@@ -80,7 +85,7 @@ RETAINED_SURFACES = [
 ]
 
 CLOSURE_DISCLOSURES = [
-    "Your XP ledger entries, payment intents, XP account, task events, and "
+    "Your TK ledger entries, payment intents, TK account, task events, and "
     "audit events are retained: they are the immutable money and evidence "
     "trail, and they no longer contain your identity.",
     "Task and automation-job rows are kept as structural anchors with their "
@@ -374,7 +379,7 @@ async def close_account(
     ).scalar_one_or_none()
     if balance is not None and balance > 0:
         reasons.append(
-            f"XP balance is {balance} - spend it down first; closure never "
+            f"TK balance is {balance} - spend it down first; closure never "
             "fabricates a forfeit entry, and operator-assisted refund is the "
             "honest path for the remainder"
         )
@@ -443,6 +448,11 @@ async def close_account(
             WalletAddress, WalletAddress.user_id == user_id
         )
     erased["wallets"] = await _erase(Wallet, Wallet.user_id == user_id)
+    erased["payment_requests"] = await _erase(PaymentRequest, PaymentRequest.user_id == user_id)
+    erased["handle_addresses"] = await _erase(HandleAddress, HandleAddress.user_id == user_id)
+    erased["wallet_handles"] = await _erase(WalletHandle, WalletHandle.user_id == user_id)
+    erased["watched_addresses"] = await _erase(WatchedAddress, WatchedAddress.user_id == user_id)
+    erased["wallet_alert_settings"] = await _erase(WalletAlertSetting, WalletAlertSetting.user_id == user_id)
 
     # artifact files (explicit user action; the sweep can never do this)
     if artifact_keys:

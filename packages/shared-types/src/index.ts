@@ -95,6 +95,7 @@ export interface TaskOut {
   id: string;
   objective: string;
   status: TaskStatus;
+  error?: string | null;
   budget_xp: number;
   reserved_xp: number;
   actual_xp: number;

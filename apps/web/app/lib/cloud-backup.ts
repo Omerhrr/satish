@@ -39,7 +39,11 @@ export const keys = (net: NetworkName) => ({
   wallet: `xpw1_${net}_wallet`,
   count: `xpw1_${net}_contacts_n`,
   chunk: (i: number) => `xpw1_${net}_contacts_${i}`,
+  notesCount: `xpw1_${net}_notes_n`,
+  notesChunk: (i: number) => `xpw1_${net}_notes_${i}`,
 });
+
+const MAX_NOTE_CHUNKS = 10;
 
 export function newBackupKey(): string {
   return Array.from(crypto.getRandomValues(new Uint8Array(32)), (b) => b.toString(16).padStart(2, "0")).join("");
@@ -92,6 +96,20 @@ export async function backupContacts(kv: KeyValueStore, net: NetworkName, backup
   await kv.set(k.count, String(parts));
 }
 
+/** Write payment notes ("rent", "rice"). Oldest notes are dropped if they don't fit. */
+export async function backupNotes(kv: KeyValueStore, net: NetworkName, backupKey: string, notes: Record<string, string>): Promise<void> {
+  let entries = Object.entries(notes);
+  let sealed = await sealWithKey(backupKey, JSON.stringify(Object.fromEntries(entries)));
+  while (Math.ceil(sealed.length / CHUNK) > MAX_NOTE_CHUNKS && entries.length) {
+    entries = entries.slice(Math.ceil(entries.length / 10));
+    sealed = await sealWithKey(backupKey, JSON.stringify(Object.fromEntries(entries)));
+  }
+  const parts = Math.ceil(sealed.length / CHUNK) || 1;
+  const k = keys(net);
+  for (let i = 0; i < parts; i++) await kv.set(k.notesChunk(i), sealed.slice(i * CHUNK, (i + 1) * CHUNK));
+  await kv.set(k.notesCount, String(parts));
+}
+
 export async function hasBackup(kv: KeyValueStore, net: NetworkName): Promise<boolean> {
   const got = await kv.getMany([keys(net).wallet]);
   return !!got[keys(net).wallet];
@@ -103,13 +121,14 @@ export interface Restored {
   secret: EncryptedSecret;
   backupKey: string;
   contacts: Contact[];
+  notes: Record<string, string>;
   createdAt: number;
 }
 
 /** Restore everything with the wallet password. Throws WrongPassword. */
 export async function restoreBackup(kv: KeyValueStore, net: NetworkName, password: string): Promise<Restored> {
   const k = keys(net);
-  const head = await kv.getMany([k.wallet, k.count]);
+  const head = await kv.getMany([k.wallet, k.count, k.notesCount]);
   if (!head[k.wallet]) throw new Error("No backup found in your Telegram account.");
   const record = JSON.parse(head[k.wallet]) as WalletBackup;
   const phrase = await decryptPhrase(record.secret, password);
@@ -125,12 +144,27 @@ export async function restoreBackup(kv: KeyValueStore, net: NetworkName, passwor
       contacts = []; // a damaged address-book backup must never block wallet recovery
     }
   }
-  return { phrase, xpub: record.xpub, secret: record.secret, backupKey, contacts, createdAt: record.createdAt };
+  let notes: Record<string, string> = {};
+  const m = Math.min(Number(head[k.notesCount] || 0), MAX_NOTE_CHUNKS);
+  if (m > 0) {
+    const noteKeys = Array.from({ length: m }, (_, i) => k.notesChunk(i));
+    const chunks = await kv.getMany(noteKeys);
+    try {
+      notes = JSON.parse(await openWithKey(backupKey, noteKeys.map((c) => chunks[c] ?? "").join("")));
+    } catch {
+      notes = {};
+    }
+  }
+  return { phrase, xpub: record.xpub, secret: record.secret, backupKey, contacts, notes, createdAt: record.createdAt };
 }
 
 export async function deleteBackup(kv: KeyValueStore, net: NetworkName): Promise<void> {
   const k = keys(net);
-  await kv.remove([k.wallet, k.count, ...Array.from({ length: MAX_CHUNKS }, (_, i) => k.chunk(i))]);
+  await kv.remove([
+    k.wallet, k.count, k.notesCount,
+    ...Array.from({ length: MAX_CHUNKS }, (_, i) => k.chunk(i)),
+    ...Array.from({ length: MAX_NOTE_CHUNKS }, (_, i) => k.notesChunk(i)),
+  ]);
 }
 
 /** Telegram WebApp.CloudStorage as a KeyValueStore, or null outside Telegram / old clients. */

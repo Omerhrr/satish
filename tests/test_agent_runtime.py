@@ -678,3 +678,42 @@ def test_evaluation_flags_stub_results():
     )
     assert any("stub" in n for n in out["notes"])
     assert any("do not fabricate" in n for n in out["notes"])
+
+
+async def test_stale_running_task_is_stopped_and_refunded(session, dev_user):
+    from datetime import UTC, datetime, timedelta
+
+    from app.services.agent_service import STALE_MESSAGE, fail_stale_tasks
+    from sqlalchemy import select
+    from xp_core.config import get_settings
+    from xp_core.db import get_session_factory
+    from xp_core.models.entities import Task, XpAccount
+    from xp_core.services import ledger
+
+    acct = (await session.execute(select(XpAccount).where(XpAccount.user_id == dev_user.id))).scalar_one_or_none()
+    if acct is None:
+        acct = XpAccount(user_id=dev_user.id, balance=1000)
+        session.add(acct)
+    else:
+        acct.balance = 1000
+    await session.flush()
+    task = Task(user_id=dev_user.id, objective="stuck one", budget_xp=300, status="planned")
+    session.add(task)
+    await session.flush()
+    await ledger.reserve_budget(session, user_id=dev_user.id, task_id=task.id, amount=300)
+    task.reserved_xp = 300
+    task.status = "running"
+    task.started_at = datetime.now(UTC) - timedelta(hours=1)
+    fresh = Task(user_id=dev_user.id, objective="still fine", budget_xp=1, status="running", started_at=datetime.now(UTC))
+    session.add(fresh)
+    await session.commit()
+
+    out = await fail_stale_tasks(get_session_factory(), get_settings())
+    assert out == {"stopped": 1}
+    await session.refresh(task)
+    await session.refresh(fresh)
+    await session.refresh(acct)
+    assert task.status == "failed" and task.error == STALE_MESSAGE and task.reserved_xp == 0
+    assert fresh.status == "running"
+    assert acct.balance == 1000  # held XP returned
+    assert (await fail_stale_tasks(get_session_factory(), get_settings())) == {"stopped": 0}

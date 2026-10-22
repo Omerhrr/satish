@@ -64,6 +64,6 @@ async def capabilities() -> CapabilitiesOut:
         notes=[
             "Wallet and Lightning adapters are replaceable protocols by design.",
             "No private key or seed material ever passes through this API.",
-            "XP is an internal usage credit; it is not Bitcoin and not a token.",
+            "TK is an internal usage credit; it is not Bitcoin and not a token.",
         ],
     )

@@ -32,7 +32,7 @@ from app.services.task_events import append_event, load_events
 from dsh_adapter.client import make_chat_client
 from dsh_adapter.evaluation import evaluate_run
 from dsh_adapter.runner import PersistenceHooks, PlanRunner
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from xp_core.config import Settings, get_settings
 from xp_core.logging import get_logger
@@ -515,12 +515,46 @@ async def run_agent_task(
         return summary
 
 
+STALE_GRACE_SECONDS = 120
+STALE_MESSAGE = "This task took too long and was stopped. Your TK was returned; please try again."
+
+
+async def fail_stale_tasks(session_factory, settings: Settings, *, now: datetime | None = None) -> dict[str, int]:
+    """Watchdog: a run killed mid-way (time limit, worker restart) never gets
+    to mark itself failed. Stop such tasks and return their held TK."""
+    now = now or datetime.now(UTC)
+    cutoff = (now - timedelta(seconds=settings.agent_task_timeout_seconds + STALE_GRACE_SECONDS)).replace(tzinfo=None)
+    stopped = 0
+    async with session_factory() as session:
+        stale = (
+            await session.execute(select(Task).where(Task.status == "running", Task.started_at < cutoff))
+        ).scalars().all()
+        for task in stale:
+            moved = await session.execute(
+                update(Task).where(Task.id == task.id, Task.status == "running").values(
+                    status="failed", error=STALE_MESSAGE, completed_at=now
+                )
+            )
+            if not moved.rowcount:
+                continue  # finished on its own meanwhile
+            await session.refresh(task)
+            if task.reserved_xp > 0:
+                await ledger.release_reservation(session, user_id=task.user_id, task_id=task.id, amount=task.reserved_xp)
+                task.reserved_xp = 0
+            await append_event(session, task.id, "task.failed", {"error": STALE_MESSAGE, "reason": "timeout"})
+            await session.commit()
+            stopped += 1
+            log.warning("agent_task_stale_stopped", task_id=task.id)
+    return {"stopped": stopped}
+
+
 __all__ = [
     "USER_TASK_SCOPES",
     "AgentRuntimeError",
     "DbPersistenceHooks",
     "TaskNotRunnable",
     "append_event",
+    "fail_stale_tasks",
     "load_events",
     "run_agent_task",
 ]

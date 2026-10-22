@@ -63,7 +63,7 @@ def test_derivation_matches_bip84_vectors_and_rejects_private_keys():
         onchain.derive_address(xprv, "testnet", 0)
     with pytest.raises(onchain.OnchainConfigError):
         onchain.derive_address("not-a-key", "testnet", 0)
-    assert onchain.bip21("tb1qx", 150_000) == "bitcoin:tb1qx?amount=0.0015&label=XP%20credits"
+    assert onchain.bip21("tb1qx", 150_000) == "bitcoin:tb1qx?amount=0.0015&label=TK%20credits"
 
 
 async def _balance(session, user_id):
