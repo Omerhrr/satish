@@ -119,7 +119,7 @@ describe("scanning against a fake network", () => {
       const stats = { funded_txo_sum: v, spent_txo_sum: 0, tx_count: v ? 1 : 0 };
       return new Response(JSON.stringify({ chain_stats: stats, mempool_stats: { funded_txo_sum: 0, spent_txo_sum: 0, tx_count: 0 } }));
     };
-    const infos = await scanAddresses(x, T, new Esplora("https://x", fake));
+    const infos = await scanAddresses(x, T, new Esplora("https://x", fake, { minGapMs: 0 }));
     expect(infos.filter((i) => i.txCount).reduce((s, i) => s + i.confirmed, 0)).toBe(75_000);
     expect(nextUnused(infos, 0)?.index).toBe(1);
     expect(calls).toBeLessThan(100);

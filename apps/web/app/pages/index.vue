@@ -132,6 +132,18 @@
     <template v-else>
       <!-- home -->
       <template v-if="view === 'home'">
+        <div v-if="ln.available" class="switch" role="tablist">
+          <button role="tab" :aria-selected="tab === 'btc'" :class="{ on: tab === 'btc' }" @click="setTab('btc')">
+            ₿ Bitcoin<small v-if="!w.state.hideBalance">{{ total.toLocaleString() }} sats</small>
+          </button>
+          <button role="tab" :aria-selected="tab === 'ln'" :class="{ on: tab === 'ln' }" @click="setTab('ln')">
+            ⚡ Lightning<small v-if="!w.state.hideBalance && lnBalance !== null">{{ lnBalance.toLocaleString() }} sats</small>
+          </button>
+        </div>
+
+        <LightningWallet v-if="tab === 'ln' && ln.available" :hide="w.state.hideBalance" :username="w.state.handle?.username ?? null" @pay-onchain="payOnchainTo" />
+
+        <template v-if="tab === 'btc' || !ln.available">
         <section class="card center">
           <div class="dim small">
             {{ w.net.label }} balance
@@ -165,8 +177,6 @@
           <p v-if="w.state.error" class="err">{{ w.state.error }}</p>
           <p v-if="w.state.lastSync && !w.state.live && !w.state.loading" class="small dim">Last updated {{ ago(w.state.lastSync) }}</p>
         </section>
-
-        <LightningWallet :hide="w.state.hideBalance" :username="w.state.handle?.username ?? null" @pay-onchain="payOnchainTo" />
 
         <section class="card">
           <h2>Activity</h2>
@@ -228,8 +238,14 @@
           </button>
         </section>
 
+        </template>
+
         <section class="card">
           <h2>Wallet settings</h2>
+          <div v-if="w.state.unlocked" class="backup-row">
+            <span>🔓 Unlocked for this session</span>
+            <button class="btn small ghost" @click="lockNow">Lock now</button>
+          </div>
           <div v-if="w.state.cloudAvailable" class="backup-row">
             <span>
               ☁️ Telegram backup:
@@ -519,7 +535,9 @@
         <label class="field">Note for yourself (optional)<input v-model="sendNote" maxlength="120" placeholder="e.g. rent, rice, school fees" /></label>
         <p v-if="error" class="err">{{ error }}</p>
         <div class="stack">
-          <button class="btn primary" :disabled="!feeRates" @click="review">Review</button>
+          <button class="btn primary" :disabled="!feeRates || busy" @click="review">
+            <span v-if="busy" class="spinner" /> {{ busy && w.state.loading ? "Updating your wallet…" : "Review" }}
+          </button>
           <button class="btn ghost" @click="go('home')">Cancel</button>
         </div>
       </section>
@@ -545,11 +563,13 @@
           <p v-for="m in warnings" :key="m" class="small">⚠️ {{ m }}</p>
           <label class="check"><input v-model="warningsOk" type="checkbox" /> <span>I've checked, send it</span></label>
         </div>
-        <label class="field">Wallet password<input v-model="password" type="password" autocomplete="current-password" /></label>
+        <template v-if="!w.state.unlocked">
+          <label class="field">Wallet password<input v-model="password" type="password" autocomplete="current-password" /></label>
+          <button class="linkish small" @click="go('forgot')">Forgot your password?</button>
+        </template>
         <p v-if="error" class="err">{{ error }}</p>
-        <button class="linkish small" @click="go('forgot')">Forgot your password?</button>
         <div class="stack">
-          <button class="btn primary" :disabled="busy || !password || (warnings.length > 0 && !warningsOk)" @click="confirmSend">
+          <button class="btn primary" :disabled="busy || (!password && !w.state.unlocked) || (warnings.length > 0 && !warningsOk)" @click="confirmSend">
             <span v-if="busy" class="spinner" /> Send now
           </button>
           <button class="btn ghost" :disabled="busy" @click="go('send')">← Edit</button>
@@ -632,10 +652,10 @@
           <div v-if="bumpKind === 'cancel'"><span>Comes back to you</span><b>{{ bumpPlan.outputs[0].value.toLocaleString() }} sats</b></div>
         </div>
         <p v-else-if="!error" class="small dim"><span class="spinner" /> Working it out…</p>
-        <label v-if="bumpPlan" class="field">Wallet password<input v-model="password" type="password" autocomplete="current-password" /></label>
+        <label v-if="bumpPlan && !w.state.unlocked" class="field">Wallet password<input v-model="password" type="password" autocomplete="current-password" /></label>
         <p v-if="error" class="err">{{ error }}</p>
         <div class="stack">
-          <button class="btn primary" :disabled="busy || !bumpPlan || !password" @click="confirmBump">
+          <button class="btn primary" :disabled="busy || !bumpPlan || (!password && !w.state.unlocked)" @click="confirmBump">
             <span v-if="busy" class="spinner" /> {{ bumpKind === "speed" ? "Speed it up" : "Cancel it" }}
           </button>
           <button class="btn ghost" :disabled="busy" @click="go('tx')">← Back</button>
@@ -868,7 +888,7 @@ async function confirmBump() {
   error.value = "";
   try {
     const kind = bumpKind.value;
-    sentTxid.value = await w.sendReplace(bumpPlan.value, password.value);
+    sentTxid.value = await w.sendReplace(bumpPlan.value, password.value || undefined);
     password.value = "";
     txId.value = sentTxid.value;
     notice.value = kind === "speed" ? "Sped up ✓ It should confirm sooner now." : "Cancelled ✓ Your bitcoin is coming back to you.";
@@ -935,14 +955,14 @@ function toggleLock() {
   } catch {
     /* ignore */
   }
-  notice.value = lockOn.value ? "Satish will ask for your password each time you open it, and after 5 minutes away." : "Lock is off.";
+  notice.value = lockOn.value ? "Satish will ask for your password each time you open it, and after 5 minutes away. One password opens both wallets." : "Lock is off.";
 }
 
 async function unlock() {
   busy.value = true;
   error.value = "";
   try {
-    await w.revealPhrase(password.value);
+    await ln.unlockAll(password.value);
     password.value = "";
     locked.value = false;
   } catch {
@@ -956,6 +976,7 @@ function onVisibility() {
   if (document.hidden) hiddenAt = Date.now();
   else if (lockOn.value && hiddenAt && Date.now() - hiddenAt > LOCK_AFTER_MS && w.state.stored) {
     locked.value = true;
+    w.lockSession();
     void ln.close(); // keys leave memory while locked
     view.value = "home";
   }
@@ -1002,6 +1023,29 @@ async function exportHistory() {
 }
 
 const ln = useLightning();
+const tabKey = () => `xp_tab_v1_${(window as any).Telegram?.WebApp?.initDataUnsafe?.user?.id ?? "local"}`;
+const tab = ref<"btc" | "ln">("btc");
+try {
+  if (localStorage.getItem(tabKey()) === "ln") tab.value = "ln";
+} catch {
+  /* ignore */
+}
+const lnBalance = computed(() => ln.st.balance ?? ln.st.cachedBalance);
+
+function setTab(t: "btc" | "ln") {
+  tab.value = t;
+  try {
+    localStorage.setItem(tabKey(), t);
+  } catch {
+    /* ignore */
+  }
+}
+
+async function lockNow() {
+  w.lockSession();
+  await ln.close();
+  notice.value = "Locked. Your password is needed to send again.";
+}
 
 async function payOnchainTo(address: string) {
   await openSend();
@@ -1441,9 +1485,16 @@ function scanQr(target: "send" | "contact") {
 async function review() {
   error.value = "";
   if (w.state.loading || !w.state.live) {
-    error.value = "Your wallet is still updating. Try again in a moment.";
-    if (!w.state.loading) void w.refresh();
-    return;
+    busy.value = true;
+    try {
+      await w.refresh(); // joins the update already running, if any
+    } finally {
+      busy.value = false;
+    }
+    if (!w.state.live) {
+      error.value = w.state.error || "Couldn't update your wallet. Try again in a moment.";
+      return;
+    }
   }
   const req = resolveRecipient(w.state.contacts, sendTo.value);
   if (req.amountSats && !sendAmount.value) sendAmount.value = String(req.amountSats);
@@ -1502,7 +1553,8 @@ async function confirmSend() {
   busy.value = true;
   error.value = "";
   try {
-    sentTxid.value = await w.send(planned.value, password.value, sendNote.value || (payingRequest.value?.note ?? ""));
+    sentTxid.value = await w.send(planned.value, password.value || undefined, sendNote.value || (payingRequest.value?.note ?? ""));
+    if (ln.available) void ln.open(); // that password unlocked Lightning too
     password.value = "";
     if (plannedUsername.value) {
       w.rememberUsername(plannedUsername.value, plannedIdentity.value);
@@ -1714,6 +1766,11 @@ onBeforeUnmount(() => {
 .ok { color: var(--green); }
 .save-box { width: 100%; text-align: left; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
 .save-box input { flex: 1; min-width: 0; background: var(--bg-elev); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font: inherit; }
+.switch { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 14px; padding: 4px; margin-bottom: 12px; }
+.switch button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 6px; border: 0; border-radius: 10px; background: none; color: var(--text-dim); font: inherit; font-weight: 600; cursor: pointer; }
+.switch button small { font-weight: 400; font-size: 12px; color: var(--text-faint); }
+.switch button.on { background: var(--orange-soft); color: var(--orange); }
+.switch button.on small { color: var(--orange); }
 .beta { background: var(--orange-soft); color: var(--orange); border-radius: 10px; padding: 8px 12px; margin-bottom: 12px; font-size: 13px; }
 .eye { background: none; border: 0; cursor: pointer; font-size: 14px; padding: 0 4px; }
 .tx { width: 100%; background: none; border-left: 0; border-right: 0; border-top: 0; font: inherit; text-align: left; cursor: pointer; }

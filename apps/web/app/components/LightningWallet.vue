@@ -20,11 +20,21 @@
           {{ hide ? "••••" : ln.st.cachedBalance.toLocaleString() + " sats" }}
           <span class="small dim">last known</span>
         </div>
-        <label class="field">Wallet password<input v-model="password" type="password" autocomplete="current-password" @keyup.enter="openWallet" /></label>
-        <p v-if="ln.st.error" class="err">{{ ln.st.error }}</p>
-        <button class="btn primary" :disabled="ln.st.opening || !password" @click="openWallet">
-          <span v-if="ln.st.opening" class="spinner" /> {{ ln.st.opening ? "Opening… (first time can take a minute)" : "Open Lightning" }}
-        </button>
+        <template v-if="!w.state.unlocked">
+          <label class="field">Wallet password<input v-model="password" type="password" autocomplete="current-password" @keyup.enter="unlock" /></label>
+          <p class="small dim">One password opens both your Bitcoin and Lightning wallets.</p>
+          <p v-if="ln.st.error || error" class="err">{{ error || ln.st.error }}</p>
+          <button class="btn primary" :disabled="busy || !password" @click="unlock">
+            <span v-if="busy" class="spinner" /> Unlock Satish
+          </button>
+        </template>
+        <template v-else>
+          <p v-if="ln.st.opening" class="small dim"><span class="spinner" /> Opening Lightning… (the first time can take a minute)</p>
+          <template v-else>
+            <p v-if="ln.st.error" class="err">{{ ln.st.error }}</p>
+            <button class="btn primary" @click="ln.open()">{{ ln.st.error ? "Try again" : "Open Lightning" }}</button>
+          </template>
+        </template>
       </template>
 
       <template v-else>
@@ -182,6 +192,7 @@
 import { renderSVG } from "uqr";
 import type { PrepareSendPaymentResponse } from "@breeztech/breez-sdk-spark";
 import { LightningError, type FeeQuote, type SendTarget } from "~/lib/lightning";
+import { WrongPassword } from "~/lib/wallet-core";
 
 const props = defineProps<{ hide: boolean; username: string | null }>();
 const emit = defineEmits<{ (e: "pay-onchain", address: string): void }>();
@@ -234,14 +245,29 @@ function msg(e: unknown, fallback: string) {
   return e instanceof LightningError || e instanceof Error ? e.message : fallback;
 }
 
-async function openWallet() {
+async function unlock() {
+  busy.value = true;
+  error.value = "";
   try {
-    await ln.open(password.value);
+    await ln.unlockAll(password.value);
     password.value = "";
-  } catch {
-    /* message is in ln.st.error */
+  } catch (e) {
+    error.value = e instanceof WrongPassword ? "Wrong password." : msg(e, "Couldn't unlock.");
+  } finally {
+    busy.value = false;
   }
 }
+
+// Unlocked somewhere else (lock screen, a Bitcoin payment): open Lightning too.
+onMounted(() => {
+  if (w.state.unlocked && !ln.st.open) void ln.open();
+});
+watch(
+  () => w.state.unlocked,
+  (on) => {
+    if (on && !ln.st.open) void ln.open();
+  },
+);
 
 function startReceive() {
   amount.value = "";

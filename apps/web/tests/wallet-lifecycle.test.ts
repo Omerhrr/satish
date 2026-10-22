@@ -18,7 +18,7 @@ function fakeChain(funded: Map<string, number>) {
     const stats = { funded_txo_sum: v, spent_txo_sum: 0, tx_count: v ? 1 : 0 };
     return new Response(JSON.stringify({ chain_stats: stats, mempool_stats: { funded_txo_sum: 0, spent_txo_sum: 0, tx_count: 0 } }));
   };
-  return { api: new Esplora("https://x", fetchImpl), calls: () => calls };
+  return { api: new Esplora("https://x", fetchImpl, { minGapMs: 0 }), calls: () => calls };
 }
 
 describe("restore finds @username payments", () => {
@@ -146,5 +146,44 @@ describe("chained pending payments", () => {
     expect(h.map((x) => x.txid)).toEqual([child.txid, parent.txid]);
     expect(h[0].replaceable).toBe(true);
     expect(h[1].replaceable).toBe(false);
+  });
+});
+
+describe("gentle with the Bitcoin network service", () => {
+  test("never more than 3 requests at once, and rate limits are retried", async () => {
+    let active = 0, peak = 0, calls = 0;
+    const fetchImpl = async (url: string) => {
+      calls++;
+      active++;
+      peak = Math.max(peak, active);
+      await new Promise((r) => setTimeout(r, 5));
+      active--;
+      if (calls % 10 === 0) return new Response("slow down", { status: 429 });
+      if (calls % 13 === 0) throw new TypeError("Failed to fetch");
+      const stats = { funded_txo_sum: 0, spent_txo_sum: 0, tx_count: 0 };
+      return new Response(JSON.stringify({ chain_stats: stats, mempool_stats: stats }));
+    };
+    const api = new Esplora("https://x", fetchImpl, { backoffMs: 1, minGapMs: 0 });
+    const infos = await scanAddresses(X, T, api, undefined, { poolGap: 5 });
+    expect(peak).toBeLessThanOrEqual(3);
+    expect(infos.length).toBeGreaterThanOrEqual(35);
+  }, 30000);
+
+  test("gives up with a plain message after retries", async () => {
+    const api = new Esplora("https://x", async () => new Response("no", { status: 429 }), { backoffMs: 1, retries: 2, minGapMs: 0 });
+    await expect(api.address("tb1q")).rejects.toThrow(/busy/);
+    const down = new Esplora("https://x", async () => { throw new TypeError("Failed to fetch"); }, { backoffMs: 1, retries: 1, minGapMs: 0 });
+    await expect(down.address("tb1q")).rejects.toThrow(/Check your connection/);
+  });
+
+  test("a later sync scans only a few addresses past the last @username payment", async () => {
+    let calls = 0;
+    const fetchImpl = async () => {
+      calls++;
+      const stats = { funded_txo_sum: 0, spent_txo_sum: 0, tx_count: 0 };
+      return new Response(JSON.stringify({ chain_stats: stats, mempool_stats: stats }));
+    };
+    await scanAddresses(X, T, new Esplora("https://x", fetchImpl, { minGapMs: 0 }), undefined, { poolGap: 5 });
+    expect(calls).toBeLessThanOrEqual(40);
   });
 });

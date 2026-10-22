@@ -49,6 +49,7 @@ export const NETWORKS: Record<NetworkName, NetworkInfo> = {
 };
 
 export const GAP_LIMIT = 20;
+export const CHANGE_GAP = 10; // change addresses are used strictly in order
 export const DUST_SATS = 546;
 const RBF_SEQUENCE = 0xfffffffd;
 
@@ -243,14 +244,81 @@ export interface FeeRates {
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
+export class NetworkBusy extends Error {}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Esplora client that is gentle with public servers (mempool.space rate-limits
+ * bursts): at most `maxParallel` requests at once, and retries with back-off on
+ * network errors, 429 and 5xx. Inside Telegram a rate-limited reply shows up
+ * only as "Failed to fetch", so that is retried too.
+ */
 export class Esplora {
+  private active = 0;
+  private waiting: (() => void)[] = [];
+  private gapMs: number;
+  private nextAt = 0;
   constructor(
     private base: string,
     private fetchImpl: FetchLike = (i, init) => fetch(i, init),
-  ) {}
+    private opts: { maxParallel?: number; retries?: number; backoffMs?: number; minGapMs?: number } = {},
+  ) {
+    this.gapMs = opts.minGapMs ?? 120;
+  }
+
+  /** Space out request starts; slow down after push-back, speed up again on success. */
+  private async pace() {
+    const now = Date.now();
+    const at = Math.max(now, this.nextAt);
+    this.nextAt = at + this.gapMs;
+    if (at > now) await sleep(at - now);
+  }
+
+  private eased(ok: boolean) {
+    const base = this.opts.minGapMs ?? 120;
+    this.gapMs = ok ? Math.max(base, Math.round(this.gapMs * 0.8)) : Math.min(2000, Math.round(this.gapMs * 1.5) + 150);
+  }
+
+  private async slot<T>(fn: () => Promise<T>): Promise<T> {
+    const max = this.opts.maxParallel ?? 3;
+    if (this.active >= max) await new Promise<void>((r) => this.waiting.push(r));
+    this.active++;
+    try {
+      return await fn();
+    } finally {
+      this.active--;
+      this.waiting.shift()?.();
+    }
+  }
+
+  private async fetchRetry(path: string, init?: RequestInit): Promise<Response> {
+    const retries = this.opts.retries ?? 5;
+    const backoff = this.opts.backoffMs ?? 700;
+    for (let attempt = 0; ; attempt++) {
+      let res: Response | null = null;
+      try {
+        res = await this.slot(async () => {
+          await this.pace();
+          return this.fetchImpl(this.base + path, init);
+        });
+      } catch {
+        res = null; // network error / blocked by rate limit (no CORS headers on 429)
+      }
+      const good = !!res && res.status !== 429 && res.status < 500;
+      this.eased(good);
+      if (good) return res!;
+      if (attempt >= retries) {
+        throw new NetworkBusy(
+          res ? `The Bitcoin network service is busy (${res.status}). Try again in a minute.` : "Couldn't reach the Bitcoin network. Check your connection and try again.",
+        );
+      }
+      await sleep(backoff * 2 ** attempt + Math.random() * 300);
+    }
+  }
 
   private async get<T>(path: string): Promise<T> {
-    const res = await this.fetchImpl(this.base + path);
+    const res = await this.fetchRetry(path);
     if (!res.ok) throw new Error(`Couldn't reach the Bitcoin network (${res.status}). Try again.`);
     return (await res.json()) as T;
   }
@@ -288,7 +356,13 @@ export class Esplora {
   }
 
   async broadcast(txHex: string): Promise<string> {
-    const res = await this.fetchImpl(this.base + "/tx", { method: "POST", body: txHex });
+    // Not retried blindly: a timeout after the server accepted it must not look like a failure.
+    let res: Response;
+    try {
+      res = await this.fetchImpl(this.base + "/tx", { method: "POST", body: txHex });
+    } catch {
+      throw new Error("Couldn't reach the Bitcoin network, so nothing was sent. Check your connection and try again.");
+    }
     const text = (await res.text()).trim();
     if (!res.ok) throw new Error(friendlyBroadcastError(text));
     return text;
@@ -327,6 +401,7 @@ export async function scanAddresses(
   net: NetworkInfo,
   api: Esplora,
   extra?: { from: number; to: number },
+  opts: { poolGap?: number } = {},
 ): Promise<AddressInfo[]> {
   const out: AddressInfo[] = [];
   const lookup = async (change: 0 | 1, i: number): Promise<AddressInfo> => {
@@ -339,48 +414,25 @@ export async function scanAddresses(
       unconfirmed: a.mempool_stats.funded_txo_sum - a.mempool_stats.spent_txo_sum,
     };
   };
-  {
-    const mustReach = extra && extra.to >= POOL_START ? extra.to : POOL_START - 1;
-    let index = POOL_START;
+  const gapScan = async (change: 0 | 1, start: number, mustReach: number, gap: number) => {
+    let index = start;
     let unusedRun = 0;
-    while (index <= mustReach || unusedRun < GAP_LIMIT) {
-      const batch = Array.from({ length: 10 }, (_, k) => index + k);
-      const infos = await Promise.all(batch.map((k) => lookup(0, k)));
+    while (index <= mustReach || unusedRun < gap) {
+      const batch = Array.from({ length: 5 }, (_, k) => index + k);
+      const infos = await Promise.all(batch.map((k) => lookup(change, k)));
       for (const info of infos) {
         out.push(info);
         unusedRun = info.txCount === 0 ? unusedRun + 1 : 0;
       }
       index += batch.length;
     }
-  }
-  for (const change of [0, 1] as const) {
-    let index = 0;
-    let unusedRun = 0;
-    while (unusedRun < GAP_LIMIT) {
-      const batch = Array.from({ length: 10 }, (_, i) => index + i);
-      const infos = await Promise.all(
-        batch.map(async (i) => {
-          const address = addressAt(xpub, net, change, i);
-          const a = await api.address(address);
-          return {
-            address,
-            change,
-            index: i,
-            txCount: a.chain_stats.tx_count + a.mempool_stats.tx_count,
-            confirmed: a.chain_stats.funded_txo_sum - a.chain_stats.spent_txo_sum,
-            unconfirmed: a.mempool_stats.funded_txo_sum - a.mempool_stats.spent_txo_sum,
-          } satisfies AddressInfo;
-        }),
-      );
-      for (const info of infos) {
-        out.push(info);
-        unusedRun = info.txCount === 0 ? unusedRun + 1 : 0;
-        if (unusedRun >= GAP_LIMIT) break;
-      }
-      index += batch.length;
-    }
-  }
-  return out;
+  };
+  await Promise.all([
+    gapScan(0, 0, -1, GAP_LIMIT),
+    gapScan(1, 0, -1, CHANGE_GAP),
+    gapScan(0, POOL_START, extra && extra.to >= POOL_START ? extra.to : POOL_START - 1, opts.poolGap ?? GAP_LIMIT),
+  ]);
+  return out.sort((a, b) => a.change - b.change || a.index - b.index);
 }
 
 export function nextUnused(addresses: AddressInfo[], change: 0 | 1): AddressInfo | undefined {

@@ -55,7 +55,12 @@ const state = reactive({
   notes: {} as Record<string, string>,
   live: false, // true once this session has fresh data from the network (cached data is display-only)
   hideBalance: false,
+  unlocked: false, // wallet session open: one password for Bitcoin and Lightning
 });
+
+// The decrypted phrase for an unlocked session lives only in memory, never in storage.
+let sessionPhrase: string | null = null;
+let refreshing: Promise<void> | null = null;
 
 interface Snapshot {
   xpub: string;
@@ -288,8 +293,15 @@ export function useWallet() {
     await refresh();
   }
 
-  async function refresh() {
+  function refresh(): Promise<void> {
+    if (refreshing) return refreshing;
+    refreshing = doRefresh().finally(() => (refreshing = null));
+    return refreshing;
+  }
+
+  async function doRefresh() {
     if (!state.stored) return;
+    const firstSync = !state.lastSync;
     state.loading = true;
     state.error = "";
     try {
@@ -302,7 +314,12 @@ export function useWallet() {
         /* not signed in / offline: the pool is still gap-scanned */
       }
       const pool = state.handle && state.handle.issuedMax >= POOL_START ? { from: POOL_START, to: state.handle.issuedMax } : undefined;
-      const addresses = await scanAddresses(state.stored.xpub, net, api, pool);
+      // Full look-ahead for @username coins on this device's first sync (e.g. after a restore); small after that.
+      const knownPoolMax = Math.max(-1, ...state.addresses.filter((a) => a.index >= POOL_START && a.txCount > 0).map((a) => a.index));
+      const poolTo = Math.max(pool?.to ?? -1, knownPoolMax);
+      const addresses = await scanAddresses(state.stored.xpub, net, api, poolTo >= POOL_START ? { from: POOL_START, to: poolTo } : undefined, {
+        poolGap: firstSync ? 20 : 5,
+      });
       const used = addresses.filter((a) => a.txCount > 0);
       const [utxoLists, txLists] = await Promise.all([
         Promise.all(used.map((a) => api.utxos(a.address).then((us) => us.map((u) => ({ ...u, a }))))),
@@ -335,9 +352,33 @@ export function useWallet() {
     return planSend(state.utxos, to, amount, feeRate, { sendMax });
   }
 
-  async function send(p: SendPlan, password: string, note = ""): Promise<string> {
+  /** Unlock the wallet for this session (Bitcoin and Lightning). Throws WrongPassword. */
+  async function unlock(password: string): Promise<void> {
     if (!state.stored) throw new Error("No wallet on this device.");
-    const phrase = await decryptPhrase(state.stored.secret, password);
+    sessionPhrase = await decryptPhrase(state.stored.secret, password);
+    state.unlocked = true;
+  }
+
+  function lockSession() {
+    sessionPhrase = null;
+    state.unlocked = false;
+  }
+
+  function sessionPhraseOrNull(): string | null {
+    return sessionPhrase;
+  }
+
+  /** The phrase for signing: from the unlocked session, or by checking the password (which also unlocks). */
+  async function phraseFor(password?: string): Promise<string> {
+    if (sessionPhrase) return sessionPhrase;
+    if (!password) throw new Error("Enter your wallet password.");
+    await unlock(password);
+    return sessionPhrase!;
+  }
+
+  async function send(p: SendPlan, password?: string, note = ""): Promise<string> {
+    if (!state.stored) throw new Error("No wallet on this device.");
+    const phrase = await phraseFor(password);
     const change = nextUnused(state.addresses, 1)?.address;
     if (!change) throw new Error("Refresh your wallet and try again.");
     const signed = signPlan(p, phrase, net, change);
@@ -360,9 +401,9 @@ export function useWallet() {
     return planBump(tx, kind, feeRate, state.addresses, state.utxos, back);
   }
 
-  async function sendReplace(p: BumpPlan, password: string): Promise<string> {
+  async function sendReplace(p: BumpPlan, password?: string): Promise<string> {
     if (!state.stored) throw new Error("No wallet on this device.");
-    const phrase = await decryptPhrase(state.stored.secret, password);
+    const phrase = await phraseFor(password);
     const signed = signTx(p.inputs, p.outputs, p.fee, phrase, net);
     const txid = await api.broadcast(signed.hex);
     const old = state.notes[p.replaces];
@@ -415,6 +456,7 @@ export function useWallet() {
     } else if (state.stored?.cloud) {
       state.cloudHasBackup = true;
     }
+    lockSession();
     writeStore(null, netName);
     writeJson(snapKey(netName), null);
     state.live = false;
@@ -527,6 +569,7 @@ export function useWallet() {
     loadHandle, claimUsername, resolveUsername, rememberUsername, topUp,
     state, net, saveContact, deleteContact, confirmed, pending, spendable, receiveAddress,
     save, refresh, fees, plan, send, revealPhrase, changePassword, remove,
+    unlock, lockSession, sessionPhraseOrNull,
     planReplace, sendReplace, setNote, exportCsv, exportDescriptors, setHideBalance,
     checkCloud, restoreFromCloud, enableCloud, disableCloud,
     explorerTx: (txid: string) => `${net.explorer}/tx/${txid}`,

@@ -825,3 +825,23 @@ Breez SDK on Spark (`@breeztech/breez-sdk-spark`, WebAssembly):
 wallet; paying TK from the Lightning balance needs the server to accept
 Lightning (next step). Spark's operator model is a weaker guarantee than a
 plain on-chain wallet and is disclosed as such.
+
+## D30 - One unlock for both wallets; polite chain lookups (2026-10-22)
+
+**One password, one session.** "Unlock Satish" decrypts the recovery phrase
+once and keeps it in memory for the session; it opens Lightning and lets
+Bitcoin payments, speed-ups and cancels go through without asking again.
+Showing the 12 words, changing the password and exporting still ask. "Lock
+now", the app lock (on open and after 5 minutes away) and removing the wallet
+drop the phrase from memory and close Lightning. The home screen has a
+Bitcoin / Lightning switch showing both balances.
+
+**Chain lookups.** mempool.space rate-limits bursts, and inside Telegram a
+rate-limited reply surfaces only as "Failed to fetch", which left the Bitcoin
+side stuck on "Updating…". The Esplora client now paces request starts
+(~8/s), runs at most 3 at once, slows down automatically on push-back and
+speeds up again on success, and retries network errors, 429 and 5xx with
+back-off (broadcasts are never blindly retried). Syncs are single-flight,
+the change chain look-ahead is 10, and the @username pool look-ahead is 20
+only on a device's first sync (5 after). "Review" waits for an update in
+progress instead of failing.

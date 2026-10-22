@@ -5,7 +5,6 @@
  */
 import type { SdkEvent } from "@breeztech/breez-sdk-spark";
 import { LightningError, LightningWallet, type LnNetwork, type LnPayment, type SdkModule } from "~/lib/lightning";
-import { WrongPassword } from "~/lib/wallet-core";
 
 const st = reactive({
   open: false,
@@ -71,23 +70,33 @@ export function useLightning() {
     }
   }
 
-  async function open(password: string) {
-    if (st.open) return;
+  /** Start Lightning from the unlocked wallet session (no second password). */
+  async function open() {
+    if (st.open || st.opening) return;
+    const phrase = useWallet().sessionPhraseOrNull();
+    if (!phrase) {
+      st.error = "Unlock Satish first.";
+      return;
+    }
     st.opening = true;
     st.error = "";
     try {
-      const phrase = await useWallet().revealPhrase(password);
       wallet = new LightningWallet(await loadSdk(), network, apiKey, uid());
       await wallet.connect(phrase, onEvent);
       st.open = true;
       await refresh();
     } catch (e) {
       wallet = null;
-      st.error = e instanceof LightningError ? e.message : e instanceof WrongPassword ? "Wrong password." : e instanceof Error ? e.message : "Couldn't open Lightning.";
-      throw e;
+      st.error = e instanceof LightningError || e instanceof Error ? e.message : "Couldn't open Lightning.";
     } finally {
       st.opening = false;
     }
+  }
+
+  /** One password unlocks both wallets. Throws WrongPassword. */
+  async function unlockAll(password: string) {
+    await useWallet().unlock(password);
+    if (available) void open();
   }
 
   async function refresh() {
@@ -138,7 +147,7 @@ export function useLightning() {
   }
 
   return {
-    st, network, available, canMove, open, refresh, close, forget, flash,
+    st, network, available, canMove, open, unlockAll, refresh, close, forget, flash,
     invoice: (amount: number | undefined, description: string) => need().invoice(amount, description),
     sparkAddress: () => need().sparkAddress(),
     depositAddress: () => need().depositAddress(),
