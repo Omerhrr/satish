@@ -64,6 +64,17 @@ const state = reactive({
 
 // The decrypted phrase for an unlocked session lives only in memory, never in storage.
 let sessionPhrase: string | null = null;
+
+// App-wide "away" clock, so the 5-minute lock counts time away from any page.
+let hiddenAt = 0;
+if (typeof document !== "undefined") {
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) hiddenAt = Date.now();
+  });
+}
+export function awayFor(): number {
+  return hiddenAt && !document.hidden ? Date.now() - hiddenAt : 0;
+}
 let refreshing: Promise<void> | null = null;
 
 interface Snapshot {

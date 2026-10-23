@@ -1020,6 +1020,7 @@
 
 <script setup lang="ts">
 import { renderSVG } from "uqr";
+import { awayFor } from "~/composables/useWallet";
 import type { PaymentRequestOut } from "@xp/api-client";
 import {
   SendError, WrongPassword, checkAddress, verifyPoolAddress, isValidPhrase, newRecoveryPhrase, normalizePhrase,
@@ -1153,10 +1154,10 @@ const LOCK_AFTER_MS = 5 * 60 * 1000;
 const lockKey = () => `xp_lock_v1_${(window as any).Telegram?.WebApp?.initDataUnsafe?.user?.id ?? "local"}`;
 const lockOn = ref(false);
 const locked = ref(false);
-let hiddenAt = 0;
 try {
   lockOn.value = localStorage.getItem(lockKey()) === "1";
-  locked.value = lockOn.value && !!w.state.stored;
+  // One login per session: coming back to the wallet from Satish AI etc. must not ask again.
+  locked.value = lockOn.value && !!w.state.stored && !w.state.unlocked;
 } catch {
   /* storage blocked: no lock */
 }
@@ -1186,8 +1187,12 @@ async function unlock() {
 }
 
 function onVisibility() {
-  if (document.hidden) hiddenAt = Date.now();
-  else if (lockOn.value && hiddenAt && Date.now() - hiddenAt > LOCK_AFTER_MS && w.state.stored) {
+  if (!document.hidden) checkAway();
+}
+
+/** Lock both wallets after 5 minutes away (from any page), if the lock is on. */
+function checkAway() {
+  if (lockOn.value && w.state.stored && w.state.unlocked && awayFor() > LOCK_AFTER_MS) {
     locked.value = true;
     w.lockSession();
     void ln.close(); // keys leave memory while locked
@@ -2011,6 +2016,7 @@ onMounted(async () => {
     if (section.value === "activity") void loadRequests();
   }
   document.addEventListener("visibilitychange", onVisibility);
+  checkAway(); // coming back to the wallet after being away on another page
   const qs = new URLSearchParams(location.search);
   const pay = qs.get("pay");
   if (pay && w.state.stored) await openPayRequest(pay);
