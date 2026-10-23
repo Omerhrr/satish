@@ -60,6 +60,22 @@ class IssuedAddressOut(BaseModel):
     reused: bool
 
 
+class LightningIn(BaseModel):
+    network: Network
+    identity_pubkey: str = Field(min_length=66, max_length=66)
+    ln_network: Literal["mainnet", "regtest", "signet"]
+    spark_address: str = Field(min_length=20, max_length=300)
+    signature: str = Field(min_length=16, max_length=160)
+
+
+class LightningOut(BaseModel):
+    username: str
+    identity_pubkey: str
+    ln_network: str
+    spark_address: str
+    signature: str
+
+
 class RequestIn(BaseModel):
     network: Network
     amount_sats: int | None = Field(default=None, ge=546)
@@ -159,6 +175,32 @@ async def lookup(username: str, network: Network, user: CurrentUser, session: Db
     if row is None:
         raise HTTPException(status_code=404, detail=f"No Satish user called @{svc.normalize_username(username)}.")
     return HandleOut(username=row.username, identity_pubkey=row.identity_pubkey)
+
+
+@router.post("/handles/lightning", response_model=LightningOut)
+async def publish_lightning(payload: LightningIn, user: CurrentUser, session: DbSession) -> LightningOut:
+    try:
+        h = await svc.set_lightning(
+            session, user, network=payload.network, identity_pubkey=payload.identity_pubkey.lower(),
+            ln_network=payload.ln_network, spark_address=payload.spark_address, signature=payload.signature.strip().lower(),
+        )
+    except svc.HandleError as exc:
+        raise _bad(exc) from exc
+    await session.commit()
+    return LightningOut(username=h.username, identity_pubkey=h.identity_pubkey, ln_network=h.spark_network or "",
+                        spark_address=h.spark_address or "", signature=h.spark_signature or "")
+
+
+@router.get("/handles/{username}/lightning", response_model=LightningOut)
+async def lightning_address(username: str, network: Network, user: CurrentUser, session: DbSession) -> LightningOut:
+    name = svc.normalize_username(username)
+    h = await svc.active_handle(session, network, name)
+    if h is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"No Satish user called @{name}.")
+    if not h.spark_address or not h.spark_signature:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"@{name} hasn't opened Lightning yet. Pay them from your Bitcoin wallet, or ask them to open Lightning once.")
+    return LightningOut(username=h.username, identity_pubkey=h.identity_pubkey, ln_network=h.spark_network or "",
+                        spark_address=h.spark_address, signature=h.spark_signature)
 
 
 @router.post("/handles/{username}/address", response_model=IssuedAddressOut)

@@ -171,3 +171,48 @@ async def test_closure_erases_usernames(session, dev_user):
     await close_account(session, dev_user, get_settings())
     for model in (WalletHandle, HandleAddress, PaymentRequest):
         assert (await session.execute(select(model))).scalars().all() == []
+
+
+SPARK = "sprt1pgssyuuuhnrrdjswal5c3s3rafw9w3y5dd4cjy3duxlf7hjzkp0rqx6dj6mrhu"
+
+
+def _spark_sig(words_wallet, ln_net: str, addr: str) -> str:
+    root = bip32.HDKey.from_seed(bip39.mnemonic_to_seed(words_wallet))
+    identity = root.derive("m/84h/1h/0h").derive([7, 0]).key
+    return identity.sign(svc.spark_message(NET, ln_net, addr)).serialize().hex()
+
+
+async def test_username_lightning_address(session, dev_user):
+    from app.main import app
+    from httpx import ASGITransport, AsyncClient
+
+    pub, signed = ADA
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        body = {"network": NET, "identity_pubkey": pub, "ln_network": "regtest", "spark_address": SPARK,
+                "signature": _spark_sig("abandon " * 11 + "about", "regtest", SPARK)}
+        r = await c.post("/api/v1/handles/lightning", json=body)
+        assert r.status_code == 422 and "username" in r.json()["detail"]  # needs a username first
+
+        claim = {"network": NET, "username": "ada", "identity_pubkey": pub,
+                 "addresses": [{"address": s.address, "index": s.index, "signature": s.signature} for s in map(signed, range(1000, 1003))]}
+        assert (await c.post("/api/v1/handles/claim", json=claim)).status_code == 200
+
+        r = await c.get("/api/v1/handles/ada/lightning", params={"network": NET})
+        assert r.status_code == 404 and "hasn't opened Lightning" in r.json()["detail"]
+
+        # forged: signed by Bob's key / for a different address / wrong owner key
+        bad = body | {"signature": _spark_sig("legal winner thank year wave sausage worth useful legal winner thank yellow", "regtest", SPARK)}
+        assert (await c.post("/api/v1/handles/lightning", json=bad)).status_code == 422
+        other = body | {"spark_address": SPARK[:-4] + "qqqq"}
+        assert (await c.post("/api/v1/handles/lightning", json=other)).status_code == 422
+        assert (await c.post("/api/v1/handles/lightning", json=body | {"identity_pubkey": BOB[0]})).status_code == 422
+        assert (await c.post("/api/v1/handles/lightning", json=body | {"spark_address": "not an address at all!!"})).status_code == 422
+
+        r = await c.post("/api/v1/handles/lightning", json=body)
+        assert r.status_code == 200
+        r = await c.get("/api/v1/handles/@Ada/lightning", params={"network": NET})
+        got = r.json()
+        assert got["spark_address"] == SPARK and got["ln_network"] == "regtest"
+        assert svc.verify_spark_signature(got["identity_pubkey"], NET, got["ln_network"], got["spark_address"], got["signature"])
+        assert not svc.verify_spark_signature(got["identity_pubkey"], NET, "mainnet", got["spark_address"], got["signature"])
+        assert (await c.get("/api/v1/handles/nobody/lightning", params={"network": NET})).status_code == 404

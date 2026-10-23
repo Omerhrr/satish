@@ -534,6 +534,10 @@ class WalletHandle(Base):
     identity_pubkey: Mapped[str] = mapped_column(String(66))
     status: Mapped[str] = mapped_column(String(16), default="active")
     released_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Lightning (Spark) address published by the owner's phone, signed by the identity key.
+    spark_address: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    spark_signature: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    spark_network: Mapped[str | None] = mapped_column(String(16), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 

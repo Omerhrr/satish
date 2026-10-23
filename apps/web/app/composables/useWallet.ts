@@ -11,7 +11,7 @@ import {
 import {
   Esplora, NETWORKS, accountXpub, buildHistory, decryptPhrase, encryptPhrase, nextUnused,
   normalizePhrase, planSend, scanAddresses, signPlan, signTx, planBump, walletDescriptors, historyCsv, checkContact,
-  identityFromPhrase, signPoolAddresses, verifyPoolAddress, normalizeUsername, POOL_START,
+  identityFromPhrase, signPoolAddresses, verifyPoolAddress, signSparkAddress, verifySparkAddress, normalizeUsername, POOL_START,
   type AddressInfo, type BumpPlan, type Contact, type EncryptedSecret, type FeeRates, type HistoryItem, type NetworkName, type SendPlan, type Utxo,
 } from "~/lib/wallet-core";
 
@@ -26,6 +26,7 @@ interface StoredWallet {
   cloud?: boolean; // Telegram backup switched on
   identityKey?: string; // can only vouch for addresses (@username), never spend
   identityPub?: string;
+  lnPublished?: string; // "<username>|<ln network>|<spark address>" last published
 }
 
 interface HandleInfo {
@@ -553,6 +554,37 @@ export function useWallet() {
     return { username, address: got.address, identityPubkey: got.identity_pubkey, changed: !!pinned && pinned !== got.identity_pubkey };
   }
 
+  /** Publish my Lightning (Spark) address under my @username, signed by my identity key. */
+  async function publishLightning(lnNetwork: string, sparkAddress: string): Promise<boolean> {
+    const w = state.stored;
+    const username = state.handle?.username;
+    if (!w?.identityKey || !w.identityPub || !username) return false;
+    const marker = `${username}|${lnNetwork}|${sparkAddress}`;
+    if (w.lnPublished === marker) return true;
+    const signature = signSparkAddress(w.identityKey, net, lnNetwork, sparkAddress);
+    await xpApi.handleLightningPublish({ network: netName, identity_pubkey: w.identityPub, ln_network: lnNetwork, spark_address: sparkAddress, signature });
+    persist({ ...state.stored!, lnPublished: marker });
+    return true;
+  }
+
+  /**
+   * Find @username's Lightning address and check it really belongs to them:
+   * the signature must verify, and the identity key must match the one we
+   * pinned the first time we paid them (on Bitcoin or Lightning).
+   */
+  async function resolveUsernameLightning(raw: string, lnNetwork: string) {
+    const username = normalizeUsername(raw);
+    const got = await xpApi.handleLightning(username, netName);
+    if (got.ln_network !== lnNetwork) {
+      throw new Error(`@${username}'s Lightning wallet is on a different network, so it can't be paid from here.`);
+    }
+    if (!verifySparkAddress(got.identity_pubkey, net, got.ln_network, got.spark_address, got.signature)) {
+      throw new Error(`The Lightning address for @${username} failed its security check. Nothing was sent.`);
+    }
+    const pinned = state.contacts.find((c) => c.username === username)?.identityPubkey;
+    return { username, address: got.spark_address, identityPubkey: got.identity_pubkey, changed: !!pinned && pinned !== got.identity_pubkey };
+  }
+
   /** After paying @username: save them (or update their pinned key). */
   function rememberUsername(username: string, identityPubkey: string) {
     const existing = state.contacts.find((c) => c.username === username);
@@ -566,7 +598,7 @@ export function useWallet() {
   }
 
   return {
-    loadHandle, claimUsername, resolveUsername, rememberUsername, topUp,
+    loadHandle, claimUsername, resolveUsername, rememberUsername, topUp, publishLightning, resolveUsernameLightning,
     state, net, saveContact, deleteContact, confirmed, pending, spendable, receiveAddress,
     save, refresh, fees, plan, send, revealPhrase, changePassword, remove,
     unlock, lockSession, sessionPhraseOrNull,

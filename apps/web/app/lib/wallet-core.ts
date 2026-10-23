@@ -849,6 +849,23 @@ export function verifyPoolAddress(identityPubHex: string, net: NetworkInfo, addr
   }
 }
 
+/** What the identity key signs to vouch for a @username's Lightning (Spark) address. */
+export function sparkMessage(net: NetworkInfo, lnNetwork: string, address: string): Uint8Array {
+  return sha256(new TextEncoder().encode(`xp-handle-ln-v1|${net.name}|${lnNetwork}|${address}`));
+}
+
+export function signSparkAddress(identityPrivHex: string, net: NetworkInfo, lnNetwork: string, address: string): string {
+  return hex.encode(secp256k1.sign(sparkMessage(net, lnNetwork, address), hex.decode(identityPrivHex)).toDERRawBytes());
+}
+
+export function verifySparkAddress(identityPubHex: string, net: NetworkInfo, lnNetwork: string, address: string, signatureHex: string): boolean {
+  try {
+    return secp256k1.verify(hex.decode(signatureHex), sparkMessage(net, lnNetwork, address), hex.decode(identityPubHex), { format: "der" });
+  } catch {
+    return false;
+  }
+}
+
 export function normalizeUsername(raw: string): string {
   return raw.trim().replace(/^@/, "").toLowerCase();
 }

@@ -85,11 +85,22 @@ export function useLightning() {
       await wallet.connect(phrase, onEvent);
       st.open = true;
       await refresh();
+      void publish();
     } catch (e) {
       wallet = null;
       st.error = e instanceof LightningError || e instanceof Error ? e.message : "Couldn't open Lightning.";
     } finally {
       st.opening = false;
+    }
+  }
+
+  /** Let people pay my @username on Lightning (quiet: retried next time if it fails). */
+  async function publish() {
+    if (!wallet?.connected || !useWallet().state.handle?.username) return;
+    try {
+      await useWallet().publishLightning(network, await wallet.sparkAddress());
+    } catch {
+      /* offline / not signed in: try again next open */
     }
   }
 
@@ -147,7 +158,7 @@ export function useLightning() {
   }
 
   return {
-    st, network, available, canMove, open, unlockAll, refresh, close, forget, flash,
+    st, network, available, canMove, open, unlockAll, refresh, close, forget, flash, publish,
     invoice: (amount: number | undefined, description: string) => need().invoice(amount, description),
     sparkAddress: () => need().sparkAddress(),
     depositAddress: () => need().depositAddress(),

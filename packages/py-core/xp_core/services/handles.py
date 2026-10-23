@@ -80,6 +80,47 @@ def address_message(network: str, address: str) -> bytes:
     return hashlib.sha256(f"xp-handle-v1|{network}|{address}".encode()).digest()
 
 
+LN_NETWORKS = ("mainnet", "regtest", "signet")
+_SPARK = re.compile(r"^[a-z]{2,8}1[02-9ac-hj-np-z]{20,280}$")
+
+
+def spark_message(network: str, ln_network: str, address: str) -> bytes:
+    """What the identity key signs to vouch for a Lightning (Spark) address."""
+    return hashlib.sha256(f"xp-handle-ln-v1|{network}|{ln_network}|{address}".encode()).digest()
+
+
+def verify_spark_signature(identity_pubkey: str, network: str, ln_network: str, address: str, signature_hex: str) -> bool:
+    try:
+        pub = ec.PublicKey.parse(bytes.fromhex(identity_pubkey))
+        sig = ec.Signature.parse(bytes.fromhex(signature_hex))
+        return bool(pub.verify(sig, spark_message(network, ln_network, address)))
+    except Exception:
+        return False
+
+
+async def set_lightning(
+    session: AsyncSession, user: User, *, network: str, identity_pubkey: str, ln_network: str, spark_address: str, signature: str
+) -> WalletHandle:
+    """Publish (or replace) the Lightning address for my @username."""
+    handle = await my_handle(session, user, _network(network))
+    if handle is None:
+        raise HandleError("Pick a username for your wallet first.")
+    if handle.identity_pubkey != identity_pubkey:
+        raise HandleError("This wallet doesn't own that username. Open Satish with the wallet that claimed it.")
+    if ln_network not in LN_NETWORKS:
+        raise HandleError("Unknown Lightning network.")
+    address = spark_address.strip()
+    if not _SPARK.match(address):
+        raise HandleError("That isn't a valid Lightning (Spark) address.")
+    if not verify_spark_signature(identity_pubkey, handle.network, ln_network, address, signature):
+        raise HandleError("The Lightning address signature didn't check out.")
+    handle.spark_address = address
+    handle.spark_signature = signature
+    handle.spark_network = ln_network
+    await session.flush()
+    return handle
+
+
 def verify_address_signature(identity_pubkey: str, network: str, address: str, signature_hex: str) -> bool:
     try:
         pub = ec.PublicKey.parse(bytes.fromhex(identity_pubkey))

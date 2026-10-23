@@ -46,6 +46,7 @@
           </template>
         </div>
         <div v-if="ln.st.address" class="small">Your Lightning address: <b class="mono">{{ ln.st.address }}</b></div>
+        <div v-if="username" class="small">Satish users can pay you at <b>@{{ username }}</b> ⚡</div>
         <div class="row">
           <button class="btn primary" @click="startReceive">↓ Receive</button>
           <button class="btn primary" :disabled="!ln.st.balance" @click="startSend()">↑ Send</button>
@@ -118,13 +119,22 @@
     <template v-else-if="view === 'send'">
       <h2>⚡ Send with Lightning</h2>
       <label class="field">
-        Invoice, Lightning address or Spark address
+        @username, invoice or Lightning address
         <div class="inline">
-          <input v-model="target" autocapitalize="none" autocomplete="off" spellcheck="false" placeholder="lnbc…, name@wallet.com or sp1…" @change="check" />
+          <input v-model="target" autocapitalize="none" autocomplete="off" spellcheck="false" placeholder="@ada, lnbc… or name@wallet.com" @change="check" />
           <button v-if="canScan" class="btn small" type="button" @click="scan">Scan</button>
         </div>
       </label>
-      <p v-if="parsed" class="small ok">→ {{ parsedLine }}</p>
+      <div v-if="userSuggestions.length" class="chips">
+        <button v-for="c in userSuggestions" :key="c.id" type="button" class="chip-btn" @click="pickUser(c.username!)">
+          @{{ c.username }}<template v-if="c.name !== '@' + c.username"> · {{ c.name }}</template>
+        </button>
+      </div>
+      <p v-if="parsed" class="small ok">→ {{ parsedLine }}<span v-if="toUser" class="verified"> ✓ verified</span></p>
+      <label v-if="toUser?.changed" class="check warn">
+        <input v-model="acceptChange" type="checkbox" />
+        <span>⚠️ @{{ toUser.username }} has a different wallet than last time. Only continue if they told you they changed wallets.</span>
+      </label>
       <label v-if="parsed && needsAmount" class="field">
         Amount in sats
         <input v-model="amount" inputmode="numeric" :placeholder="rangeHint" />
@@ -141,7 +151,7 @@
     <template v-else-if="view === 'review' && quote">
       <h2>Check before sending</h2>
       <div class="summary">
-        <div><span>To</span><b class="mono">{{ parsedLine }}</b></div>
+        <div><span>To</span><b :class="{ mono: !toUser }">{{ parsedLine }}<span v-if="toUser" class="verified"> ✓ verified</span></b></div>
         <div><span>Amount</span><b>{{ quote.amount.toLocaleString() }} sats<small v-if="naira(quote.amount)" class="ngn">{{ naira(quote.amount) }}</small></b></div>
         <div><span>Fee</span><b>{{ quote.fee.toLocaleString() }} sats</b></div>
         <div class="total"><span>Total</span><b>{{ (quote.amount + quote.fee).toLocaleString() }} sats</b></div>
@@ -258,6 +268,14 @@ async function unlock() {
   }
 }
 
+// Claimed a username after opening Lightning: let people pay it on Lightning too.
+watch(
+  () => w.state.handle?.username,
+  (name) => {
+    if (name && ln.st.open) void ln.publish();
+  },
+);
+
 // Unlocked somewhere else (lock screen, a Bitcoin payment): open Lightning too.
 onMounted(() => {
   if (w.state.unlocked && !ln.st.open) void ln.open();
@@ -320,10 +338,29 @@ async function showDeposit() {
   }
 }
 
+const toUser = ref<{ username: string; address: string; identityPubkey: string; changed: boolean } | null>(null);
+const acceptChange = ref(false);
+
+// Saved Satish contacts as you type ("@ad" or a contact's name).
+const userSuggestions = computed(() => {
+  const q = target.value.trim().replace(/^@/, "").toLowerCase();
+  if (toUser.value || q.length > 20 || /^(ln|sp)/.test(q) || q.includes("@")) return [];
+  return w.state.contacts
+    .filter((c) => c.username && (!q || c.username.includes(q) || c.name.toLowerCase().includes(q)))
+    .slice(0, 6);
+});
+
+function pickUser(username: string) {
+  target.value = "@" + username;
+  void check();
+}
+
 function startSend(prefill = "") {
   target.value = prefill;
   amount.value = "";
   parsed.value = null;
+  toUser.value = null;
+  acceptChange.value = false;
   quote.value = null;
   go("send");
   if (prefill) void check();
@@ -346,15 +383,33 @@ const parsedLine = computed(() => {
   if (p.kind === "invoice") return `Lightning invoice${p.amount ? ` for ${p.amount.toLocaleString()} sats` : ""}${p.description ? ` · ${p.description}` : ""}`;
   if (p.kind === "lightningAddress") return p.address;
   if (p.kind === "lnurl") return `Lightning payment to ${p.domain}`;
+  if (toUser.value) return `@${toUser.value.username}`;
   if (p.kind === "spark") return `Spark address ${p.address.slice(0, 10)}…${p.address.slice(-6)}`;
   return `Bitcoin address ${p.address.slice(0, 10)}…${p.address.slice(-6)}`;
 });
 
+/** "@ada", or a saved contact's name that has a username. */
+function usernameIn(text: string): string | null {
+  const t = text.trim();
+  if (/^@[a-z0-9_]{3,20}$/i.test(t)) return t.slice(1).toLowerCase();
+  const c = w.state.contacts.find((x) => x.username && x.name.toLowerCase() === t.toLowerCase());
+  return c?.username ?? null;
+}
+
 async function check() {
   error.value = "";
   parsed.value = null;
+  toUser.value = null;
   if (!target.value.trim()) return;
+  const name = usernameIn(target.value);
   try {
+    if (name) {
+      const u = await w.resolveUsernameLightning(name, ln.network);
+      toUser.value = u;
+      acceptChange.value = false;
+      parsed.value = { kind: "spark", address: u.address };
+      return;
+    }
     parsed.value = await ln.parse(target.value);
   } catch (e) {
     error.value = msg(e, "That doesn't look like something Lightning can pay.");
@@ -375,6 +430,10 @@ async function review() {
   if (!parsed.value) await check();
   const p = parsed.value;
   if (!p) return;
+  if (toUser.value?.changed && !acceptChange.value) {
+    error.value = "Check with them before paying: their wallet key changed.";
+    return;
+  }
   let a: number | undefined;
   if (needsAmount.value) {
     a = Number(amount.value.replace(/[,\s]/g, ""));
@@ -389,7 +448,7 @@ async function review() {
   }
   busy.value = true;
   try {
-    const r = await ln.prepare(target.value, a);
+    const r = await ln.prepare(toUser.value ? toUser.value.address : target.value, a);
     if (r.quote.amount + r.quote.fee > (ln.st.balance ?? 0)) {
       error.value = "You don't have enough in Lightning for this amount plus the fee.";
       return;
@@ -412,6 +471,7 @@ async function confirmSend() {
   try {
     const p = await ln.send(prep.value, idem);
     sentPending.value = p.status === "pending";
+    if (toUser.value) w.rememberUsername(toUser.value.username, toUser.value.identityPubkey);
     go("sent");
   } catch (e) {
     error.value = msg(e, "The payment failed. Nothing was sent.");
@@ -526,6 +586,11 @@ defineExpose({ startSend });
 .ngn { display: block; font-weight: 400; font-size: 12px; color: var(--text-dim); }
 .safe { margin: 4px 0 6px; line-height: 1.5; }
 .safe summary { cursor: pointer; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.chip-btn { border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 999px; padding: 5px 12px; font: inherit; font-size: 13px; cursor: pointer; }
+.verified { color: var(--green); font-size: 12px; font-weight: 600; }
+.check { display: flex; gap: 8px; align-items: center; margin-top: 10px; font-size: 14px; }
+.warn span { color: var(--orange); }
 .deposit { background: var(--orange-soft); border-radius: 10px; padding: 8px 12px; margin: 6px 0; }
 .center { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .big-icon { font-size: 44px; }

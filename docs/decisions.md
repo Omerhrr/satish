@@ -845,3 +845,20 @@ back-off (broadcasts are never blindly retried). Syncs are single-flight,
 the change chain look-ahead is 10, and the @username pool look-ahead is 20
 only on a device's first sync (5 after). "Review" waits for an update in
 progress instead of failing.
+
+## D31 - Pay @username on Lightning (2026-10-23)
+
+**Decision:** when a user opens Lightning, their phone publishes their Spark
+address under their @username, signed by the same wallet identity key that
+vouches for their on-chain pool addresses (message
+`sha256("xp-handle-ln-v1|<network>|<ln network>|<address>")`). The server
+checks the signature and that the key owns the username before storing it.
+Paying "@ada" on Lightning fetches her signed address; the payer's phone
+re-verifies the signature, checks the Lightning network matches, and checks
+the identity key against the one pinned the first time they paid her (on
+Bitcoin or Lightning), warning if it changed. The payment is a Spark transfer:
+instant and free. Saved Satish contacts are suggested as you type.
+
+**Consequences:** a compromised server can't redirect @username Lightning
+payments (it can't forge the signature). If the recipient has never opened
+Lightning, the payer is told to pay on Bitcoin or ask them to open it once.

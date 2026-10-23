@@ -117,9 +117,19 @@ export interface XpClient {
   btcPrice: () => Promise<{ btc_ngn: number; btc_usd: number | null; updated_at: number; source: string }>;
   onrampStatus: () => Promise<{ enabled: boolean; default_fiat: string }>;
   onrampLink: (body: { address: string; fiat?: string; amount?: number }) => Promise<{ url: string; expires_at: string }>;
+  handleLightningPublish: (body: { network: string; identity_pubkey: string; ln_network: string; spark_address: string; signature: string }) => Promise<HandleLightningOut>;
+  handleLightning: (username: string, network: string) => Promise<HandleLightningOut>;
   alertsStatus: (network: string) => Promise<WalletAlertsOut>;
   alertsSet: (body: { network: string; enabled: boolean; addresses?: string[] }) => Promise<WalletAlertsOut>;
   alertsWatch: (body: { network: string; addresses: string[] }) => Promise<WalletAlertsOut>;
+}
+
+export interface HandleLightningOut {
+  username: string;
+  identity_pubkey: string;
+  ln_network: string;
+  spark_address: string;
+  signature: string;
 }
 
 export interface WalletAlertsOut {
@@ -131,10 +141,14 @@ export interface WalletAlertsOut {
 export function friendlyError(status: number, detail: string): string {
   if (status === 401) return "You're not signed in. Please open Satish from the Telegram bot.";
   if (status === 403) return "That isn't available on your account.";
-  if (status === 404) return "We couldn't find that. It may have been removed.";
+  if (status === 404) {
+    // Our own 404s explain themselves ("No Satish user called @x."); framework ones say "Not Found".
+    const own = detail.trim();
+    return own && own !== "Not Found" && /\s/.test(own) ? own : "We couldn't find that. It may have been removed.";
+  }
   if (status === 429) return "You're going a bit fast. Please wait a moment and try again.";
   if (status >= 500) return "Something went wrong on our side. Please try again shortly.";
-  if (/insufficient|balance/i.test(detail)) return "You don't have enough XP for that. Buy more XP and try again.";
+  if (/insufficient|balance/i.test(detail)) return "You don't have enough TK for that. Buy more TK and try again.";
   // 400/409/422: the server's reason is usually meaningful; keep it short.
   const text = detail.replace(/^[A-Z_]+:\s*/, "").trim();
   return text ? text.charAt(0).toUpperCase() + text.slice(1) : "That didn't work. Please try again.";
@@ -364,6 +378,9 @@ export function createXpClient(config: XpClientConfig = {}): XpClient {
     btcPrice: () => request("/api/v1/price/btc"),
     onrampStatus: () => request("/api/v1/onramp/status"),
     onrampLink: (body) => request("/api/v1/onramp/link", { method: "POST", body: JSON.stringify(body) }),
+    handleLightningPublish: (body) => request("/api/v1/handles/lightning", { method: "POST", body: JSON.stringify(body) }),
+    handleLightning: (username, network) =>
+      request(`/api/v1/handles/${encodeURIComponent(username)}/lightning?network=${network}`),
     alertsStatus: (network) => request(`/api/v1/wallet/alerts?network=${network}`),
     alertsSet: (body) => request("/api/v1/wallet/alerts", { method: "PUT", body: JSON.stringify(body) }),
     alertsWatch: (body) => request("/api/v1/wallet/alerts/addresses", { method: "POST", body: JSON.stringify(body) }),
