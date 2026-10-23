@@ -45,6 +45,8 @@ class HandleMeOut(BaseModel):
     available: int
     max_index: int
     issued_max_index: int
+    lightning_address: str | None = None  # published Spark address, if any
+    lightning_network: str | None = None
 
 
 class HandleOut(BaseModel):
@@ -152,7 +154,10 @@ async def claim(payload: ClaimIn, user: CurrentUser, session: DbSession) -> Hand
 async def me(network: Network, user: CurrentUser, session: DbSession) -> HandleMeOut:
     row = await svc.my_handle(session, user, network)
     pool = await svc.pool_status(session, user, network)
-    return HandleMeOut(username=row.username if row else None, identity_pubkey=row.identity_pubkey if row else None, **pool)
+    return HandleMeOut(
+        username=row.username if row else None, identity_pubkey=row.identity_pubkey if row else None,
+        lightning_address=row.spark_address if row else None, lightning_network=row.spark_network if row else None, **pool,
+    )
 
 
 @router.post("/handles/addresses", response_model=HandleMeOut)

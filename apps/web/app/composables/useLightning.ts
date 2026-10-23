@@ -17,6 +17,8 @@ const st = reactive({
   error: "",
   flash: "",
   loaded: false,
+  publish: "idle" as "idle" | "working" | "ok" | "error" | "nousername",
+  publishError: "",
 });
 
 let wallet: LightningWallet | null = null;
@@ -35,6 +37,7 @@ async function loadSdk(): Promise<SdkModule> {
 
 export function useLightning() {
   const config = useRuntimeConfig();
+  const wal = useWallet(); // captured now: composables can't be called after an await
   const onchainNet = config.public.bitcoinNetwork === "mainnet" ? "mainnet" : "testnet";
   const network = ((config.public.lightningNetwork as string) || (onchainNet === "mainnet" ? "mainnet" : "regtest")) as LnNetwork;
   const apiKey = (config.public.breezApiKey as string) || "";
@@ -73,7 +76,7 @@ export function useLightning() {
   /** Start Lightning from the unlocked wallet session (no second password). */
   async function open() {
     if (st.open || st.opening) return;
-    const phrase = useWallet().sessionPhraseOrNull();
+    const phrase = wal.sessionPhraseOrNull();
     if (!phrase) {
       st.error = "Unlock Satish first.";
       return;
@@ -94,19 +97,28 @@ export function useLightning() {
     }
   }
 
-  /** Let people pay my @username on Lightning (quiet: retried next time if it fails). */
-  async function publish() {
-    if (!wallet?.connected || !useWallet().state.handle?.username) return;
-    try {
-      await useWallet().publishLightning(network, await wallet.sparkAddress());
-    } catch {
-      /* offline / not signed in: try again next open */
-    }
+  /** Let people pay my @username on Lightning. Retried on every sync until it works. */
+  let publishing: Promise<void> | null = null;
+  function publish(): Promise<void> {
+    if (publishing) return publishing;
+    publishing = (async () => {
+      if (!wallet?.connected) return;
+      st.publish = "working";
+      st.publishError = "";
+      try {
+        const ok = await wal.publishLightning(network, await wallet.sparkAddress());
+        st.publish = ok ? "ok" : "nousername";
+      } catch (e) {
+        st.publish = "error";
+        st.publishError = e instanceof Error ? e.message : "Couldn't set up your username for Lightning.";
+      }
+    })().finally(() => (publishing = null));
+    return publishing;
   }
 
   /** One password unlocks both wallets. Throws WrongPassword. */
   async function unlockAll(password: string) {
-    await useWallet().unlock(password);
+    await wal.unlock(password);
     if (available) void open();
   }
 
@@ -119,6 +131,7 @@ export function useLightning() {
         wallet.unclaimedDeposits().catch(() => []),
         wallet.lightningAddress().catch(() => null),
       ]);
+      if (st.publish !== "ok" && st.publish !== "working") void publish();
       st.balance = balance;
       st.payments = payments;
       st.deposits = deposits;

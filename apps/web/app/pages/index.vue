@@ -141,7 +141,7 @@
           </button>
         </div>
 
-        <LightningWallet v-if="tab === 'ln' && ln.available" :hide="w.state.hideBalance" :username="w.state.handle?.username ?? null" @pay-onchain="payOnchainTo" />
+        <LightningWallet v-if="tab === 'ln' && ln.available" :hide="w.state.hideBalance" :username="w.state.handle?.username ?? null" @pay-onchain="payOnchainTo" @pay-user-onchain="payUserOnchain" />
 
         <template v-if="tab === 'btc' || !ln.available">
         <section class="card center">
@@ -1051,6 +1051,12 @@ async function payOnchainTo(address: string) {
   await openSend();
   sendTo.value = address;
   sendNote.value = "Moved to Lightning";
+}
+
+async function payUserOnchain(username: string) {
+  setTab("btc");
+  await openSend();
+  sendTo.value = "@" + username;
 }
 
 async function moveEverything() {

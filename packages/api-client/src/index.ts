@@ -171,6 +171,8 @@ export interface HandleMeOut {
   available: number;
   max_index: number;
   issued_max_index: number;
+  lightning_address?: string | null;
+  lightning_network?: string | null;
 }
 export interface IssuedAddressOut {
   username: string;

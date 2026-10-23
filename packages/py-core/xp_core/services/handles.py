@@ -81,7 +81,15 @@ def address_message(network: str, address: str) -> bytes:
 
 
 LN_NETWORKS = ("mainnet", "regtest", "signet")
-_SPARK = re.compile(r"^[a-z]{2,8}1[02-9ac-hj-np-z]{20,280}$")
+_SPARK = re.compile(r"^[a-z]{2,10}1[02-9ac-hj-np-z]{20,280}$")
+
+
+def normalize_spark(address: str) -> str:
+    """Spark addresses as wallets may hand them over: 'spark:' URI prefix, any case."""
+    a = address.strip()
+    if a.lower().startswith("spark:"):
+        a = a[6:]
+    return a.lower()
 
 
 def spark_message(network: str, ln_network: str, address: str) -> bytes:
@@ -109,7 +117,7 @@ async def set_lightning(
         raise HandleError("This wallet doesn't own that username. Open Satish with the wallet that claimed it.")
     if ln_network not in LN_NETWORKS:
         raise HandleError("Unknown Lightning network.")
-    address = spark_address.strip()
+    address = normalize_spark(spark_address)
     if not _SPARK.match(address):
         raise HandleError("That isn't a valid Lightning (Spark) address.")
     if not verify_spark_signature(identity_pubkey, handle.network, ln_network, address, signature):

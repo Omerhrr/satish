@@ -11,7 +11,7 @@ import {
 import {
   Esplora, NETWORKS, accountXpub, buildHistory, decryptPhrase, encryptPhrase, nextUnused,
   normalizePhrase, planSend, scanAddresses, signPlan, signTx, planBump, walletDescriptors, historyCsv, checkContact,
-  identityFromPhrase, signPoolAddresses, verifyPoolAddress, signSparkAddress, verifySparkAddress, normalizeUsername, POOL_START,
+  identityFromPhrase, signPoolAddresses, verifyPoolAddress, signSparkAddress, verifySparkAddress, normalizeSpark, normalizeUsername, POOL_START,
   type AddressInfo, type BumpPlan, type Contact, type EncryptedSecret, type FeeRates, type HistoryItem, type NetworkName, type SendPlan, type Utxo,
 } from "~/lib/wallet-core";
 
@@ -34,6 +34,8 @@ interface HandleInfo {
   available: number;
   maxIndex: number;
   issuedMax: number;
+  lightningAddress: string | null; // what the server has published for my @username
+  lightningNetwork: string | null;
 }
 
 const POOL_BATCH = 30;
@@ -489,8 +491,14 @@ export function useWallet() {
 
   // ------------------------------------------------------------ @username
 
-  function setHandle(h: { username: string | null; available: number; max_index: number; issued_max_index: number }) {
-    state.handle = { username: h.username, available: h.available, maxIndex: h.max_index, issuedMax: h.issued_max_index };
+  function setHandle(h: {
+    username: string | null; available: number; max_index: number; issued_max_index: number;
+    lightning_address?: string | null; lightning_network?: string | null;
+  }) {
+    state.handle = {
+      username: h.username, available: h.available, maxIndex: h.max_index, issuedMax: h.issued_max_index,
+      lightningAddress: h.lightning_address ?? null, lightningNetwork: h.lightning_network ?? null,
+    };
   }
 
   /** Load my @username (if any) and quietly top up its address pool. */
@@ -554,16 +562,27 @@ export function useWallet() {
     return { username, address: got.address, identityPubkey: got.identity_pubkey, changed: !!pinned && pinned !== got.identity_pubkey };
   }
 
-  /** Publish my Lightning (Spark) address under my @username, signed by my identity key. */
+  /**
+   * Publish my Lightning (Spark) address under my @username, signed by my
+   * identity key. Checks the server's own record (not a local flag), so a
+   * failed or lost publish is retried. Returns false when there's no username.
+   * Throws with a plain reason when the server refuses.
+   */
   async function publishLightning(lnNetwork: string, sparkAddress: string): Promise<boolean> {
+    if (!state.handle) await loadHandle();
     const w = state.stored;
     const username = state.handle?.username;
-    if (!w?.identityKey || !w.identityPub || !username) return false;
-    const marker = `${username}|${lnNetwork}|${sparkAddress}`;
-    if (w.lnPublished === marker) return true;
-    const signature = signSparkAddress(w.identityKey, net, lnNetwork, sparkAddress);
-    await xpApi.handleLightningPublish({ network: netName, identity_pubkey: w.identityPub, ln_network: lnNetwork, spark_address: sparkAddress, signature });
-    persist({ ...state.stored!, lnPublished: marker });
+    if (!w || !username) return false;
+    if (!w.identityKey || !w.identityPub) {
+      throw new Error("Your username was set up on another phone. Pick it again here to receive on Lightning.");
+    }
+    const address = normalizeSpark(sparkAddress);
+    if (state.handle!.lightningAddress === address && state.handle!.lightningNetwork === lnNetwork) return true;
+    const signature = signSparkAddress(w.identityKey, net, lnNetwork, address);
+    const got = await xpApi.handleLightningPublish({
+      network: netName, identity_pubkey: w.identityPub, ln_network: lnNetwork, spark_address: address, signature,
+    });
+    if (state.handle) state.handle = { ...state.handle, lightningAddress: got.spark_address, lightningNetwork: got.ln_network };
     return true;
   }
 

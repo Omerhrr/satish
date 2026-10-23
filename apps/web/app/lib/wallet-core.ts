@@ -849,6 +849,13 @@ export function verifyPoolAddress(identityPubHex: string, net: NetworkInfo, addr
   }
 }
 
+/** Spark addresses as wallets may hand them over: "spark:" URI prefix, any case. */
+export function normalizeSpark(address: string): string {
+  let a = address.trim();
+  if (/^spark:/i.test(a)) a = a.slice(6);
+  return a.toLowerCase();
+}
+
 /** What the identity key signs to vouch for a @username's Lightning (Spark) address. */
 export function sparkMessage(net: NetworkInfo, lnNetwork: string, address: string): Uint8Array {
   return sha256(new TextEncoder().encode(`xp-handle-ln-v1|${net.name}|${lnNetwork}|${address}`));

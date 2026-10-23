@@ -216,3 +216,23 @@ async def test_username_lightning_address(session, dev_user):
         assert svc.verify_spark_signature(got["identity_pubkey"], NET, got["ln_network"], got["spark_address"], got["signature"])
         assert not svc.verify_spark_signature(got["identity_pubkey"], NET, "mainnet", got["spark_address"], got["signature"])
         assert (await c.get("/api/v1/handles/nobody/lightning", params={"network": NET})).status_code == 404
+
+
+async def test_lightning_status_in_me_and_address_normalised(session, dev_user):
+    from app.main import app
+    from httpx import ASGITransport, AsyncClient
+
+    pub, signed = ADA
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        claim = {"network": NET, "username": "ada", "identity_pubkey": pub,
+                 "addresses": [{"address": s.address, "index": s.index, "signature": s.signature} for s in map(signed, range(1000, 1002))]}
+        assert (await c.post("/api/v1/handles/claim", json=claim)).status_code == 200
+        me = (await c.get("/api/v1/handles/me", params={"network": NET})).json()
+        assert me["lightning_address"] is None
+        real = "sparkrt1pgssyuuuhnrrdjswal5c3s3rafw9w3y5dd4cjy3duxlf7hjzkp0rqx6dj6mrhu"  # documented regtest format
+        body = {"network": NET, "identity_pubkey": pub, "ln_network": "regtest",
+                "spark_address": "spark:" + real.upper(), "signature": _spark_sig("abandon " * 11 + "about", "regtest", real)}
+        r = await c.post("/api/v1/handles/lightning", json=body)
+        assert r.status_code == 200 and r.json()["spark_address"] == real
+        me = (await c.get("/api/v1/handles/me", params={"network": NET})).json()
+        assert me["lightning_address"] == real and me["lightning_network"] == "regtest"

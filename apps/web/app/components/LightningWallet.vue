@@ -46,7 +46,13 @@
           </template>
         </div>
         <div v-if="ln.st.address" class="small">Your Lightning address: <b class="mono">{{ ln.st.address }}</b></div>
-        <div v-if="username" class="small">Satish users can pay you at <b>@{{ username }}</b> ⚡</div>
+        <div v-if="ln.st.publish === 'ok'" class="small ok">✓ Satish users can pay you at <b>@{{ username }}</b> ⚡</div>
+        <div v-else-if="ln.st.publish === 'working'" class="small dim"><span class="spinner" /> Setting up @{{ username }} for Lightning…</div>
+        <div v-else-if="ln.st.publish === 'error'" class="small warnline">
+          ⚠️ Satish users can't pay @{{ username }} on Lightning yet: {{ ln.st.publishError }}
+          <button class="btn small" @click="ln.publish()">Try again</button>
+        </div>
+        <div v-else-if="ln.st.publish === 'nousername' || !username" class="small dim">Pick a username on the Bitcoin tab so Satish users can pay you here.</div>
         <div class="row">
           <button class="btn primary" @click="startReceive">↓ Receive</button>
           <button class="btn primary" :disabled="!ln.st.balance" @click="startSend()">↑ Send</button>
@@ -142,6 +148,7 @@
       </label>
       <p class="small dim">Available: {{ (ln.st.balance ?? 0).toLocaleString() }} sats</p>
       <p v-if="error" class="err">{{ error }}</p>
+      <button v-if="fallbackUser" class="btn small" @click="emit('pay-user-onchain', fallbackUser)">Pay @{{ fallbackUser }} from Bitcoin instead</button>
       <div class="stack">
         <button class="btn primary" :disabled="busy || !target" @click="review"><span v-if="busy" class="spinner" /> Review</button>
         <button class="btn ghost" @click="go('card')">Cancel</button>
@@ -205,7 +212,8 @@ import { LightningError, type FeeQuote, type SendTarget } from "~/lib/lightning"
 import { WrongPassword } from "~/lib/wallet-core";
 
 const props = defineProps<{ hide: boolean; username: string | null }>();
-const emit = defineEmits<{ (e: "pay-onchain", address: string): void }>();
+const emit = defineEmits<{ (e: "pay-onchain", address: string): void; (e: "pay-user-onchain", username: string): void }>();
+const fallbackUser = ref("");
 
 const ln = useLightning();
 const w = useWallet();
@@ -398,6 +406,7 @@ function usernameIn(text: string): string | null {
 
 async function check() {
   error.value = "";
+  fallbackUser.value = "";
   parsed.value = null;
   toUser.value = null;
   if (!target.value.trim()) return;
@@ -412,6 +421,7 @@ async function check() {
     }
     parsed.value = await ln.parse(target.value);
   } catch (e) {
+    if (name && /hasn't opened Lightning|different network/.test(msg(e, ""))) fallbackUser.value = name;
     error.value = msg(e, "That doesn't look like something Lightning can pay.");
   }
 }
@@ -591,6 +601,7 @@ defineExpose({ startSend });
 .verified { color: var(--green); font-size: 12px; font-weight: 600; }
 .check { display: flex; gap: 8px; align-items: center; margin-top: 10px; font-size: 14px; }
 .warn span { color: var(--orange); }
+.warnline { color: var(--orange); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0; }
 .deposit { background: var(--orange-soft); border-radius: 10px; padding: 8px 12px; margin: 6px 0; }
 .center { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .big-icon { font-size: 44px; }
