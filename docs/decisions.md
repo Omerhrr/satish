@@ -888,3 +888,29 @@ tprv, BIP84) and descriptor, plus per-address keys for addresses holding
 coins, behind the password and an explicit "I understand" tick. "Sweep a
 private key" moves everything on a WIF key (native SegWit, nested SegWit or
 legacy) into the wallet; the key is never stored.
+
+## D33 - Product design pass (2026-10-23)
+
+Audit of every screen at phone size, then fixes:
+- **Frame:** removed the brand header and footer (Telegram already shows the
+  app name); main sections moved to a bottom bar (Wallet, Satish AI) within
+  thumb reach; sub-tabs sticky at the top; wallet sub-tabs hidden until a
+  wallet exists. Chrome above content went from ~235 px to ~50 px.
+- **Home:** balance leads with sats (naira and BTC secondary); Receive and
+  Send are the two primary actions, Buy bitcoin and Request secondary; the
+  big Refresh button became a quiet "Updated just now · tap to refresh"
+  line. Lightning card matches (same balance style and action layout); its
+  "How safe is it?" is a pop-over instead of a paragraph on every visit.
+- **Send:** the fee picker shows time and typical cost (sats / naira)
+  instead of sat/vB, as three equal options.
+- **Settings:** grouped list (Security, Backup and alerts, Your wallet
+  elsewhere, Account) with switches for on/off settings and the destructive
+  action last; no more endless "…" when the alerts status can't be loaded.
+- **Satish AI:** one name everywhere; sub-tabs Ask, Automations, Credits,
+  Connect (Buy TK + TK history merged into Credits); tasks as a phone list
+  instead of a 6-column table; budget shown in sats/naira; an everyday
+  Nigerian example instead of a technical one; credit packs lead with TK and
+  show price in sats and naira; removed the misleading "≈ sats equivalent".
+- **Detail:** day-first dates without seconds ("22 Oct, 09:00"); sentence-
+  case table headers; emoji removed from headings; visible keyboard focus;
+  reduced-motion respected; clear offline message.

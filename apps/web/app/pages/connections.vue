@@ -1,6 +1,6 @@
 <template>
   <div>
-    <h1 class="page-title">🔗 Connect your email</h1>
+    <h1 class="page-title">Connect your email</h1>
     <p class="page-sub">
       Let the assistant write emails for you. Nothing is sent until you approve
       it. Your password is stored encrypted and never shown again.

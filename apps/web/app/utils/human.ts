@@ -39,3 +39,13 @@ export function human(code?: string | null): string {
   const words = key.replace(/[._:]+/g, " ").trim();
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
+
+
+/** "22 Oct, 09:00" (this year) or "22 Oct 2025, 09:00": day-first, no seconds. */
+export function niceDate(unixSecs: number): string {
+  const d = new Date(unixSecs * 1000);
+  const sameYear = d.getFullYear() === new Date().getFullYear();
+  const day = d.toLocaleDateString("en-GB", { day: "numeric", month: "short", ...(sameYear ? {} : { year: "numeric" }) });
+  const time = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  return `${day}, ${time}`;
+}

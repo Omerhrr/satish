@@ -1,6 +1,6 @@
 <template>
   <div>
-    <h1 class="page-title">🛡 Security &amp; recovery</h1>
+    <h1 class="page-title">Security &amp; recovery</h1>
     <p class="page-sub">How Satish keeps your account and money safe.</p>
 
     <section class="card">

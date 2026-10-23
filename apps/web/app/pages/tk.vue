@@ -1,6 +1,6 @@
 <template>
   <div>
-    <h1 class="page-title">⚡ TK history</h1>
+    <h1 class="page-title">TK history</h1>
     <p class="page-sub">
       Every TK you buy, reserve, spend or get back, line by line.
     </p>

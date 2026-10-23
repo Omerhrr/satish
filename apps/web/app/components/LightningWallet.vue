@@ -3,23 +3,24 @@
     <!-- ======== card ======== -->
     <template v-if="view === 'card'">
       <div class="head">
-        <h2>⚡ Lightning</h2>
-        <span class="chip">{{ netLabel }}</span>
-      </div>
-      <p class="small dim">Instant payments with tiny fees, for everyday spending. Same 12 words as your savings wallet.</p>
-      <details class="small dim safe">
-        <summary>How safe is it?</summary>
+        <span class="dim small">Lightning spending{{ ln.network === "mainnet" ? "" : " (test)" }}</span>
+        <details class="small dim safe">
+          <summary>How safe is it?</summary>
+          <div class="safe-body">
         Your keys stay on this phone, like your savings wallet. Lightning here runs on Spark:
         payments are co-signed by a few independent companies (Lightspark, Breez, Flashnet),
         who can't move your money on their own, and you can always take it back to the Bitcoin
         network yourself. It's built for spending money; keep larger savings in your Bitcoin wallet.
-      </details>
+          </div>
+        </details>
+      </div>
 
       <template v-if="!ln.st.open">
         <div v-if="ln.st.cachedBalance !== null" class="bal">
-          {{ hide ? "••••" : ln.st.cachedBalance.toLocaleString() + " sats" }}
-          <span class="small dim">last known</span>
+          {{ hide ? "••••" : ln.st.cachedBalance.toLocaleString() }}<span class="unit"> sats</span>
         </div>
+        <p v-if="ln.st.cachedBalance !== null" class="small dim">Last known balance</p>
+        <p v-else class="small dim">Instant payments with tiny fees. Uses the same 12 words as your savings.</p>
         <template v-if="!w.state.unlocked">
           <label class="field">Wallet password<input v-model="password" type="password" autocomplete="current-password" @keyup.enter="unlock" /></label>
           <p class="small dim">One password opens both your Bitcoin and Lightning wallets.</p>
@@ -40,24 +41,22 @@
       <template v-else>
         <div class="bal">
           <template v-if="hide">••••</template>
-          <template v-else>
-            {{ (ln.st.balance ?? 0).toLocaleString() }} sats
-            <span v-if="naira(ln.st.balance ?? 0)" class="small dim">· {{ naira(ln.st.balance ?? 0) }}</span>
-          </template>
+          <template v-else>{{ (ln.st.balance ?? 0).toLocaleString() }}<span class="unit"> sats</span></template>
         </div>
+        <div v-if="!hide && naira(ln.st.balance ?? 0)" class="small dim">{{ naira(ln.st.balance ?? 0) }}</div>
         <div v-if="ln.st.address" class="small">Your Lightning address: <b class="mono">{{ ln.st.address }}</b></div>
-        <div v-if="ln.st.publish === 'ok'" class="small ok">✓ Satish users can pay you at <b>@{{ username }}</b> ⚡</div>
+        <div v-if="ln.st.publish === 'ok'" class="small ok">Satish users can pay you at <b>@{{ username }}</b></div>
         <div v-else-if="ln.st.publish === 'working'" class="small dim"><span class="spinner" /> Setting up @{{ username }} for Lightning…</div>
         <div v-else-if="ln.st.publish === 'error'" class="small warnline">
-          ⚠️ Satish users can't pay @{{ username }} on Lightning yet: {{ ln.st.publishError }}
+          Satish users can't pay @{{ username }} on Lightning yet: {{ ln.st.publishError }}
           <button class="btn small" @click="ln.publish()">Try again</button>
         </div>
         <div v-else-if="ln.st.publish === 'nousername' || !username" class="small dim">Pick a username on the Bitcoin tab so Satish users can pay you here.</div>
-        <div class="row">
-          <button class="btn primary" @click="startReceive">↓ Receive</button>
-          <button class="btn primary" :disabled="!ln.st.balance" @click="startSend()">↑ Send</button>
-          <button class="btn" @click="go('move')">⇅ Move</button>
+        <div class="actions-main">
+          <button class="btn primary" @click="startReceive">Receive</button>
+          <button class="btn primary" :disabled="!ln.st.balance" @click="startSend()">Send</button>
         </div>
+        <button class="btn" style="width: 100%; margin-top: 8px" @click="go('move')">Move between savings and Lightning</button>
         <p v-if="ln.st.flash" class="small ok">{{ ln.st.flash }}</p>
         <p v-if="ln.st.error" class="err">{{ ln.st.error }}</p>
 
@@ -91,7 +90,7 @@
 
     <!-- ======== receive ======== -->
     <template v-else-if="view === 'receive'">
-      <h2>⚡ Receive with Lightning</h2>
+      <h2>Receive with Lightning</h2>
       <div class="tabs">
         <button class="btn small" :class="{ primary: recvMode === 'invoice' }" @click="recvMode = 'invoice'; shown = ''">Invoice</button>
         <button class="btn small" :class="{ primary: recvMode === 'spark' }" @click="showSpark">Spark address</button>
@@ -124,7 +123,7 @@
 
     <!-- ======== send ======== -->
     <template v-else-if="view === 'send'">
-      <h2>⚡ Send with Lightning</h2>
+      <h2>Send with Lightning</h2>
       <label class="field">
         @username, invoice or Lightning address
         <div class="inline">
@@ -253,7 +252,7 @@ function go(v: View) {
 }
 
 function fmt(t: number) {
-  return t ? new Date(t * 1000).toLocaleString() : "";
+  return t ? niceDate(t) : "";
 }
 
 function kindLabel(k: string) {
@@ -569,7 +568,13 @@ defineExpose({ startSend });
 <style scoped>
 .ln .head { display: flex; justify-content: space-between; align-items: center; }
 .chip { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-dim); }
-.bal { font-size: 24px; font-weight: 700; margin: 8px 0; }
+.bal { font-size: 34px; font-weight: 800; letter-spacing: -0.5px; line-height: 1.15; margin: 6px 0 2px; font-variant-numeric: tabular-nums; }
+.bal .unit { font-size: 16px; font-weight: 600; color: var(--text-dim); letter-spacing: 0; }
+.actions-main { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+.actions-main .btn { min-height: 48px; font-size: 16px; }
+.safe { position: relative; }
+.safe summary { cursor: pointer; list-style: none; text-decoration: underline; }
+.safe-body { position: absolute; right: 0; z-index: 5; width: min(300px, 80vw); margin-top: 6px; padding: 12px; border-radius: 12px; background: var(--bg-elev2); border: 1px solid var(--border); color: var(--text-dim); line-height: 1.5; }
 .row { display: flex; gap: 8px; margin: 8px 0; flex-wrap: wrap; }
 .row .btn { flex: 1; min-width: 0; }
 .stack { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }

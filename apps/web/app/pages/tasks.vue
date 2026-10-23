@@ -1,9 +1,13 @@
 <template>
   <div>
-    <h1 class="page-title">🗂 Tasks</h1>
+    <div class="ask-head">
+      <h1 class="page-title">Ask Satish AI</h1>
+      <NuxtLink to="/billing" class="credit-chip">{{ balance !== null ? balance.toLocaleString() + " TK" : "… TK" }}</NuxtLink>
+    </div>
     <p class="page-sub">
-      Tell the assistant what you need and set a budget. TK is held while it
-      works; you only pay for what it uses, and the rest comes back.
+      Research, price comparisons and written reports with sources. You set a budget;
+      you only pay for what it uses and the rest comes back.
+      <NuxtLink to="/ai">What can it do?</NuxtLink>
     </p>
 
     <section class="card">
@@ -15,7 +19,7 @@
           <textarea
             v-model="objective"
             rows="3"
-            placeholder="e.g. Summarize recent cold-storage wallet security incidents and produce a PDF brief"
+            placeholder="e.g. Compare prices of a 50kg bag of rice in Kaduna markets and make me a PDF report"
             required
             minlength="8"
             maxlength="4000"
@@ -24,6 +28,7 @@
         <label class="field">
           Budget (TK)
           <input v-model.number="budget" type="number" min="1" max="100000" required />
+          <span v-if="budgetWorth" class="small dim">That's up to {{ budgetWorth }}. Unused TK comes back.</span>
         </label>
         <button class="btn primary" type="submit" :disabled="creating">
           <span v-if="creating" class="spinner" /> Create task
@@ -34,66 +39,33 @@
 
     <section class="card">
       <h2>Tasks <span class="dim">({{ tasks.length }})</span></h2>
-      <div class="table-wrap" style="margin-top: 10px">
-        <table class="ledger">
-          <thead>
-            <tr>
-              <th>Created</th>
-              <th>Task</th>
-              <th>Status</th>
-              <th style="text-align: right">Budget</th>
-              <th style="text-align: right">Spent</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="loading">
-              <td colspan="6"><span class="spinner" /> Loading…</td>
-            </tr>
-            <tr v-else-if="tasks.length === 0">
-              <td colspan="6" class="dim">No tasks yet.</td>
-            </tr>
-            <tr v-for="t in tasks" :key="t.id">
-              <td class="mono small">{{ shortTime(t.created_at) }}</td>
-              <td class="small" style="max-width: 280px">
-                {{ t.objective }}
-                <div v-if="t.status === 'running'" class="small working"><span class="spinner" /> Working on it…</div>
-                <div v-if="t.error" class="small task-err">{{ t.error }}</div>
-              </td>
-              <td><span class="badge" :class="t.status">{{ human(t.status) }}</span></td>
-              <td class="mono" style="text-align: right">{{ t.budget_xp.toLocaleString() }}</td>
-              <td class="mono" style="text-align: right">{{ t.actual_xp.toLocaleString() }}</td>
-              <td style="white-space: nowrap">
-                <button
-                  v-if="['planned', 'awaiting_approval'].includes(t.status)"
-                  class="btn primary small"
-                  :disabled="running === t.id"
-                  @click="run(t.id)"
-                >
-                  <span v-if="running === t.id" class="spinner" />
-                  {{ t.status === "awaiting_approval" ? "Resume" : "Run" }}
-                </button>
-                <button v-if="['planned', 'running'].includes(t.status)" class="btn small" @click="showEvents(t.id)">
-                  Progress
-                </button>
-                <button
-                  v-if="['completed', 'failed', 'cancelled'].includes(t.status)"
-                  class="btn small"
-                  @click="showResult(t.id)"
-                >
-                  Result
-                </button>
-                <button
-                  v-if="!['completed', 'failed', 'cancelled'].includes(t.status)"
-                  class="btn sensitive-action small ghost"
-                  @click="cancel(t.id)"
-                >
-                  Cancel
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <p v-if="loading" class="small dim" style="margin-top: 8px"><span class="spinner" /> Loading…</p>
+      <p v-else-if="tasks.length === 0" class="small dim" style="margin-top: 8px">No tasks yet. Ask for something above, or try a free sample report on <NuxtLink to="/ai">What can it do?</NuxtLink></p>
+      <div v-for="t in tasks" :key="t.id" class="task">
+        <div class="task-top">
+          <span class="badge" :class="t.status">{{ human(t.status) }}</span>
+          <span class="small dim">{{ shortTime(t.created_at) }}</span>
+        </div>
+        <p class="task-obj">{{ t.objective }}</p>
+        <div v-if="t.status === 'running'" class="small working"><span class="spinner" /> Working on it…</div>
+        <div v-if="t.error" class="small task-err">{{ t.error }}</div>
+        <div class="task-foot">
+          <span class="small dim">{{ t.actual_xp.toLocaleString() }} of {{ t.budget_xp.toLocaleString() }} TK used</span>
+          <span class="task-acts">
+            <button
+              v-if="['planned', 'awaiting_approval'].includes(t.status)"
+              class="btn primary small"
+              :disabled="running === t.id"
+              @click="run(t.id)"
+            >
+              <span v-if="running === t.id" class="spinner" />
+              {{ t.status === "awaiting_approval" ? "Resume" : "Run" }}
+            </button>
+            <button v-if="['planned', 'running'].includes(t.status)" class="btn small" @click="showEvents(t.id)">Progress</button>
+            <button v-if="['completed', 'failed', 'cancelled'].includes(t.status)" class="btn small" @click="showResult(t.id)">Result</button>
+            <button v-if="!['completed', 'failed', 'cancelled'].includes(t.status)" class="btn sensitive-action small ghost" @click="cancel(t.id)">Cancel</button>
+          </span>
+        </div>
       </div>
       <div class="notice small">
         The assistant plans the work, uses only approved tools, and never goes
@@ -210,7 +182,24 @@ const loading = ref(true);
 const creating = ref(false);
 const createError = ref("");
 const objective = ref("");
-const budget = ref(100);
+const budget = ref(1000);
+const balance = ref<number | null>(null);
+const tkPerSat = ref<number | null>(null);
+const { naira } = usePrice();
+const budgetWorth = computed(() => {
+  if (!tkPerSat.value || !budget.value) return "";
+  const sats = Math.ceil(budget.value / tkPerSat.value);
+  return `${sats.toLocaleString()} sats` + (naira(sats) ? ` (${naira(sats)})` : "");
+});
+async function loadCredits() {
+  try {
+    const b = await api.balance();
+    balance.value = b.balance_xp;
+    tkPerSat.value = b.xp_per_sat;
+  } catch {
+    /* shown as "… TK" */
+  }
+}
 const running = ref<string | null>(null);
 const eventTask = ref<string | null>(null);
 const eventStatus = ref("");
@@ -231,6 +220,7 @@ function compact(payload: Record<string, unknown>): string {
 let poller: ReturnType<typeof setTimeout> | null = null;
 
 async function refresh() {
+  void loadCredits();
   loading.value = true;
   try {
     tasks.value = await api.listTasks();
@@ -355,6 +345,14 @@ onBeforeUnmount(() => poller && clearTimeout(poller));
 </script>
 
 <style scoped>
+.ask-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.credit-chip { flex: none; font-size: 13px; font-weight: 700; color: var(--orange); background: var(--orange-soft); border-radius: 999px; padding: 4px 12px; }
+.task { padding: 12px 0; border-bottom: 1px solid var(--border); }
+.task:last-of-type { border-bottom: 0; }
+.task-top { display: flex; justify-content: space-between; align-items: center; }
+.task-obj { margin: 6px 0; font-size: 14px; }
+.task-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.task-acts { display: flex; gap: 6px; flex-wrap: wrap; }
 .working { color: var(--orange); display: flex; gap: 6px; align-items: center; margin-top: 4px; }
 .task-err { color: var(--red); margin-top: 4px; }
 </style>

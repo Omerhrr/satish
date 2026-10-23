@@ -10,7 +10,7 @@ venv/
 .ruff_cache/
 build/
 dist/
-
+docs/
 # Databases & local data
 data/
 !tests/data/

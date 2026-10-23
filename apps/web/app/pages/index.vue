@@ -1,7 +1,7 @@
 <template>
   <div class="wallet">
-    <div v-if="w.net.name === 'testnet'" class="testnet">
-      🧪 Test network: these coins have no value.
+    <div v-if="w.net.name === 'testnet' && w.state.stored" class="testnet">
+      Test network: coins here have no value.
       <a href="https://mempool.space/testnet4/faucet" target="_blank" rel="noopener">Get free test coins</a>
     </div>
 
@@ -146,47 +146,48 @@
         <LightningWallet v-if="tab === 'ln' && ln.available" compact :hide="w.state.hideBalance" :username="w.state.handle?.username ?? null" @pay-onchain="payOnchainTo" @pay-user-onchain="payUserOnchain" />
 
         <template v-if="tab === 'btc' || !ln.available">
-        <section class="card center">
-          <div class="dim small">
-            {{ w.net.label }} balance
-            <button class="eye" :aria-label="w.state.hideBalance ? 'Show balance' : 'Hide balance'" @click="w.setHideBalance(!w.state.hideBalance)">
-              {{ w.state.hideBalance ? "🙈" : "👁" }}
+        <section class="card hero">
+          <div class="hero-top">
+            <span class="dim small">{{ w.net.name === "testnet" ? "Bitcoin savings (test)" : "Bitcoin savings" }}</span>
+            <button class="eye" :aria-label="w.state.hideBalance ? 'Show balance' : 'Hide balance'" :aria-pressed="w.state.hideBalance" @click="w.setHideBalance(!w.state.hideBalance)">
+              {{ w.state.hideBalance ? "Show" : "Hide" }}
             </button>
           </div>
           <template v-if="w.state.hideBalance">
-            <div class="balance-big">••••••</div>
-            <div class="dim small">Hidden. Tap 🙈 to show.</div>
+            <div class="amount">••••••</div>
+            <div class="dim small">Balance hidden</div>
           </template>
           <template v-else>
-            <div class="balance-big">{{ fmtBtc(total) }} <span class="unit">{{ unit }}</span></div>
+            <div class="amount">{{ total.toLocaleString() }}<span class="unit"> sats</span></div>
             <div class="dim small">
-              {{ total.toLocaleString() }} sats
-              <template v-if="naira(total)"> · {{ naira(total) }}</template>
+              <template v-if="naira(total)">{{ naira(total) }} · </template>{{ fmtBtc(total) }} {{ unit }}
             </div>
             <div v-if="w.pending.value" class="pending small">
               {{ w.pending.value > 0 ? "+" : "" }}{{ w.pending.value.toLocaleString() }} sats waiting to confirm
             </div>
           </template>
-          <div class="row">
-            <button class="btn primary" @click="go('receive'); watchReceive()">↓ Receive</button>
-            <button class="btn primary" :disabled="!w.spendable.value" @click="openSend">↑ Send</button>
-            <button class="btn primary" @click="openBuy">＋ Buy</button>
-            <button class="btn primary" @click="openRequest">⇄ Request</button>
+          <div class="actions-main">
+            <button class="btn primary" @click="go('receive'); watchReceive()">Receive</button>
+            <button class="btn primary" :disabled="!w.spendable.value" @click="openSend">Send</button>
           </div>
-          <button class="btn ghost small" :disabled="w.state.loading" @click="w.refresh()">
-            <span v-if="w.state.loading" class="spinner" /> {{ w.state.loading ? "Syncing…" : "Refresh" }}
+          <div class="actions-alt">
+            <button class="btn" @click="openBuy">Buy bitcoin</button>
+            <button class="btn" @click="openRequest">Request</button>
+          </div>
+          <button class="sync" :disabled="w.state.loading" @click="w.refresh()">
+            <span v-if="w.state.loading" class="spinner" />
+            {{ w.state.loading ? "Updating…" : w.state.lastSync ? `Updated ${ago(w.state.lastSync)} · tap to refresh` : "Tap to refresh" }}
           </button>
           <p v-if="w.state.error" class="err">{{ w.state.error }}</p>
-          <p v-if="w.state.lastSync && !w.state.live && !w.state.loading" class="small dim">Last updated {{ ago(w.state.lastSync) }}</p>
           <p v-if="notice" class="small ok">{{ notice }}</p>
         </section>
 
         <section class="card">
           <div class="head">
             <h2>Recent</h2>
-            <NuxtLink v-if="w.state.history.length > 3" class="small" :to="{ path: '/', query: { s: 'history' } }">See all →</NuxtLink>
+            <NuxtLink v-if="w.state.history.length > 3" class="small" :to="{ path: '/', query: { s: 'history' } }">See all</NuxtLink>
           </div>
-          <p v-if="!w.state.history.length && !w.state.loading" class="dim small">No transactions yet. Tap Receive to get your address.</p>
+          <p v-if="!w.state.history.length && !w.state.loading" class="dim small">Nothing yet. Tap Receive to get your address, or share your username.</p>
           <button v-for="t in w.state.history.slice(0, 3)" :key="t.txid" class="tx" @click="openTx(t.txid)">
             <div>
               <b>{{ t.amount >= 0 ? "Received" : "Sent" }}</b>
@@ -202,20 +203,20 @@
           </button>
         </section>
 
-        <section class="card">
-          <div class="head">
-            <h2>🏷 Your username</h2>
-            <button v-if="w.state.handle?.username" class="btn small ghost" @click="openUsername">Change</button>
-          </div>
-          <template v-if="w.state.handle?.username">
+        <section v-if="w.state.handle?.username" class="card userrow">
+          <div>
+            <div class="small dim">People on Satish can pay you at</div>
             <div class="handle">@{{ w.state.handle.username }}</div>
-            <p class="small dim">Friends on Satish can pay <b>@{{ w.state.handle.username }}</b> instead of copying an address.</p>
-            <button class="btn small" @click="copy('@' + w.state.handle.username)">{{ copied ? "Copied ✓" : "Copy username" }}</button>
-          </template>
-          <template v-else>
-            <p class="small dim">Pick a username so friends can pay <b>@you</b>, no long addresses.</p>
-            <button class="btn primary small" @click="openUsername">Pick a username</button>
-          </template>
+          </div>
+          <div class="acts">
+            <button class="btn small" @click="copy('@' + w.state.handle.username)">{{ copied ? "Copied" : "Copy" }}</button>
+            <button class="btn small ghost" @click="openUsername">Change</button>
+          </div>
+        </section>
+        <section v-else class="card">
+          <h2>Get paid by name</h2>
+          <p class="small dim">Pick a username so friends can pay @you instead of copying a long address.</p>
+          <button class="btn primary small" style="margin-top: 8px" @click="openUsername">Pick a username</button>
         </section>
 
         </template>
@@ -229,7 +230,7 @@
           </div>
           <section v-if="histTab === 'btc' || !ln.available" class="card">
             <div class="head">
-              <h2>₿ Bitcoin history</h2>
+              <h2>Bitcoin history</h2>
               <button class="btn small ghost" :disabled="w.state.loading" @click="w.fullRefresh()"><span v-if="w.state.loading" class="spinner" /> Check all</button>
             </div>
             <p v-if="!w.state.history.length && !w.state.loading" class="dim small">No transactions yet.</p>
@@ -251,7 +252,7 @@
             <p v-if="notice" class="small ok">{{ notice }}</p>
           </section>
           <section v-else class="card">
-            <h2>⚡ Lightning history</h2>
+            <h2>Lightning history</h2>
             <template v-if="!ln.st.open">
               <p class="small dim">Unlock to see your Lightning wallet.</p>
               <template v-if="!w.state.unlocked">
@@ -325,13 +326,14 @@
             </section>
             <section class="card">
               <div class="backup-row">
-                <span>🔔 Telegram alerts when bitcoin arrives: <b :class="alerts?.enabled ? 'ok' : 'pending'">{{ alerts === null ? "…" : alerts.enabled ? "On" : "Off" }}</b></span>
+                <span>Telegram message when bitcoin arrives: <b :class="alerts?.enabled ? 'ok' : 'dim'">{{ alertsFailed ? "couldn't check" : alerts === null ? "checking" : alerts.enabled ? "On" : "Off" }}</b></span>
                 <button v-if="alerts && !alerts.enabled" class="btn small" @click="go('alerts')">Turn on</button>
+                <button v-else-if="alertsFailed" class="btn small ghost" @click="loadAlerts">Try again</button>
               </div>
             </section>
           </template>
           <section v-else class="card">
-            <h2>⚡ Lightning activity</h2>
+            <h2>Lightning activity</h2>
             <template v-if="!ln.st.open">
               <p class="small dim">Unlock to see your Lightning wallet.</p>
               <template v-if="!w.state.unlocked">
@@ -371,7 +373,7 @@
         <template v-else-if="section === 'contacts'">
           <section class="card">
           <div class="head">
-            <h2>📒 Address book</h2>
+            <h2>Address book</h2>
             <button class="btn small primary" @click="openContact()">+ Add</button>
           </div>
           <label class="field">
@@ -398,52 +400,57 @@
 
         <!-- ===== Settings ===== -->
         <template v-else-if="section === 'settings'">
-        <section class="card">
-          <h2>Wallet settings</h2>
-          <div v-if="w.state.unlocked" class="backup-row">
-            <span>🔓 Unlocked for this session</span>
-            <button class="btn small ghost" @click="lockNow">Lock now</button>
+        <p v-if="notice" class="small ok" style="margin-bottom: 10px">{{ notice }}</p>
+
+        <h3 class="group">Security</h3>
+        <section class="card list">
+          <div class="item">
+            <div><b>Ask for my password when I open Satish</b><span>And after 5 minutes away. One password opens both wallets.</span></div>
+            <button class="toggle" role="switch" :aria-checked="lockOn" @click="toggleLock"><i /></button>
           </div>
-          <div v-if="w.state.cloudAvailable" class="backup-row">
-            <span>
-              ☁️ Telegram backup:
-              <b :class="w.state.stored.cloud ? 'ok' : 'pending'">{{ w.state.stored.cloud ? "On" : "Off" }}</b>
-              <span v-if="w.state.cloudError" class="small err"> · {{ w.state.cloudError }}</span>
-            </span>
-            <button v-if="!w.state.stored.cloud" class="btn small" @click="go('cloudon')">Turn on</button>
-            <button v-else class="btn small ghost" @click="cloudOff">Turn off</button>
+          <div v-if="w.state.unlocked" class="item">
+            <div><b>Unlocked right now</b><span>Sending won't ask for your password until you lock.</span></div>
+            <button class="btn small" @click="lockNow">Lock now</button>
           </div>
-          <div class="backup-row">
-            <span>🔔 Payment alerts in Telegram: <b :class="alerts?.enabled ? 'ok' : 'pending'">{{ alerts === null ? "…" : alerts.enabled ? "On" : "Off" }}</b></span>
-            <button v-if="alerts && !alerts.enabled" class="btn small" @click="go('alerts')">Turn on</button>
-            <button v-else-if="alerts" class="btn small ghost" :disabled="busy" @click="setAlerts(false)">Turn off</button>
-          </div>
-          <div class="backup-row">
-            <span>🔒 Lock Satish when I leave it: <b :class="lockOn ? 'ok' : 'pending'">{{ lockOn ? "On" : "Off" }}</b></span>
-            <button class="btn small" :class="{ ghost: lockOn }" @click="toggleLock">{{ lockOn ? "Turn off" : "Turn on" }}</button>
-          </div>
-          <div class="stack">
-            <button class="btn" @click="go('reveal')">Show recovery phrase</button>
-            <button class="btn" @click="go('changepw')">Change password</button>
-            <button class="btn" :disabled="!w.state.history.length" @click="exportHistory">Download history (CSV)</button>
-            <button class="btn" @click="go('export')">Use this wallet in another app</button>
-            <button class="btn" :disabled="!w.spendable.value" @click="moveEverything">Move everything to another wallet</button>
-            <NuxtLink class="btn ghost" to="/recovery">How recovery works (and for your family)</NuxtLink>
-            <button class="btn ghost danger" @click="go('remove')">Remove wallet from this phone</button>
-          </div>
-          <p v-if="notice" class="small ok">{{ notice }}</p>
+          <button class="item" @click="go('changepw')"><div><b>Change password</b></div><em>›</em></button>
+          <button class="item" @click="go('reveal')"><div><b>Show recovery phrase</b><span>Your 12 words. Keep them on paper.</span></div><em>›</em></button>
         </section>
-        <section class="card">
-          <h2>🔑 Private keys</h2>
-          <p class="small dim">For advanced use. Your 12 words already back up everything.</p>
-          <div class="stack">
-            <button class="btn" @click="go('privkeys')">Show private keys</button>
-            <button class="btn" @click="openSweep">Sweep a private key into Satish</button>
+
+        <h3 class="group">Backup and alerts</h3>
+        <section class="card list">
+          <div v-if="w.state.cloudAvailable" class="item">
+            <div>
+              <b>Back up to my Telegram</b>
+              <span>Encrypted with your password, so only you can open it.</span>
+              <span v-if="w.state.cloudError" class="err">{{ w.state.cloudError }}</span>
+            </div>
+            <button class="toggle" role="switch" :aria-checked="!!w.state.stored.cloud" @click="w.state.stored.cloud ? cloudOff() : go('cloudon')"><i /></button>
           </div>
+          <div class="item">
+            <div>
+              <b>Tell me when bitcoin arrives</b>
+              <span v-if="alertsFailed">Couldn't check right now. <button class="linkish small" @click="loadAlerts">Try again</button></span>
+              <span v-else>A Telegram message when a payment comes in and when it confirms.</span>
+            </div>
+            <button v-if="alerts" class="toggle" role="switch" :aria-checked="alerts.enabled" :disabled="busy" @click="alerts.enabled ? setAlerts(false) : go('alerts')"><i /></button>
+            <span v-else-if="!alertsFailed" class="spinner" />
+          </div>
+          <NuxtLink class="item" to="/recovery"><div><b>How recovery works</b><span>New phone, forgotten password, and planning for your family.</span></div><em>›</em></NuxtLink>
         </section>
-        <section class="card">
-          <h2>Account</h2>
-          <NuxtLink class="btn" to="/settings">Sign-ins, your data and closing your account</NuxtLink>
+
+        <h3 class="group">Your wallet elsewhere</h3>
+        <section class="card list">
+          <button class="item" :disabled="!w.state.history.length" @click="exportHistory"><div><b>Download history</b><span>A spreadsheet (CSV) of every payment.</span></div><em>›</em></button>
+          <button class="item" @click="go('export')"><div><b>Watch this wallet in another app</b><span>Sparrow, BlueWallet and others. They can see, not spend.</span></div><em>›</em></button>
+          <button class="item" :disabled="!w.spendable.value" @click="moveEverything"><div><b>Move everything to another wallet</b></div><em>›</em></button>
+          <button class="item" @click="go('privkeys')"><div><b>Show private keys</b><span>Advanced. Your 12 words already back up everything.</span></div><em>›</em></button>
+          <button class="item" @click="openSweep"><div><b>Sweep a private key into Satish</b><span>Bring in bitcoin from a paper wallet or an old app.</span></div><em>›</em></button>
+        </section>
+
+        <h3 class="group">Account</h3>
+        <section class="card list">
+          <NuxtLink class="item" to="/settings"><div><b>Sign-ins and your data</b><span>Devices signed in, download or delete your Satish data.</span></div><em>›</em></NuxtLink>
+          <button class="item danger" @click="go('remove')"><div><b>Remove wallet from this phone</b><span>Your bitcoin stays safe. You'll need your 12 words to get it back.</span></div></button>
         </section>
         </template>
       </template>
@@ -662,19 +669,22 @@
         </label>
         <div class="field">
           Network fee
-          <div class="fees">
+          <div class="feepick" role="radiogroup" aria-label="Network fee">
             <button
               v-for="opt in feeOptions"
               :key="opt.key"
               type="button"
-              class="btn small"
-              :class="{ primary: feeChoice === opt.key }"
+              role="radio"
+              :aria-checked="feeChoice === opt.key"
+              :class="{ on: feeChoice === opt.key }"
               @click="feeChoice = opt.key"
             >
-              {{ opt.label }}<span class="small dim"> · {{ opt.rate }} sat/vB</span>
+              <b>{{ opt.label }}</b>
+              <span>{{ opt.time }}</span>
+              <span>{{ opt.cost }}</span>
             </button>
           </div>
-          <span class="small dim">Faster fees confirm sooner. Most payments confirm within an hour on "Normal". You can speed it up later if it gets stuck.</span>
+          <span class="small dim">You can speed a payment up later if it gets stuck.</span>
         </div>
         <label class="field">Note for yourself (optional)<input v-model="sendNote" maxlength="120" placeholder="e.g. rent, rice, school fees" /></label>
         <p v-if="error" class="err">{{ error }}</p>
@@ -740,7 +750,7 @@
 
       <!-- private keys -->
       <section v-else-if="view === 'privkeys'" class="card">
-        <h2>🔑 Private keys</h2>
+        <h2>Private keys</h2>
         <p class="sub">
           Anyone who sees these can take all your bitcoin. Only use them to move your wallet
           into another app you trust. Never send them to anyone, including "support".
@@ -877,7 +887,7 @@
 
       <!-- payment alerts -->
       <section v-else-if="view === 'alerts'" class="card">
-        <h2>🔔 Payment alerts</h2>
+        <h2>Payment alerts</h2>
         <p class="sub">
           Get a Telegram message when bitcoin arrives, even when Satish is closed, and
           another when it's confirmed.
@@ -1117,12 +1127,16 @@ async function confirmBump() {
 // ---- payment alerts
 const alerts = ref<{ enabled: boolean; watched: number } | null>(null);
 
+const alertsFailed = ref(false);
+
 async function loadAlerts() {
+  alertsFailed.value = false;
   try {
     alerts.value = await api.alertsStatus(w.net.name);
     if (alerts.value.enabled) watchReceive();
   } catch {
     alerts.value = null;
+    alertsFailed.value = true;
   }
 }
 
@@ -1251,7 +1265,16 @@ const histTab = ref<"btc" | "ln">("btc");
 const actTab = ref<"btc" | "ln">("btc");
 
 // Switching sub-tab always lands on that section's main screen.
+// A wallet created or restored in this session: load its alerts status too.
+watch(
+  () => !!w.state.stored,
+  (has) => {
+    if (has && alerts.value === null) void loadAlerts();
+  },
+);
+
 watch(section, (sct) => {
+  if ((sct === "settings" || sct === "activity") && w.state.stored && alerts.value === null) void loadAlerts();
   if (w.state.stored && !locked.value) {
     view.value = "home";
     error.value = "";
@@ -1699,12 +1722,19 @@ const qrSvg = computed(() =>
     : "",
 );
 
+/** What a typical payment (1 coin in, 2 out = 141 vB) costs at this rate, in plain sats / naira. */
+function feeCost(rate?: number) {
+  if (!rate) return "…";
+  const sats = Math.ceil(141 * rate);
+  return naira(sats) || `${sats.toLocaleString()} sats`;
+}
+
 const feeOptions = computed(() => {
   const f = feeRates.value;
   return [
-    { key: "fast" as const, label: "Fast", rate: f?.fast ?? "…" },
-    { key: "normal" as const, label: "Normal", rate: f?.normal ?? "…" },
-    { key: "slow" as const, label: "Slow", rate: f?.slow ?? "…" },
+    { key: "fast" as const, label: "Fast", time: "~10 min", cost: feeCost(f?.fast) },
+    { key: "normal" as const, label: "Normal", time: "~30 min", cost: feeCost(f?.normal) },
+    { key: "slow" as const, label: "Slow", time: "~1 hour+", cost: feeCost(f?.slow) },
   ];
 });
 
@@ -1728,7 +1758,7 @@ function fmtBtc(sats: number) {
   return satsToBtc(sats);
 }
 function fmtTime(t?: number) {
-  return t ? new Date(t * 1000).toLocaleString() : "";
+  return t ? niceDate(t) : "";
 }
 
 function startCreate() {
@@ -2053,7 +2083,17 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.testnet { background: var(--orange-soft); color: var(--orange); border-radius: 10px; padding: 8px 12px; margin-bottom: 12px; font-size: 13px; }
+.testnet { color: var(--orange); font-size: 12px; margin: -4px 0 10px; text-align: center; }
+.hero { display: flex; flex-direction: column; gap: 6px; }
+.hero-top { display: flex; justify-content: space-between; align-items: center; }
+.hero .amount { font-size: 34px; font-weight: 800; letter-spacing: -0.5px; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.hero .amount .unit { font-size: 16px; font-weight: 600; color: var(--text-dim); letter-spacing: 0; }
+.actions-main { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+.actions-main .btn { min-height: 48px; font-size: 16px; }
+.actions-alt { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.sync { background: none; border: 0; color: var(--text-faint); font: inherit; font-size: 12px; cursor: pointer; padding: 6px 0 0; display: flex; gap: 6px; align-items: center; justify-content: center; }
+.userrow { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.userrow .handle { margin: 0; font-size: 20px; }
 .testnet a { color: inherit; text-decoration: underline; }
 .center { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .big-icon { font-size: 44px; line-height: 1; }
@@ -2077,6 +2117,27 @@ onBeforeUnmount(() => {
 .qr :deep(svg) { width: 100%; height: 100%; }
 .addr { word-break: break-all; font-size: 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px; width: 100%; }
 .fees { display: flex; gap: 8px; flex-wrap: wrap; }
+.group { font-size: 13px; color: var(--text-dim); font-weight: 600; margin: 18px 4px 8px; }
+.group:first-of-type { margin-top: 4px; }
+.list { padding: 4px 0; }
+.list .item { display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%; padding: 12px 16px; background: none; border: 0; border-bottom: 1px solid var(--border); color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.list .item:last-child { border-bottom: 0; }
+.list .item:disabled { opacity: 0.45; cursor: default; }
+.list .item > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.list .item b { font-weight: 600; font-size: 15px; }
+.list .item span { font-size: 13px; color: var(--text-dim); }
+.list .item em { font-style: normal; color: var(--text-faint); font-size: 22px; line-height: 1; }
+.list .item.danger b { color: var(--red); }
+.list .item .btn { flex: none; white-space: nowrap; }
+.toggle { flex: none; width: 46px; height: 28px; border-radius: 999px; border: 0; background: var(--border); position: relative; cursor: pointer; transition: background 0.15s; }
+.toggle i { position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; transition: transform 0.15s; }
+.toggle[aria-checked="true"] { background: var(--orange); }
+.toggle[aria-checked="true"] i { transform: translateX(18px); }
+.feepick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.feepick button { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 9px 4px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg); color: var(--text-dim); font: inherit; font-size: 12px; cursor: pointer; }
+.feepick button b { color: var(--text); font-size: 14px; }
+.feepick button.on { border-color: var(--orange); background: var(--orange-soft); color: var(--text); }
+.feepick button.on b { color: var(--orange); }
 .summary { display: flex; flex-direction: column; gap: 10px; margin: 12px 0; }
 .summary div { display: flex; justify-content: space-between; gap: 12px; }
 .summary span { color: var(--text-dim); }
@@ -2133,7 +2194,7 @@ onBeforeUnmount(() => {
 .tx.static { cursor: default; }
 .keyrow { display: flex; flex-direction: column; gap: 6px; padding: 8px 0; border-bottom: 1px solid var(--border); }
 .beta { background: var(--orange-soft); color: var(--orange); border-radius: 10px; padding: 8px 12px; margin-bottom: 12px; font-size: 13px; }
-.eye { background: none; border: 0; cursor: pointer; font-size: 14px; padding: 0 4px; }
+.eye { background: none; border: 1px solid var(--border); border-radius: 999px; color: var(--text-dim); cursor: pointer; font: inherit; font-size: 12px; padding: 2px 10px; }
 .tx { width: 100%; background: none; border-left: 0; border-right: 0; border-top: 0; font: inherit; text-align: left; cursor: pointer; }
 .stuck { background: var(--orange-soft); border-radius: 10px; padding: 10px 12px; margin-top: 12px; }
 .warnbox { background: var(--orange-soft); border-radius: 10px; padding: 8px 12px; margin: 8px 0; }

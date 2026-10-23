@@ -1,24 +1,24 @@
 <template>
   <div>
     <header>
-      <h1 class="page-title">Buy TK</h1>
+      <h1 class="page-title">Credits</h1>
       <p class="page-sub">
-        TK are credits you spend on AI tasks. You pay for them in bitcoin. TK can't be sent to anyone or turned back into sats.
-        1 sat = {{ rate?.xp_per_sat ?? "…" }} TK
-        <span v-if="rate" class="env-chip">{{ rate.can_change ? "rate may change" : "fixed" }}</span>
+        TK credits pay for Satish AI tasks. You buy them with bitcoin; they can't be sent
+        to anyone or turned back into sats.
       </p>
     </header>
 
     <section class="card">
-      <h2>Balance</h2>
+      <div class="head-row">
+        <h2>Your credits</h2>
+        <NuxtLink class="small" to="/tk">TK history</NuxtLink>
+      </div>
       <div class="balance-big">{{ balance ? balance.balance_xp.toLocaleString() + " TK" : "…" }}</div>
-      <p class="dim small" v-if="balance">
-        ≈ {{ Math.ceil(balance.balance_xp / balance.xp_per_sat).toLocaleString() }} sats equivalent
-      </p>
+      <p v-if="rate" class="dim small">1 sat buys {{ rate.xp_per_sat }} TK{{ rate.can_change ? " (this rate can change)" : "" }}.</p>
     </section>
 
     <section class="card">
-      <h2>Buy TK</h2>
+      <h2>Buy credits</h2>
       <p class="dim small">
         Pick a pack, then pay from your Satish wallet in one tap (or any other
         bitcoin wallet). Your TK arrives as soon as the payment is confirmed.
@@ -32,9 +32,8 @@
           @click="buy(p)"
         >
           <span v-if="buying === p.pack_id" class="spinner" />
-          <strong>{{ p.amount_sats.toLocaleString() }} sats</strong>
-          <span class="dim">→ {{ p.xp_amount.toLocaleString() }} TK</span>
-          <span v-if="naira(p.amount_sats)" class="dim small">{{ naira(p.amount_sats) }}</span>
+          <strong>{{ p.xp_amount.toLocaleString() }} TK</strong>
+          <span class="dim small">{{ p.amount_sats.toLocaleString() }} sats<template v-if="naira(p.amount_sats)"> · {{ naira(p.amount_sats) }}</template></span>
         </button>
       </div>
       <p v-if="error" class="notice small">{{ error }}</p>
@@ -321,6 +320,7 @@ onMounted(refresh);
 </script>
 
 <style scoped>
+.head-row { display: flex; justify-content: space-between; align-items: baseline; }
 .packs {
   display: flex;
   gap: 10px;

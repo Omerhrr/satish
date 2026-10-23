@@ -1,7 +1,7 @@
 <template>
   <div>
     <section class="hero">
-      <h1>🤖 AI assistant</h1>
+      <h1>Satish AI</h1>
       <p class="tagline">
         Ask for research, price comparisons and written reports. You pay with
         <b>TK credits</b>, bought with bitcoin from your Satish wallet. You approve a
@@ -19,7 +19,7 @@
 
     <template v-else>
       <section class="card">
-        <h2>⚡ TK credits</h2>
+        <h2>Your TK credits</h2>
         <div class="balance-big">
           <span v-if="balance">{{ balance.balance_xp.toLocaleString() }} TK</span>
           <span v-else-if="balanceError" class="small dim">Couldn't load your credits. <a href="#" @click.prevent="load">Try again</a></span>
@@ -31,7 +31,7 @@
         <div class="actions">
           <NuxtLink class="btn primary" to="/tasks">Start a task</NuxtLink>
           <NuxtLink class="btn" to="/billing">Buy TK</NuxtLink>
-          <NuxtLink class="btn ghost" to="/tk">History →</NuxtLink>
+          <NuxtLink class="btn ghost" to="/tk">TK history</NuxtLink>
         </div>
       </section>
 
@@ -54,7 +54,7 @@
       </section>
 
       <section class="card">
-        <h2>📄 Try a sample report</h2>
+        <h2>Try a sample report</h2>
         <p class="sub">See what a report looks like. Free, takes a few seconds.</p>
         <div class="actions">
           <button class="btn primary" :disabled="pdfPending" @click="makePdf">

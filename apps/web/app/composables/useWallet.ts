@@ -332,6 +332,10 @@ export function useWallet() {
 
   async function doRefresh() {
     if (!state.stored) return;
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      state.error = state.lastSync ? "You're offline. Showing your last known balance." : "You're offline. Connect to the internet to load your wallet.";
+      return;
+    }
     const xpub = state.stored.xpub;
     const firstSync = !state.lastSync;
     state.loading = true;

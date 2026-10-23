@@ -1,4 +1,4 @@
-/* XP Mini App design system - dark, bitcoin-orange, mobile-first. */
+/* Satish Mini App design system - dark, bitcoin-orange, mobile-first. */
 
 :root {
   --bg: #0b0e11;
@@ -337,9 +337,8 @@ table.ledger th {
   background: var(--bg-elev2);
   color: var(--text-dim);
   text-align: left;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.7px;
+  font-size: 12px;
+  font-weight: 600;
   padding: 10px 12px;
   border-bottom: 1px solid var(--border);
 }
@@ -434,3 +433,42 @@ table.ledger tr:hover td { background: rgba(255, 255, 255, 0.025); }
   color: var(--orange);
   letter-spacing: -0.5px;
 }
+
+
+/* ---------- frame: sub-tabs on top, the two main sections at the bottom (thumb reach) ---------- */
+.tabbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  padding-top: max(8px, env(safe-area-inset-top));
+  background: rgba(11, 14, 17, 0.92);
+  backdrop-filter: blur(12px);
+}
+main.page { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
+.bottomnav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 6px 12px max(8px, env(safe-area-inset-bottom));
+  background: rgba(19, 23, 32, 0.96);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid var(--border);
+}
+.bottomnav a {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 0 2px;
+  color: var(--text-faint);
+  font-size: 12px;
+  font-weight: 600;
+}
+.bottomnav svg { width: 24px; height: 24px; fill: currentColor; }
+.bottomnav a.on { color: var(--orange); }
+:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; border-radius: 6px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
