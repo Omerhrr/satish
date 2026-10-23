@@ -68,7 +68,7 @@
 
         <h3 class="small sect">Recent</h3>
         <p v-if="!ln.st.payments.length" class="small dim">No Lightning payments yet.</p>
-        <div v-for="p in ln.st.payments.slice(0, showAll ? 50 : 5)" :key="p.id" class="tx">
+        <div v-for="p in ln.st.payments.slice(0, compact ? 3 : showAll ? 50 : 5)" :key="p.id" class="tx">
           <div>
             <b>{{ p.direction === "receive" ? "Received" : "Sent" }}</b>
             <span class="small dim"> · {{ kindLabel(p.kind) }}</span>
@@ -81,7 +81,8 @@
             {{ hide ? "••••" : (p.direction === "receive" ? "+" : "-") + (p.amount + (p.direction === "send" ? p.fee : 0)).toLocaleString() + " sats" }}
           </div>
         </div>
-        <button v-if="ln.st.payments.length > 5 && !showAll" class="btn ghost small" @click="showAll = true">Show more</button>
+        <NuxtLink v-if="compact && ln.st.payments.length > 3" class="small" :to="{ path: '/', query: { s: 'history' } }">See all →</NuxtLink>
+        <button v-else-if="!compact && ln.st.payments.length > 5 && !showAll" class="btn ghost small" @click="showAll = true">Show more</button>
         <button v-if="ln.addressSupported && !ln.st.address && username" class="btn small" :disabled="busy" @click="getAddress">
           Get {{ username }}@{{ addressDomain }}
         </button>
@@ -211,7 +212,7 @@ import type { PrepareSendPaymentResponse } from "@breeztech/breez-sdk-spark";
 import { LightningError, type FeeQuote, type SendTarget } from "~/lib/lightning";
 import { WrongPassword } from "~/lib/wallet-core";
 
-const props = defineProps<{ hide: boolean; username: string | null }>();
+const props = defineProps<{ hide: boolean; username: string | null; compact?: boolean }>();
 const emit = defineEmits<{ (e: "pay-onchain", address: string): void; (e: "pay-user-onchain", username: string): void }>();
 const fallbackUser = ref("");
 

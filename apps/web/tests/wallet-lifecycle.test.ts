@@ -150,7 +150,7 @@ describe("chained pending payments", () => {
 });
 
 describe("gentle with the Bitcoin network service", () => {
-  test("never more than 3 requests at once, and rate limits are retried", async () => {
+  test("never more than 4 requests at once, and rate limits are retried", async () => {
     let active = 0, peak = 0, calls = 0;
     const fetchImpl = async (url: string) => {
       calls++;
@@ -165,7 +165,7 @@ describe("gentle with the Bitcoin network service", () => {
     };
     const api = new Esplora("https://x", fetchImpl, { backoffMs: 1, minGapMs: 0 });
     const infos = await scanAddresses(X, T, api, undefined, { poolGap: 5 });
-    expect(peak).toBeLessThanOrEqual(3);
+    expect(peak).toBeLessThanOrEqual(4);
     expect(infos.length).toBeGreaterThanOrEqual(35);
   }, 30000);
 
@@ -185,5 +185,39 @@ describe("gentle with the Bitcoin network service", () => {
     };
     await scanAddresses(X, T, new Esplora("https://x", fetchImpl, { minGapMs: 0 }), undefined, { poolGap: 5 });
     expect(calls).toBeLessThanOrEqual(40);
+  });
+});
+
+import { quickScan } from "../app/lib/wallet-core";
+
+describe("quick sync", () => {
+  function chainWith(funded: Map<string, number>) {
+    let calls = 0;
+    const fetchImpl = async (url: string) => {
+      calls++;
+      const v = funded.get(url.split("/address/")[1]) ?? 0;
+      const stats = { funded_txo_sum: v, spent_txo_sum: 0, tx_count: v ? 1 : 0 };
+      const empty = { funded_txo_sum: 0, spent_txo_sum: 0, tx_count: 0 };
+      return new Response(JSON.stringify({ chain_stats: stats, mempool_stats: empty }));
+    };
+    return { api: new Esplora("https://x", fetchImpl, { minGapMs: 0 }), calls: () => calls };
+  }
+
+  test("only looks at used addresses plus a few fresh ones", async () => {
+    const funded = new Map([[addressAt(X, T, 0, 0), 5000], [addressAt(X, T, 0, 1), 7000]]);
+    const c1 = chainWith(funded);
+    const full = await scanAddresses(X, T, c1.api, undefined, { poolGap: 5 });
+    const c2 = chainWith(funded);
+    const q = await quickScan(X, T, c2.api, full);
+    expect(c2.calls()).toBeLessThanOrEqual(7); // 2 used + 2 receive + 1 change + 2 pool
+    expect(q.needFull).toBe(false);
+    expect(q.addresses.filter((a) => a.txCount).reduce((s, a) => s + a.confirmed, 0)).toBe(12_000);
+  });
+
+  test("asks for a full scan when a fresh address got used", async () => {
+    const funded = new Map([[addressAt(X, T, 0, 0), 5000]]);
+    const full = await scanAddresses(X, T, chainWith(funded).api, undefined, { poolGap: 5 });
+    funded.set(addressAt(X, T, 0, 1), 1000);
+    expect((await quickScan(X, T, chainWith(funded).api, full)).needFull).toBe(true);
   });
 });

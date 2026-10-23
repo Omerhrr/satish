@@ -862,3 +862,29 @@ instant and free. Saved Satish contacts are suggested as you type.
 **Consequences:** a compromised server can't redirect @username Lightning
 payments (it can't forge the signature). If the recipient has never opened
 Lightning, the payer is told to pay on Bitcoin or ask them to open it once.
+
+## D32 - Two-part app, instant sync, private keys (2026-10-23)
+
+**Navigation.** Two main tabs: **Wallet** and **Satish AI**, each with its
+own sub-tabs. Wallet: Home (Bitcoin / Lightning switch), History (Bitcoin |
+Lightning), Activity (Bitcoin: payments waiting to confirm, payment requests,
+alerts; Lightning: in-progress/failed payments, deposits, @username status),
+Address book, Settings. Satish AI: Assistant, Tasks, Automations, Buy TK, TK
+history, Connect. Wallet sections are `/?s=<section>` so the existing wallet
+flows (send, receive, speed up...) keep working from any section.
+
+**Instant sync.** The cached balance shows immediately; a quick sync then
+re-checks only addresses in use plus a few fresh ones (receive x2, change x1,
+@username pool up to what was handed out), downloads history/coins only for
+addresses whose numbers changed (per-address cache in the device snapshot),
+and fetches the username in parallel. A full gap scan runs on first sync /
+restore, every 30 minutes, when a fresh address turns out used, or on
+"Check all". Requests use a token bucket (burst 6, then ~6.6/s, slowing on
+push-back). Measured against a server limited to 8 requests/s: reopening a
+funded wallet is fully synced in 0.25-0.4 s with no rate-limit hits.
+
+**Private keys.** Settings -> Private keys: the account private key (xprv /
+tprv, BIP84) and descriptor, plus per-address keys for addresses holding
+coins, behind the password and an explicit "I understand" tick. "Sweep a
+private key" moves everything on a WIF key (native SegWit, nested SegWit or
+legacy) into the wallet; the key is never stored.

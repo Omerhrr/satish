@@ -130,8 +130,10 @@
 
     <!-- ============ wallet ============ -->
     <template v-else>
-      <!-- home -->
+      <!-- home: the five wallet sections (sub-tabs) -->
       <template v-if="view === 'home'">
+        <!-- ===== Home ===== -->
+        <template v-if="section === 'home'">
         <div v-if="ln.available" class="switch" role="tablist">
           <button role="tab" :aria-selected="tab === 'btc'" :class="{ on: tab === 'btc' }" @click="setTab('btc')">
             ₿ Bitcoin<small v-if="!w.state.hideBalance">{{ total.toLocaleString() }} sats</small>
@@ -141,7 +143,7 @@
           </button>
         </div>
 
-        <LightningWallet v-if="tab === 'ln' && ln.available" :hide="w.state.hideBalance" :username="w.state.handle?.username ?? null" @pay-onchain="payOnchainTo" @pay-user-onchain="payUserOnchain" />
+        <LightningWallet v-if="tab === 'ln' && ln.available" compact :hide="w.state.hideBalance" :username="w.state.handle?.username ?? null" @pay-onchain="payOnchainTo" @pay-user-onchain="payUserOnchain" />
 
         <template v-if="tab === 'btc' || !ln.available">
         <section class="card center">
@@ -172,18 +174,20 @@
             <button class="btn primary" @click="openRequest">⇄ Request</button>
           </div>
           <button class="btn ghost small" :disabled="w.state.loading" @click="w.refresh()">
-            <span v-if="w.state.loading" class="spinner" /> {{ w.state.loading ? "Updating…" : "Refresh" }}
+            <span v-if="w.state.loading" class="spinner" /> {{ w.state.loading ? "Syncing…" : "Refresh" }}
           </button>
           <p v-if="w.state.error" class="err">{{ w.state.error }}</p>
           <p v-if="w.state.lastSync && !w.state.live && !w.state.loading" class="small dim">Last updated {{ ago(w.state.lastSync) }}</p>
+          <p v-if="notice" class="small ok">{{ notice }}</p>
         </section>
 
         <section class="card">
-          <h2>Activity</h2>
-          <p v-if="!w.state.history.length && !w.state.loading" class="dim small">
-            No transactions yet. Tap Receive to get your address.
-          </p>
-          <button v-for="t in w.state.history.slice(0, historyLimit)" :key="t.txid" class="tx" @click="openTx(t.txid)">
+          <div class="head">
+            <h2>Recent</h2>
+            <NuxtLink v-if="w.state.history.length > 3" class="small" :to="{ path: '/', query: { s: 'history' } }">See all →</NuxtLink>
+          </div>
+          <p v-if="!w.state.history.length && !w.state.loading" class="dim small">No transactions yet. Tap Receive to get your address.</p>
+          <button v-for="t in w.state.history.slice(0, 3)" :key="t.txid" class="tx" @click="openTx(t.txid)">
             <div>
               <b>{{ t.amount >= 0 ? "Received" : "Sent" }}</b>
               <span v-if="w.state.notes[t.txid]" class="small dim"> · {{ w.state.notes[t.txid] }}</span>
@@ -196,7 +200,6 @@
               <template v-else>{{ t.amount >= 0 ? "+" : "" }}{{ t.amount.toLocaleString() }} sats</template>
             </div>
           </button>
-          <button v-if="w.state.history.length > historyLimit" class="btn ghost small" @click="historyLimit += 20">Show more</button>
         </section>
 
         <section class="card">
@@ -215,31 +218,186 @@
           </template>
         </section>
 
-        <section class="card">
+        </template>
+        </template>
+
+        <!-- ===== History ===== -->
+        <template v-else-if="section === 'history'">
+          <div class="seg" role="tablist">
+            <button :class="{ on: histTab === 'btc' }" @click="histTab = 'btc'">₿ Bitcoin</button>
+            <button v-if="ln.available" :class="{ on: histTab === 'ln' }" @click="histTab = 'ln'; ensureLn()">⚡ Lightning</button>
+          </div>
+          <section v-if="histTab === 'btc' || !ln.available" class="card">
+            <div class="head">
+              <h2>₿ Bitcoin history</h2>
+              <button class="btn small ghost" :disabled="w.state.loading" @click="w.fullRefresh()"><span v-if="w.state.loading" class="spinner" /> Check all</button>
+            </div>
+            <p v-if="!w.state.history.length && !w.state.loading" class="dim small">No transactions yet.</p>
+            <button v-for="t in w.state.history.slice(0, historyLimit)" :key="t.txid" class="tx" @click="openTx(t.txid)">
+            <div>
+              <b>{{ t.amount >= 0 ? "Received" : "Sent" }}</b>
+              <span v-if="w.state.notes[t.txid]" class="small dim"> · {{ w.state.notes[t.txid] }}</span>
+              <div class="small" :class="t.confirmed ? 'dim' : 'pending'">
+                {{ t.confirmed ? fmtTime(t.time) : t.amount < 0 && t.replaceable ? "Waiting to confirm · tap to speed up" : "Waiting to confirm" }}
+              </div>
+            </div>
+            <div :class="t.amount >= 0 ? 'pos' : 'neg'">
+              <template v-if="w.state.hideBalance">••••</template>
+              <template v-else>{{ t.amount >= 0 ? "+" : "" }}{{ t.amount.toLocaleString() }} sats</template>
+            </div>
+          </button>
+            <button v-if="w.state.history.length > historyLimit" class="btn ghost small" @click="historyLimit += 20">Show more</button>
+            <button class="btn small" style="margin-top: 10px" :disabled="!w.state.history.length" @click="exportHistory">Download history (CSV)</button>
+            <p v-if="notice" class="small ok">{{ notice }}</p>
+          </section>
+          <section v-else class="card">
+            <h2>⚡ Lightning history</h2>
+            <template v-if="!ln.st.open">
+              <p class="small dim">Unlock to see your Lightning wallet.</p>
+              <template v-if="!w.state.unlocked">
+                <label class="field">Wallet password<input v-model="password" type="password" autocomplete="current-password" @keyup.enter="unlockLn" /></label>
+                <p v-if="error" class="err">{{ error }}</p>
+                <button class="btn primary" :disabled="busy || !password" @click="unlockLn"><span v-if="busy" class="spinner" /> Unlock Satish</button>
+              </template>
+              <p v-else-if="ln.st.opening" class="small dim"><span class="spinner" /> Opening Lightning…</p>
+              <p v-else-if="ln.st.error" class="err">{{ ln.st.error }}</p>
+            </template>
+            <template v-else>
+              <p v-if="!ln.st.payments.length" class="small dim">No Lightning payments yet.</p>
+              <div v-for="p in ln.st.payments" :key="p.id" class="tx static">
+                <div>
+                  <b>{{ p.direction === "receive" ? "Received" : "Sent" }}</b>
+                  <span class="small dim"> · {{ lnKind(p.kind) }}</span>
+                  <span v-if="p.description" class="small dim"> · {{ p.description }}</span>
+                  <div class="small" :class="p.status === 'completed' ? 'dim' : p.status === 'failed' ? 'err' : 'pending'">
+                    {{ p.status === "completed" ? fmtTime(p.time) : p.status === "failed" ? "Failed" : "In progress" }}
+                  </div>
+                </div>
+                <div :class="p.direction === 'receive' ? 'pos' : 'neg'">
+                  {{ w.state.hideBalance ? "••••" : (p.direction === "receive" ? "+" : "-") + (p.amount + (p.direction === "send" ? p.fee : 0)).toLocaleString() + " sats" }}
+                </div>
+              </div>
+            </template>
+          </section>
+        </template>
+
+        <!-- ===== Activity ===== -->
+        <template v-else-if="section === 'activity'">
+          <div class="seg" role="tablist">
+            <button :class="{ on: actTab === 'btc' }" @click="actTab = 'btc'">₿ Bitcoin</button>
+            <button v-if="ln.available" :class="{ on: actTab === 'ln' }" @click="actTab = 'ln'; ensureLn()">⚡ Lightning</button>
+          </div>
+          <template v-if="actTab === 'btc' || !ln.available">
+            <section class="card">
+              <h2>Needs attention</h2>
+              <p v-if="!pendingTxs.length" class="small dim">Nothing waiting. All your Bitcoin payments are confirmed.</p>
+            <button v-for="t in pendingTxs" :key="t.txid" class="tx" @click="openTx(t.txid)">
+            <div>
+              <b>{{ t.amount >= 0 ? "Received" : "Sent" }}</b>
+              <span v-if="w.state.notes[t.txid]" class="small dim"> · {{ w.state.notes[t.txid] }}</span>
+              <div class="small" :class="t.confirmed ? 'dim' : 'pending'">
+                {{ t.confirmed ? fmtTime(t.time) : t.amount < 0 && t.replaceable ? "Waiting to confirm · tap to speed up" : "Waiting to confirm" }}
+              </div>
+            </div>
+            <div :class="t.amount >= 0 ? 'pos' : 'neg'">
+              <template v-if="w.state.hideBalance">••••</template>
+              <template v-else>{{ t.amount >= 0 ? "+" : "" }}{{ t.amount.toLocaleString() }} sats</template>
+            </div>
+          </button>
+            </section>
+            <section class="card">
+              <div class="head">
+                <h2>Payment requests</h2>
+                <button class="btn small" @click="openRequest">+ New</button>
+              </div>
+              <p v-if="!myRequests.length" class="small dim">Requests you share (on WhatsApp, Telegram…) show up here with their status.</p>
+              <div v-for="q in myRequests" :key="q.id" class="req-row">
+                <span>
+                  <b>{{ q.amount_sats ? q.amount_sats.toLocaleString() + " sats" : "Any amount" }}</b>
+                  <span v-if="q.note" class="small dim"> · {{ q.note }}</span>
+                  <span class="small dim"> · {{ fmtDate(q.created_at) }}</span>
+                </span>
+                <span class="req-acts">
+                  <span class="chip" :class="q.status">{{ human(q.status) }}</span>
+                  <button v-if="q.status === 'open'" class="btn small" @click="showRequest(q)">Share</button>
+                </span>
+              </div>
+            </section>
+            <section class="card">
+              <div class="backup-row">
+                <span>🔔 Telegram alerts when bitcoin arrives: <b :class="alerts?.enabled ? 'ok' : 'pending'">{{ alerts === null ? "…" : alerts.enabled ? "On" : "Off" }}</b></span>
+                <button v-if="alerts && !alerts.enabled" class="btn small" @click="go('alerts')">Turn on</button>
+              </div>
+            </section>
+          </template>
+          <section v-else class="card">
+            <h2>⚡ Lightning activity</h2>
+            <template v-if="!ln.st.open">
+              <p class="small dim">Unlock to see your Lightning wallet.</p>
+              <template v-if="!w.state.unlocked">
+                <label class="field">Wallet password<input v-model="password" type="password" autocomplete="current-password" @keyup.enter="unlockLn" /></label>
+                <p v-if="error" class="err">{{ error }}</p>
+                <button class="btn primary" :disabled="busy || !password" @click="unlockLn"><span v-if="busy" class="spinner" /> Unlock Satish</button>
+              </template>
+              <p v-else-if="ln.st.opening" class="small dim"><span class="spinner" /> Opening Lightning…</p>
+              <p v-else-if="ln.st.error" class="err">{{ ln.st.error }}</p>
+            </template>
+            <template v-else>
+              <div v-if="ln.st.publish === 'ok'" class="small ok">✓ Satish users can pay you at @{{ w.state.handle?.username }} on Lightning</div>
+              <div v-else-if="ln.st.publish === 'error'" class="small err">⚠️ {{ ln.st.publishError }} <button class="btn small" @click="ln.publish()">Try again</button></div>
+              <div v-for="d in ln.st.deposits" :key="d.txid + d.vout" class="small pending" style="margin-top: 8px">
+                ⏳ Deposit of {{ d.amount.toLocaleString() }} sats on its way in. {{ d.problem }}
+              </div>
+              <h3 class="small sub-head">In progress or failed</h3>
+              <p v-if="!lnOpenItems.length" class="small dim">Nothing waiting.</p>
+              <div v-for="p in lnOpenItems" :key="p.id" class="tx static">
+                <div>
+                  <b>{{ p.direction === "receive" ? "Received" : "Sent" }}</b>
+                  <span class="small dim"> · {{ lnKind(p.kind) }}</span>
+                  <span v-if="p.description" class="small dim"> · {{ p.description }}</span>
+                  <div class="small" :class="p.status === 'completed' ? 'dim' : p.status === 'failed' ? 'err' : 'pending'">
+                    {{ p.status === "completed" ? fmtTime(p.time) : p.status === "failed" ? "Failed" : "In progress" }}
+                  </div>
+                </div>
+                <div :class="p.direction === 'receive' ? 'pos' : 'neg'">
+                  {{ w.state.hideBalance ? "••••" : (p.direction === "receive" ? "+" : "-") + (p.amount + (p.direction === "send" ? p.fee : 0)).toLocaleString() + " sats" }}
+                </div>
+              </div>
+            </template>
+          </section>
+        </template>
+
+        <!-- ===== Address book ===== -->
+        <template v-else-if="section === 'contacts'">
+          <section class="card">
           <div class="head">
             <h2>📒 Address book</h2>
-            <button class="btn small" @click="openContact()">+ Add</button>
+            <button class="btn small primary" @click="openContact()">+ Add</button>
           </div>
-          <p v-if="!w.state.contacts.length" class="dim small">
-            Save addresses with a name, like "Mum" or "Shop", so you can pay them without copying long addresses.
+          <label class="field">
+            <input v-model="contactQuery" placeholder="Search names or addresses" autocapitalize="none" autocomplete="off" />
+          </label>
+          <p v-if="!filteredContacts.length" class="dim small" style="margin-top: 12px">
+            {{ w.state.contacts.length ? "No matches." : "No saved addresses yet." }}
           </p>
-          <button
-            v-for="c in contactsPreview"
-            :key="c.id"
-            class="contact"
-            @click="sendToContact(c)"
-          >
+          <div v-for="c in filteredContacts" :key="c.id" class="contact static">
             <span class="avatar">{{ c.name.charAt(0).toUpperCase() }}</span>
-            <span class="who"><b>{{ c.name }}</b><span class="small dim mono">{{ contactLine(c) }}</span></span>
-            <span class="small dim">Send →</span>
-          </button>
-          <button v-if="w.state.contacts.length" class="btn ghost small" @click="openContacts">
-            See all ({{ w.state.contacts.length }})
-          </button>
-        </section>
+            <span class="who">
+              <b>{{ c.name }}</b>
+              <span class="small dim mono">{{ contactLine(c) }}</span>
+              <span v-if="c.note" class="small dim">{{ c.note }}</span>
+            </span>
+            <span class="acts">
+              <button class="btn small primary" @click="sendToContact(c)">Send</button>
+              <button class="btn small" @click="openContact(c)">Edit</button>
+            </span>
+          </div>
+          </section>
 
         </template>
 
+        <!-- ===== Settings ===== -->
+        <template v-else-if="section === 'settings'">
         <section class="card">
           <h2>Wallet settings</h2>
           <div v-if="w.state.unlocked" class="backup-row">
@@ -275,6 +433,19 @@
           </div>
           <p v-if="notice" class="small ok">{{ notice }}</p>
         </section>
+        <section class="card">
+          <h2>🔑 Private keys</h2>
+          <p class="small dim">For advanced use. Your 12 words already back up everything.</p>
+          <div class="stack">
+            <button class="btn" @click="go('privkeys')">Show private keys</button>
+            <button class="btn" @click="openSweep">Sweep a private key into Satish</button>
+          </div>
+        </section>
+        <section class="card">
+          <h2>Account</h2>
+          <NuxtLink class="btn" to="/settings">Sign-ins, your data and closing your account</NuxtLink>
+        </section>
+        </template>
       </template>
 
       <!-- receive -->
@@ -430,33 +601,6 @@
         <button class="btn ghost" style="margin-top: 14px" @click="go('home')">← Back</button>
       </section>
 
-      <!-- address book -->
-      <section v-else-if="view === 'contacts'" class="card">
-        <div class="head">
-          <h2>📒 Address book</h2>
-          <button class="btn small primary" @click="openContact()">+ Add</button>
-        </div>
-        <label class="field">
-          <input v-model="contactQuery" placeholder="Search names or addresses" autocapitalize="none" autocomplete="off" />
-        </label>
-        <p v-if="!filteredContacts.length" class="dim small" style="margin-top: 12px">
-          {{ w.state.contacts.length ? "No matches." : "No saved addresses yet." }}
-        </p>
-        <div v-for="c in filteredContacts" :key="c.id" class="contact static">
-          <span class="avatar">{{ c.name.charAt(0).toUpperCase() }}</span>
-          <span class="who">
-            <b>{{ c.name }}</b>
-            <span class="small dim mono">{{ contactLine(c) }}</span>
-            <span v-if="c.note" class="small dim">{{ c.note }}</span>
-          </span>
-          <span class="acts">
-            <button class="btn small primary" @click="sendToContact(c)">Send</button>
-            <button class="btn small" @click="openContact(c)">Edit</button>
-          </span>
-        </div>
-        <button class="btn ghost" style="margin-top: 14px" @click="go('home')">← Back</button>
-      </section>
-
       <section v-else-if="view === 'contact'" class="card">
         <h2>{{ contactForm.id ? "Edit contact" : "New contact" }}</h2>
         <label class="field">Name<input v-model="contactForm.name" maxlength="40" placeholder="e.g. Mum, Chika's shop" /></label>
@@ -592,6 +736,75 @@
         </div>
         <p v-else-if="savedNote" class="small ok">{{ savedNote }}</p>
         <button class="btn primary" @click="go('home')">Done</button>
+      </section>
+
+      <!-- private keys -->
+      <section v-else-if="view === 'privkeys'" class="card">
+        <h2>🔑 Private keys</h2>
+        <p class="sub">
+          Anyone who sees these can take all your bitcoin. Only use them to move your wallet
+          into another app you trust. Never send them to anyone, including "support".
+        </p>
+        <template v-if="!privKeys">
+          <label class="field">Wallet password<input v-model="password" type="password" autocomplete="current-password" /></label>
+          <label class="check"><input v-model="privOk" type="checkbox" /> <span>I understand, and nobody can see my screen</span></label>
+          <p v-if="error" class="err">{{ error }}</p>
+          <div class="stack">
+            <button class="btn danger" :disabled="busy || !password || !privOk" @click="showPrivKeys"><span v-if="busy" class="spinner" /> Show private keys</button>
+            <button class="btn ghost" @click="go('home')">← Back</button>
+          </div>
+        </template>
+        <template v-else>
+          <p class="small dim">Wallet private key ({{ privKeys.path }}, Native SegWit / BIP84, fingerprint {{ privKeys.fingerprint }}):</p>
+          <div class="addr mono">{{ privKeys.xprv }}</div>
+          <button class="btn small" @click="copy(privKeys.xprv)">{{ copied ? "Copied ✓" : "Copy" }}</button>
+          <p class="small dim" style="margin-top: 12px">As a descriptor (Sparrow, Bitcoin Core):</p>
+          <div class="addr mono">{{ privKeys.descriptor }}</div>
+          <button class="btn small" @click="copy(privKeys.descriptor)">Copy descriptor</button>
+          <h3 class="small sub-head">Keys for addresses holding coins</h3>
+          <p v-if="!privKeys.funded.length" class="small dim">None right now.</p>
+          <div v-for="k in privKeys.funded" :key="k.address" class="keyrow">
+            <div class="small mono">{{ k.address }} · {{ k.balance.toLocaleString() }} sats</div>
+            <div v-if="shownWif === k.address" class="addr mono">{{ k.wif }}</div>
+            <button class="btn small" @click="shownWif === k.address ? copy(k.wif) : (shownWif = k.address)">{{ shownWif === k.address ? "Copy key" : "Show key" }}</button>
+          </div>
+          <button class="btn primary" style="margin-top: 14px" @click="go('home')">Done</button>
+        </template>
+      </section>
+
+      <!-- sweep a private key -->
+      <section v-else-if="view === 'sweep'" class="card">
+        <h2>Sweep a private key</h2>
+        <p class="sub">
+          Have bitcoin on a paper wallet or an old app's private key? Satish moves all of it into
+          your wallet. The key itself is never stored.
+        </p>
+        <template v-if="!sweepFound">
+          <label class="field">
+            Private key
+            <div class="inline">
+              <input v-model="sweepWif" autocapitalize="none" autocomplete="off" spellcheck="false" placeholder="K…, L…, 5… (or c… on the test network)" />
+              <button v-if="canScan" class="btn small" type="button" @click="scanWif">Scan</button>
+            </div>
+          </label>
+          <p v-if="error" class="err">{{ error }}</p>
+          <div class="stack">
+            <button class="btn primary" :disabled="busy || !sweepWif" @click="checkSweep"><span v-if="busy" class="spinner" /> Look for bitcoin</button>
+            <button class="btn ghost" @click="go('home')">← Back</button>
+          </div>
+        </template>
+        <template v-else>
+          <div class="summary">
+            <div><span>Found</span><b>{{ sweepFound.total.toLocaleString() }} sats<small v-if="naira(sweepFound.total)" class="ngn">{{ naira(sweepFound.total) }}</small></b></div>
+            <div><span>Network fee</span><b>{{ sweepPlanned?.fee.toLocaleString() ?? "…" }} sats</b></div>
+            <div class="total"><span>Comes to your wallet</span><b>{{ sweepPlanned?.receive.toLocaleString() ?? "…" }} sats</b></div>
+          </div>
+          <p v-if="error" class="err">{{ error }}</p>
+          <div class="stack">
+            <button class="btn primary" :disabled="busy || !sweepPlanned" @click="doSweep"><span v-if="busy" class="spinner" /> Move it to my wallet</button>
+            <button class="btn ghost" :disabled="busy" @click="sweepFound = null">← Back</button>
+          </div>
+        </template>
       </section>
 
       <!-- transaction details -->
@@ -811,12 +1024,12 @@ import type { PaymentRequestOut } from "@xp/api-client";
 import {
   SendError, WrongPassword, checkAddress, verifyPoolAddress, isValidPhrase, newRecoveryPhrase, normalizePhrase,
   parsePaymentRequest, satsToBtc, resolveRecipient, searchContacts, normalizeUsername, usernameProblem,
-  type BumpPlan, type Contact, type FeeRates, type SendPlan,
+  planSweep, type BumpPlan, type Contact, type FeeRates, type SendPlan,
 } from "~/lib/wallet-core";
 
 const w = useWallet();
 const { naira } = usePrice();
-type View = "tx" | "bump" | "alerts" | "export" | "forgot" | "welcome" | "show" | "verify" | "restore" | "password" | "home" | "receive" | "send" | "review" | "sent" | "reveal" | "changepw" | "remove" | "contacts" | "contact" | "buy" | "cloudrestore" | "cloudon" | "username" | "request" | "requestshow";
+type View = "privkeys" | "sweep" | "tx" | "bump" | "alerts" | "export" | "forgot" | "welcome" | "show" | "verify" | "restore" | "password" | "home" | "receive" | "send" | "review" | "sent" | "reveal" | "changepw" | "remove" | "contacts" | "contact" | "buy" | "cloudrestore" | "cloudon" | "username" | "request" | "requestshow";
 const view = ref<View>(w.state.stored ? "home" : "welcome");
 const error = ref("");
 const busy = ref(false);
@@ -1023,6 +1236,130 @@ async function exportHistory() {
 }
 
 const ln = useLightning();
+const route = useRoute();
+const router = useRouter();
+const section = computed(() => {
+  const q = (route.query.s as string) || "home";
+  return ["home", "history", "activity", "contacts", "settings"].includes(q) ? q : "home";
+});
+const histTab = ref<"btc" | "ln">("btc");
+const actTab = ref<"btc" | "ln">("btc");
+
+// Switching sub-tab always lands on that section's main screen.
+watch(section, (sct) => {
+  if (w.state.stored && !locked.value) {
+    view.value = "home";
+    error.value = "";
+    window.scrollTo?.({ top: 0 });
+  }
+  if (sct === "activity") void loadRequests();
+});
+
+const pendingTxs = computed(() => w.state.history.filter((t) => !t.confirmed));
+const lnOpenItems = computed(() => ln.st.payments.filter((p) => p.status !== "completed"));
+
+function lnKind(k: string) {
+  return ({ lightning: "Lightning", spark: "Spark", deposit: "from Bitcoin", withdraw: "to Bitcoin" } as Record<string, string>)[k] ?? "";
+}
+
+function fmtDate(iso: string) {
+  return new Date(iso).toLocaleDateString();
+}
+
+function ensureLn() {
+  if (w.state.unlocked && !ln.st.open) void ln.open();
+}
+
+async function unlockLn() {
+  busy.value = true;
+  error.value = "";
+  try {
+    await ln.unlockAll(password.value);
+    password.value = "";
+  } catch (e) {
+    error.value = e instanceof WrongPassword ? "Wrong password." : e instanceof Error ? e.message : "Couldn't unlock.";
+  } finally {
+    busy.value = false;
+  }
+}
+
+async function loadRequests() {
+  try {
+    myRequests.value = (await api.listRequests()).filter((q) => q.network === w.net.name).slice(0, 20);
+  } catch {
+    /* offline: keep what we have */
+  }
+}
+
+// ---- private keys and sweeping
+const privKeys = ref<Awaited<ReturnType<typeof w.exportPrivateKeys>> | null>(null);
+const privOk = ref(false);
+const shownWif = ref("");
+const sweepWif = ref("");
+const sweepFound = ref<Awaited<ReturnType<typeof w.findSweep>> | null>(null);
+const sweepPlanned = ref<{ total: number; fee: number; receive: number } | null>(null);
+
+async function showPrivKeys() {
+  busy.value = true;
+  error.value = "";
+  try {
+    privKeys.value = await w.exportPrivateKeys(password.value);
+    password.value = "";
+  } catch {
+    error.value = "Wrong password.";
+  } finally {
+    busy.value = false;
+  }
+}
+
+function openSweep() {
+  sweepWif.value = "";
+  sweepFound.value = null;
+  sweepPlanned.value = null;
+  go("sweep");
+}
+
+function scanWif() {
+  const tg = (window as any).Telegram?.WebApp;
+  tg?.showScanQrPopup?.({ text: "Scan a private key" }, (text: string) => {
+    sweepWif.value = text.trim();
+    return true;
+  });
+}
+
+async function checkSweep() {
+  busy.value = true;
+  error.value = "";
+  try {
+    const found = await w.findSweep(sweepWif.value);
+    if (!found.inputs.length) throw new Error("There's no bitcoin on that private key.");
+    const rates = await w.fees();
+    sweepFound.value = found;
+    sweepPlanned.value = planSweep(found.inputs, rates.normal);
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : "Couldn't check that key.";
+  } finally {
+    busy.value = false;
+  }
+}
+
+async function doSweep() {
+  if (!sweepFound.value) return;
+  busy.value = true;
+  error.value = "";
+  try {
+    const rates = await w.fees();
+    sentTxid.value = await w.sweepKey(sweepFound.value, rates.normal);
+    sweepWif.value = "";
+    sweepFound.value = null;
+    notice.value = "Swept ✓ The bitcoin is on its way to your wallet.";
+    go("home");
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : "The sweep failed. Nothing was sent.";
+  } finally {
+    busy.value = false;
+  }
+}
 const tabKey = () => `xp_tab_v1_${(window as any).Telegram?.WebApp?.initDataUnsafe?.user?.id ?? "local"}`;
 const tab = ref<"btc" | "ln">("btc");
 try {
@@ -1305,12 +1642,13 @@ function shortAddr(a: string) {
 }
 
 function openContacts() {
+  void router.push({ path: "/", query: { s: "contacts" } });
   contactQuery.value = "";
   go("contacts");
 }
 
 function openContact(c?: Contact) {
-  contactReturn.value = view.value === "contacts" ? "contacts" : "home";
+  contactReturn.value = "home";
   contactForm.id = c?.id;
   contactForm.name = c?.name ?? "";
   contactForm.address = c?.address ?? "";
@@ -1371,6 +1709,11 @@ function go(v: View) {
   if (v !== "reveal") shownWords.value = [];
   if (v !== "remove" && v !== "show" && v !== "forgot") wroteDown.value = false;
   if (v !== "export") descriptors.value = null;
+  if (v !== "privkeys") {
+    privKeys.value = null;
+    privOk.value = false;
+    shownWif.value = "";
+  }
   if (v !== "home") notice.value = "";
   view.value = v;
   window.scrollTo?.({ top: 0 });
@@ -1662,9 +2005,10 @@ async function copy(text: string) {
 onMounted(async () => {
   if (!w.state.stored) w.checkCloud();
   if (w.state.stored) {
-    await w.loadHandle();
-    if (!w.state.live) await w.refresh();
+    void w.loadHandle();
+    if (!w.state.live) void w.refresh(); // cached balance shows right away; this catches up in the background
     void loadAlerts();
+    if (section.value === "activity") void loadRequests();
   }
   document.addEventListener("visibilitychange", onVisibility);
   const qs = new URLSearchParams(location.search);
@@ -1777,6 +2121,11 @@ onBeforeUnmount(() => {
 .switch button small { font-weight: 400; font-size: 12px; color: var(--text-faint); }
 .switch button.on { background: var(--orange-soft); color: var(--orange); }
 .switch button.on small { color: var(--orange); }
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 12px; padding: 4px; margin-bottom: 12px; }
+.seg button { padding: 8px; border: 0; border-radius: 9px; background: none; color: var(--text-dim); font: inherit; font-weight: 600; cursor: pointer; }
+.seg button.on { background: var(--orange-soft); color: var(--orange); }
+.tx.static { cursor: default; }
+.keyrow { display: flex; flex-direction: column; gap: 6px; padding: 8px 0; border-bottom: 1px solid var(--border); }
 .beta { background: var(--orange-soft); color: var(--orange); border-radius: 10px; padding: 8px 12px; margin-bottom: 12px; font-size: 13px; }
 .eye { background: none; border: 0; cursor: pointer; font-size: 14px; padding: 0 4px; }
 .tx { width: 100%; background: none; border-left: 0; border-right: 0; border-top: 0; font: inherit; text-align: left; cursor: pointer; }

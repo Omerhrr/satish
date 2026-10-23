@@ -258,30 +258,50 @@ export class Esplora {
   private active = 0;
   private waiting: (() => void)[] = [];
   private gapMs: number;
-  private nextAt = 0;
+  private tokens: number;
+  private refilledAt = Date.now();
+  private queue: Promise<void> = Promise.resolve();
   constructor(
     private base: string,
     private fetchImpl: FetchLike = (i, init) => fetch(i, init),
-    private opts: { maxParallel?: number; retries?: number; backoffMs?: number; minGapMs?: number } = {},
+    private opts: { maxParallel?: number; retries?: number; backoffMs?: number; minGapMs?: number; burst?: number } = {},
   ) {
-    this.gapMs = opts.minGapMs ?? 120;
+    this.gapMs = opts.minGapMs ?? 150;
+    this.tokens = opts.burst ?? 6;
   }
 
-  /** Space out request starts; slow down after push-back, speed up again on success. */
-  private async pace() {
-    const now = Date.now();
-    const at = Math.max(now, this.nextAt);
-    this.nextAt = at + this.gapMs;
-    if (at > now) await sleep(at - now);
+  /**
+   * Token bucket: a burst of requests goes out at once (a quick sync finishes
+   * in about a second), then about one request per gapMs. Slows down after
+   * push-back, speeds up again on success.
+   */
+  private pace(): Promise<void> {
+    const turn = this.queue.then(async () => {
+      const cap = this.opts.burst ?? 6;
+      const refill = () => {
+        const now = Date.now();
+        if (this.gapMs > 0) this.tokens = Math.min(cap, this.tokens + (now - this.refilledAt) / this.gapMs);
+        else this.tokens = cap;
+        this.refilledAt = now;
+      };
+      refill();
+      if (this.tokens < 1) {
+        await sleep((1 - this.tokens) * this.gapMs);
+        refill();
+      }
+      this.tokens -= 1;
+    });
+    this.queue = turn.catch(() => undefined);
+    return turn;
   }
 
   private eased(ok: boolean) {
-    const base = this.opts.minGapMs ?? 120;
+    const base = this.opts.minGapMs ?? 150;
     this.gapMs = ok ? Math.max(base, Math.round(this.gapMs * 0.8)) : Math.min(2000, Math.round(this.gapMs * 1.5) + 150);
   }
 
   private async slot<T>(fn: () => Promise<T>): Promise<T> {
-    const max = this.opts.maxParallel ?? 3;
+    const max = this.opts.maxParallel ?? 4;
     if (this.active >= max) await new Promise<void>((r) => this.waiting.push(r));
     this.active++;
     try {
@@ -307,6 +327,7 @@ export class Esplora {
       }
       const good = !!res && res.status !== 429 && res.status < 500;
       this.eased(good);
+      if (!good) this.tokens = 0; // stop the burst as soon as the server pushes back
       if (good) return res!;
       if (attempt >= retries) {
         throw new NetworkBusy(
@@ -345,6 +366,12 @@ export class Esplora {
       "/v1/fees/recommended",
     );
     return { fast: f.fastestFee, normal: f.halfHourFee, slow: f.hourFee, minimum: f.minimumFee };
+  }
+
+  async txHex(txid: string): Promise<string> {
+    const res = await this.fetchRetry(`/tx/${txid}/hex`);
+    if (!res.ok) throw new Error(`Couldn't reach the Bitcoin network (${res.status}). Try again.`);
+    return (await res.text()).trim();
   }
 
   async tx(txid: string) {
@@ -433,6 +460,54 @@ export async function scanAddresses(
     gapScan(0, POOL_START, extra && extra.to >= POOL_START ? extra.to : POOL_START - 1, opts.poolGap ?? GAP_LIMIT),
   ]);
   return out.sort((a, b) => a.change - b.change || a.index - b.index);
+}
+
+/**
+ * Fast re-check for a wallet we've already scanned: look only at addresses
+ * already in use plus a few fresh ones on each chain. If any fresh one has
+ * been used since, `needFull` tells the caller to do a full gap scan.
+ */
+export async function quickScan(
+  xpub: string,
+  net: NetworkInfo,
+  api: Esplora,
+  known: AddressInfo[],
+  poolTo = -1,
+): Promise<{ addresses: AddressInfo[]; needFull: boolean }> {
+  const byKey = new Map(known.map((a) => [`${a.change}/${a.index}`, a]));
+  const want = new Map<string, { change: 0 | 1; index: number; fresh: boolean }>();
+  for (const a of known) if (a.txCount > 0) want.set(`${a.change}/${a.index}`, { change: a.change, index: a.index, fresh: false });
+  const lastUsed = (change: 0 | 1, pool: boolean) =>
+    Math.max(pool ? POOL_START - 1 : -1, ...known.filter((a) => a.change === change && (a.index >= POOL_START) === pool && a.txCount > 0).map((a) => a.index));
+  const ahead = (change: 0 | 1, from: number, n: number) => {
+    for (let i = from; i < from + n; i++) if (!want.has(`${change}/${i}`)) want.set(`${change}/${i}`, { change, index: i, fresh: true });
+  };
+  ahead(0, lastUsed(0, false) + 1, 2); // the address on the Receive screen, and one after
+  ahead(1, lastUsed(1, false) + 1, 1); // next change address
+  const poolFrom = lastUsed(0, true) + 1;
+  ahead(0, poolFrom, Math.max(2, poolTo - poolFrom + 1)); // @username addresses handed out so far
+  const looked = await Promise.all(
+    [...want.values()].map(async (w) => {
+      const address = addressAt(xpub, net, w.change, w.index);
+      const s = await api.address(address);
+      return {
+        fresh: w.fresh,
+        info: {
+          address, change: w.change, index: w.index,
+          txCount: s.chain_stats.tx_count + s.mempool_stats.tx_count,
+          confirmed: s.chain_stats.funded_txo_sum - s.chain_stats.spent_txo_sum,
+          unconfirmed: s.mempool_stats.funded_txo_sum - s.mempool_stats.spent_txo_sum,
+        } satisfies AddressInfo,
+      };
+    }),
+  );
+  for (const l of looked) byKey.set(`${l.info.change}/${l.info.index}`, l.info);
+  const needFull = looked.some((l) => l.fresh && l.info.txCount > 0);
+  return { addresses: [...byKey.values()].sort((a, b) => a.change - b.change || a.index - b.index), needFull };
+}
+
+export function sameStats(a: AddressInfo | undefined, b: AddressInfo): boolean {
+  return !!a && a.txCount === b.txCount && a.confirmed === b.confirmed && a.unconfirmed === b.unconfirmed;
 }
 
 export function nextUnused(addresses: AddressInfo[], change: 0 | 1): AddressInfo | undefined {
@@ -682,6 +757,100 @@ export function walletDescriptors(phrase: string, net: NetworkInfo): { receive: 
     path: `m/84'/${net.coinType}'/0'`,
     fingerprint,
   };
+}
+
+// ---------------------------------------------------------------- private keys
+
+/** The account private key (can spend everything) for advanced users and other wallets. */
+export function walletPrivateKeys(phrase: string, net: NetworkInfo): { xprv: string; descriptor: string; path: string; fingerprint: string } {
+  const seed = bip39.mnemonicToSeedSync(normalizePhrase(phrase));
+  const versions = net.coinType === 1 ? { private: 0x04358394, public: 0x043587cf } : undefined;
+  const master = HDKey.fromMasterSeed(seed, versions);
+  const account = master.derive(accountPath(net));
+  const fingerprint = master.fingerprint.toString(16).padStart(8, "0");
+  return {
+    xprv: account.privateExtendedKey,
+    descriptor: `wpkh([${fingerprint}/84h/${net.coinType}h/0h]${account.privateExtendedKey}/<0;1>/*)`,
+    path: accountPath(net),
+    fingerprint,
+  };
+}
+
+/** Private key (WIF) for one address of this wallet. */
+export function addressWif(phrase: string, net: NetworkInfo, change: 0 | 1, index: number): string {
+  const node = accountFromPhrase(phrase, net).deriveChild(change).deriveChild(index);
+  return btc.WIF(net.btc).encode(node.privateKey!);
+}
+
+export type SweepKind = "p2wpkh" | "p2sh-p2wpkh" | "p2pkh";
+
+/** Addresses a single private key (WIF) can hold coins at. Throws SendError on a bad key. */
+export function sweepAddresses(wif: string, net: NetworkInfo): { priv: Uint8Array; addresses: { kind: SweepKind; address: string }[] } {
+  let priv: Uint8Array;
+  try {
+    priv = btc.WIF(net.btc).decode(wif.trim());
+  } catch {
+    const other = net.name === "mainnet" ? NETWORKS.testnet : NETWORKS.mainnet;
+    try {
+      btc.WIF(other.btc).decode(wif.trim());
+      throw new SendError(`That private key is for the ${other.name === "mainnet" ? "real Bitcoin network" : "test network"}, not this wallet's.`);
+    } catch (e) {
+      if (e instanceof SendError) throw e;
+    }
+    throw new SendError("That isn't a valid private key. It usually starts with K, L, 5 (or c on the test network).");
+  }
+  const pub = secp256k1.getPublicKey(priv, true);
+  return {
+    priv,
+    addresses: [
+      { kind: "p2wpkh", address: btc.p2wpkh(pub, net.btc).address! },
+      { kind: "p2sh-p2wpkh", address: btc.p2sh(btc.p2wpkh(pub, net.btc), net.btc).address! },
+      { kind: "p2pkh", address: btc.p2pkh(pub, net.btc).address! },
+    ],
+  };
+}
+
+export interface SweepInput {
+  txid: string;
+  vout: number;
+  value: number;
+  kind: SweepKind;
+  rawTx?: string; // needed for legacy (p2pkh) coins
+}
+
+const SWEEP_VBYTES: Record<SweepKind, number> = { p2wpkh: 68, "p2sh-p2wpkh": 91, p2pkh: 148 };
+
+export function planSweep(inputs: SweepInput[], feeRate: number): { total: number; fee: number; receive: number } {
+  if (!inputs.length) throw new SendError("There's no bitcoin on that private key.");
+  const total = inputs.reduce((s, i) => s + i.value, 0);
+  const vsize = Math.ceil(10.5 + 31 + inputs.reduce((s, i) => s + SWEEP_VBYTES[i.kind], 0));
+  const fee = Math.ceil(vsize * Math.max(1, feeRate));
+  const receive = total - fee;
+  if (receive < DUST_SATS) throw new SendError("The coins on that key are too small to cover the network fee.");
+  return { total, fee, receive };
+}
+
+/** Move everything on a private key to one of our own addresses. */
+export function signSweep(inputs: SweepInput[], priv: Uint8Array, net: NetworkInfo, to: string, fee: number): SignedTx {
+  const pub = secp256k1.getPublicKey(priv, true);
+  const tx = new btc.Transaction({ allowUnknownOutputs: false });
+  for (const i of inputs) {
+    if (i.kind === "p2wpkh") {
+      tx.addInput({ txid: i.txid, index: i.vout, witnessUtxo: { script: btc.p2wpkh(pub, net.btc).script, amount: BigInt(i.value) }, sequence: RBF_SEQUENCE });
+    } else if (i.kind === "p2sh-p2wpkh") {
+      const p = btc.p2sh(btc.p2wpkh(pub, net.btc), net.btc);
+      tx.addInput({ txid: i.txid, index: i.vout, witnessUtxo: { script: p.script, amount: BigInt(i.value) }, redeemScript: p.redeemScript, sequence: RBF_SEQUENCE });
+    } else {
+      if (!i.rawTx) throw new SendError("Couldn't load an old coin on that key. Try again.");
+      tx.addInput({ txid: i.txid, index: i.vout, nonWitnessUtxo: hex.decode(i.rawTx), sequence: RBF_SEQUENCE });
+    }
+  }
+  const total = inputs.reduce((s, i) => s + i.value, 0);
+  tx.addOutputAddress(to, BigInt(total - fee), net.btc);
+  tx.sign(priv);
+  tx.finalize();
+  if (Number(tx.fee) !== fee) throw new SendError("Fee check failed. Nothing was sent.");
+  return { hex: tx.hex, txid: tx.id, vsize: tx.vsize, fee };
 }
 
 function csvCell(v: string | number): string {

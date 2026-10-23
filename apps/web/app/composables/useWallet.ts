@@ -10,9 +10,10 @@ import {
 } from "~/lib/cloud-backup";
 import {
   Esplora, NETWORKS, accountXpub, buildHistory, decryptPhrase, encryptPhrase, nextUnused,
-  normalizePhrase, planSend, scanAddresses, signPlan, signTx, planBump, walletDescriptors, historyCsv, checkContact,
+  normalizePhrase, planSend, scanAddresses, quickScan, sameStats,
+  walletPrivateKeys, addressWif, sweepAddresses, planSweep, signSweep, type SweepInput, signPlan, signTx, planBump, walletDescriptors, historyCsv, checkContact,
   identityFromPhrase, signPoolAddresses, verifyPoolAddress, signSparkAddress, verifySparkAddress, normalizeSpark, normalizeUsername, POOL_START,
-  type AddressInfo, type BumpPlan, type Contact, type EncryptedSecret, type FeeRates, type HistoryItem, type NetworkName, type SendPlan, type Utxo,
+  type AddressInfo, type BumpPlan, type EsploraTx, type Contact, type EncryptedSecret, type FeeRates, type HistoryItem, type NetworkName, type SendPlan, type Utxo,
 } from "~/lib/wallet-core";
 
 interface StoredWallet {
@@ -71,7 +72,13 @@ interface Snapshot {
   utxos: Utxo[];
   history: HistoryItem[];
   lastSync: number;
+  lastFull?: number;
+  txs?: Record<string, EsploraTx[]>; // per used address, so unchanged addresses aren't downloaded again
 }
+
+const FULL_EVERY_MS = 30 * 60 * 1000;
+let txCache: Record<string, EsploraTx[]> = {};
+let lastFull = 0;
 
 function userId(): string {
   return String((window as any).Telegram?.WebApp?.initDataUnsafe?.user?.id ?? "local");
@@ -169,6 +176,8 @@ export function useWallet() {
       state.utxos = snap.utxos;
       state.history = snap.history;
       state.lastSync = snap.lastSync;
+      txCache = snap.txs ?? {};
+      lastFull = snap.lastFull ?? 0;
     }
     state.cloudAvailable = !!telegramStore();
     state.ready = true;
@@ -260,6 +269,10 @@ export function useWallet() {
     state.addresses = [];
     state.utxos = [];
     state.history = [];
+    state.lastSync = 0; // new or restored wallet: always a deep scan first
+    state.live = false;
+    txCache = {};
+    lastFull = 0;
     await refresh();
   }
 
@@ -293,6 +306,10 @@ export function useWallet() {
     state.addresses = [];
     state.utxos = [];
     state.history = [];
+    state.lastSync = 0; // new or restored wallet: always a deep scan first
+    state.live = false;
+    txCache = {};
+    lastFull = 0;
     await refresh();
   }
 
@@ -304,40 +321,59 @@ export function useWallet() {
 
   async function doRefresh() {
     if (!state.stored) return;
+    const xpub = state.stored.xpub;
     const firstSync = !state.lastSync;
     state.loading = true;
     state.error = "";
     try {
-      // Payers may have been handed new @username addresses since we last looked.
-      // Asked even before we know a username, so a freshly restored wallet
-      // scans every pool address that was ever handed out.
-      try {
-        setHandle(await xpApi.handleMe(netName));
-      } catch {
-        /* not signed in / offline: the pool is still gap-scanned */
-      }
-      const pool = state.handle && state.handle.issuedMax >= POOL_START ? { from: POOL_START, to: state.handle.issuedMax } : undefined;
-      // Full look-ahead for @username coins on this device's first sync (e.g. after a restore); small after that.
+      // The username's pool range comes back in parallel; it only matters if it grew.
+      const handleP = xpApi.handleMe(netName).then(setHandle).catch(() => undefined);
       const knownPoolMax = Math.max(-1, ...state.addresses.filter((a) => a.index >= POOL_START && a.txCount > 0).map((a) => a.index));
-      const poolTo = Math.max(pool?.to ?? -1, knownPoolMax);
-      const addresses = await scanAddresses(state.stored.xpub, net, api, poolTo >= POOL_START ? { from: POOL_START, to: poolTo } : undefined, {
-        poolGap: firstSync ? 20 : 5,
-      });
+      const issued = () => (state.handle && state.handle.issuedMax >= POOL_START ? state.handle.issuedMax : -1);
+      const used0 = state.addresses.filter((a) => a.txCount > 0);
+      const haveCache = used0.every((a) => txCache[a.address]);
+      let full = firstSync || !haveCache || Date.now() - lastFull > FULL_EVERY_MS;
+      let addresses: AddressInfo[] = [];
+      if (!full) {
+        const q = await quickScan(xpub, net, api, state.addresses, Math.max(issued(), knownPoolMax));
+        await handleP;
+        full = q.needFull || issued() > Math.max(knownPoolMax, ...q.addresses.filter((a) => a.index >= POOL_START).map((a) => a.index));
+        addresses = q.addresses;
+      }
+      if (full) {
+        await handleP; // a restore needs the issued range before the deep scan
+        const poolTo = Math.max(issued(), knownPoolMax);
+        addresses = await scanAddresses(xpub, net, api, poolTo >= POOL_START ? { from: POOL_START, to: poolTo } : undefined, {
+          poolGap: firstSync ? 20 : 5,
+        });
+        lastFull = Date.now();
+      }
+      // Only download details for addresses whose numbers changed.
+      const before = new Map(state.addresses.map((a) => [a.address, a]));
       const used = addresses.filter((a) => a.txCount > 0);
+      const changed = used.filter((a) => !sameStats(before.get(a.address), a) || !txCache[a.address]);
+      const keep = new Set(used.filter((a) => !changed.includes(a)).map((a) => a.address));
       const [utxoLists, txLists] = await Promise.all([
-        Promise.all(used.map((a) => api.utxos(a.address).then((us) => us.map((u) => ({ ...u, a }))))),
-        Promise.all(used.map((a) => api.txs(a.address))),
+        Promise.all(changed.map((a) => api.utxos(a.address).then((us) => us.map((u) => ({ ...u, a }))))),
+        Promise.all(changed.map((a) => api.txs(a.address).then((t) => [a.address, t] as const))),
       ]);
+      const nextCache: Record<string, EsploraTx[]> = {};
+      for (const a of used) if (keep.has(a.address)) nextCache[a.address] = txCache[a.address];
+      for (const [addr, t] of txLists) nextCache[addr] = t;
+      txCache = nextCache;
       state.addresses = addresses;
-      state.utxos = utxoLists.flat().map(({ a, ...u }) => ({
-        txid: u.txid, vout: u.vout, value: u.value, confirmed: u.status.confirmed,
-        address: a.address, change: a.change, index: a.index,
-      }));
-      state.history = buildHistory(txLists.flat(), new Set(addresses.map((a) => a.address)));
+      state.utxos = [
+        ...state.utxos.filter((u) => keep.has(u.address)),
+        ...utxoLists.flat().map(({ a, ...u }) => ({
+          txid: u.txid, vout: u.vout, value: u.value, confirmed: u.status.confirmed,
+          address: a.address, change: a.change, index: a.index,
+        })),
+      ];
+      state.history = buildHistory(Object.values(txCache).flat(), new Set(addresses.map((a) => a.address)));
       state.lastSync = Date.now();
       state.live = true;
       writeJson(snapKey(netName), {
-        xpub: state.stored.xpub, addresses: state.addresses, utxos: state.utxos, history: state.history, lastSync: state.lastSync,
+        xpub, addresses: state.addresses, utxos: state.utxos, history: state.history, lastSync: state.lastSync, lastFull, txs: txCache,
       } satisfies Snapshot);
     } catch (e) {
       state.error = e instanceof Error ? e.message : "Couldn't update your wallet.";
@@ -345,6 +381,12 @@ export function useWallet() {
     } finally {
       state.loading = false;
     }
+  }
+
+  /** Deep scan on demand (pull-to-refresh style "Check everything"). */
+  function fullRefresh(): Promise<void> {
+    lastFull = 0;
+    return refresh();
   }
 
   function fees(): Promise<FeeRates> {
@@ -429,6 +471,40 @@ export function useWallet() {
     return historyCsv(state.history, state.notes);
   }
 
+  /** Account private key + per-address keys for addresses holding coins. Always asks for the password. */
+  async function exportPrivateKeys(password: string) {
+    const phrase = await revealPhrase(password);
+    const keys = walletPrivateKeys(phrase, net);
+    const funded = state.addresses
+      .filter((a) => a.confirmed + a.unconfirmed > 0)
+      .map((a) => ({ address: a.address, balance: a.confirmed + a.unconfirmed, wif: addressWif(phrase, net, a.change, a.index) }));
+    return { ...keys, funded };
+  }
+
+  /** Look up the coins on a private key (e.g. a paper wallet) before sweeping it. */
+  async function findSweep(wif: string) {
+    const { priv, addresses } = sweepAddresses(wif, net);
+    const inputs: SweepInput[] = [];
+    for (const a of addresses) {
+      const utxos = await api.utxos(a.address);
+      for (const u of utxos) {
+        inputs.push({ txid: u.txid, vout: u.vout, value: u.value, kind: a.kind, rawTx: a.kind === "p2pkh" ? await api.txHex(u.txid) : undefined });
+      }
+    }
+    return { priv, inputs, total: inputs.reduce((s2, i) => s2 + i.value, 0) };
+  }
+
+  async function sweepKey(found: { priv: Uint8Array; inputs: SweepInput[] }, feeRate: number): Promise<string> {
+    const to = nextUnused(state.addresses, 0)?.address;
+    if (!to) throw new Error("Refresh your wallet and try again.");
+    const plan = planSweep(found.inputs, feeRate);
+    const signed = signSweep(found.inputs, found.priv, net, to, plan.fee);
+    const txid = await api.broadcast(signed.hex);
+    setNote(txid, "Swept from a private key");
+    setTimeout(refresh, 1500);
+    return txid;
+  }
+
   async function exportDescriptors(password: string) {
     return walletDescriptors(await revealPhrase(password), net);
   }
@@ -462,6 +538,8 @@ export function useWallet() {
     lockSession();
     writeStore(null, netName);
     writeJson(snapKey(netName), null);
+    txCache = {};
+    lastFull = 0;
     state.live = false;
     state.stored = null;
     state.addresses = [];
@@ -619,9 +697,9 @@ export function useWallet() {
   return {
     loadHandle, claimUsername, resolveUsername, rememberUsername, topUp, publishLightning, resolveUsernameLightning,
     state, net, saveContact, deleteContact, confirmed, pending, spendable, receiveAddress,
-    save, refresh, fees, plan, send, revealPhrase, changePassword, remove,
+    save, refresh, fullRefresh, fees, plan, send, revealPhrase, changePassword, remove,
     unlock, lockSession, sessionPhraseOrNull,
-    planReplace, sendReplace, setNote, exportCsv, exportDescriptors, setHideBalance,
+    planReplace, sendReplace, setNote, exportPrivateKeys, findSweep, sweepKey, exportCsv, exportDescriptors, setHideBalance,
     checkCloud, restoreFromCloud, enableCloud, disableCloud,
     explorerTx: (txid: string) => `${net.explorer}/tx/${txid}`,
   };
