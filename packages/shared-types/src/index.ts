@@ -192,7 +192,7 @@ export interface TaskResultOut {
 
 export interface TaskCreateIn {
   objective: string;
-  budget_xp: number;
+  budget_xp?: number | null; // omit: Satish AI charges only what it uses
   idempotency_key?: string | null;
 }
 
@@ -282,6 +282,11 @@ export interface RateOut {
   xp_per_sat: number;
   can_change: boolean;
   note: string;
+  min_tk?: number;
+  max_tk?: number;
+  methods?: ("lightning" | "onchain")[]; // what the operator has set up
+  payee_username?: string | null;
+  welcome_tk?: number;
 }
 
 export interface PackOut {
@@ -294,6 +299,8 @@ export interface PackOut {
 export interface PurchaseCreateIn {
   pack_id?: string | null;
   amount_sats?: number | null;
+  tk_amount?: number | null;
+  method?: "lightning" | "onchain" | null;
   description?: string;
 }
 
@@ -313,6 +320,7 @@ export interface PurchaseOut {
   address?: string | null;
   network?: "mainnet" | "testnet" | null;
   seen_sats?: number | null;
+  payee_username?: string | null;
 }
 
 export interface TaskEstimateOut {

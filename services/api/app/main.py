@@ -128,6 +128,23 @@ def create_app() -> FastAPI:
             redis=bool(settings.redis_url),
             rate_limit_backend=settings.rate_limit_backend,
         )
+        if settings.tk_lightning_mnemonic:
+            import asyncio
+
+            from app.services import tk_lightning
+
+            async def _tk_lightning_loop() -> None:
+                from xp_core.db import get_session_factory
+
+                while True:
+                    try:
+                        async with get_session_factory()() as s:
+                            await tk_lightning.sweep(s, settings)
+                    except Exception as exc:  # keep watching; log and retry
+                        log.warning("tk_lightning_sweep_failed", error=type(exc).__name__, detail=str(exc)[:200])
+                    await asyncio.sleep(15)
+
+            app.state.tk_ln_task = asyncio.create_task(_tk_lightning_loop())
 
     return app
 

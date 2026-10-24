@@ -111,7 +111,7 @@ async def test_purchase_pack_creates_invoice_with_xp_preview(client):
 async def test_purchase_custom_amount_and_rejections(client):
     ok = await client.post("/api/v1/xp/purchases", json={"amount_sats": 250})
     assert ok.status_code == 201
-    assert ok.json()["xp_amount"] == 25_000
+    assert ok.json()["xp_amount"] == 250 * get_settings().xp_per_sat
 
     unknown = await client.post("/api/v1/xp/purchases", json={"pack_id": "nope"})
     assert unknown.status_code == 404

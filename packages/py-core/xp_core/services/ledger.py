@@ -33,6 +33,7 @@ ENTRY_TYPES = {
     "charge",
     "refund",
     "adjustment",
+    "welcome",
 }
 
 
@@ -345,6 +346,26 @@ async def refund(
     )
     if not replay:
         await _apply_balance_delta(session, user_id=user_id, delta=amount, entry=entry)
+    return LedgerResult(entry.id, entry.entry_type, entry.amount, entry.balance_after, replay)
+
+
+async def grant_welcome(session: AsyncSession, *, user_id: str, amount: int) -> LedgerResult | None:
+    """One-time free TK for every account (idempotent per user)."""
+    if amount <= 0:
+        return None
+    entry, replay = await _append_entry(
+        session,
+        user_id=user_id,
+        entry_type="welcome",
+        amount=amount,
+        reference_type="user",
+        reference_id=user_id,
+        idempotency_key=f"welcome:{user_id}",
+        note="Welcome TK",
+    )
+    if not replay:
+        await _apply_balance_delta(session, user_id=user_id, delta=amount, entry=entry)
+        log.info("tk_welcome_granted", user_id=user_id, amount=amount)
     return LedgerResult(entry.id, entry.entry_type, entry.amount, entry.balance_after, replay)
 
 

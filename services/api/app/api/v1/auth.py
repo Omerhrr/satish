@@ -64,6 +64,10 @@ async def auth_telegram(payload: TelegramAuthIn, session: DbSession) -> SessionO
     if identity is not None:
         user = await get_or_create_user_from_telegram(session, identity)
         mode = "telegram"
+        # Every account gets its welcome TK once (new and existing accounts).
+        from xp_core.services import ledger as _ledger
+
+        await _ledger.grant_welcome(session, user_id=user.id, amount=settings.tk_welcome_bonus)
     else:
         if not settings.dev_mode:
             raise HTTPException(

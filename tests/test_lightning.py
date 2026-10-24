@@ -23,6 +23,7 @@ from lightning_adapter import (
 from lightning_adapter.common import Network
 from lightning_adapter.lnd_provider import LndConfigError, LndLightningProvider
 from lightning_adapter.state import next_invoice_state, next_payment_state
+from xp_core.config import get_settings
 from sqlalchemy import func, select
 from xp_core.models.entities import XpLedgerEntry
 
@@ -260,7 +261,7 @@ async def test_invoice_create_and_idempotent_replay(client, session, clock):
     assert body["status"] == "pending"
     assert body["bolt11"].startswith("lnbcrt")
     assert body["direction"] == "receive"
-    assert body["xp_amount"] == body["amount_sats"] * 100
+    assert body["xp_amount"] == body["amount_sats"] * get_settings().xp_per_sat
 
     got = await client.get(f"/api/v1/lightning/invoices/{body['payment_hash']}")
     assert got.status_code == 200
@@ -314,7 +315,7 @@ async def test_duplicate_settlement_credits_exactly_once(client, session):
     balance = (
         await session.execute(select(func.coalesce(func.sum(XpLedgerEntry.amount), 0)))
     ).scalar_one()
-    assert balance == 150_000  # 1500 sats x 100 XP/sat, credited exactly once
+    assert balance == 1500 * get_settings().xp_per_sat  # credited exactly once
 
 
 async def test_settlement_of_unknown_hash_is_404(client):
@@ -407,7 +408,7 @@ async def test_capabilities_disclose_mode_and_gates(client):
     joined = " ".join(body["custody_disclosure"]).lower()
     assert "canned" in joined, "canned mode disclosed verbatim"
     assert "mainnet" in joined and "refused" in joined
-    assert body["sats_to_xp"]["xp_per_sat"] == 100
+    assert body["sats_to_xp"]["xp_per_sat"] == get_settings().xp_per_sat
     assert body["sats_to_xp"]["can_change"] is True
     assert body["fee_policy"]["max_fee_msat"] == 10_000
 

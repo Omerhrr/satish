@@ -4,8 +4,8 @@
       <h1>Satish AI</h1>
       <p class="tagline">
         Ask for research, price comparisons and written reports. You pay with
-        <b>TK credits</b>, bought with bitcoin from your Satish wallet. You approve a
-        budget first, and anything unused comes back.
+        <b>TK credits</b>, taken automatically for what each task uses. Every account
+        starts with 300 TK free; buy more with Lightning or bitcoin.
       </p>
     </section>
 
@@ -40,7 +40,7 @@
         <div class="features">
           <NuxtLink to="/tasks" class="feature">
             <b>🔎 Research &amp; reports</b>
-            <span class="small dim">Ask a question, set a budget, get a PDF report with sources.</span>
+            <span class="small dim">Ask a question, get a PDF report with sources.</span>
           </NuxtLink>
           <NuxtLink to="/automations" class="feature">
             <b>⏱ Automations</b>

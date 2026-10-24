@@ -986,3 +986,24 @@ finished ones; the bare row stays because TK ledger entries reference it.
 Automations accept every N minutes/hours/days, daily at several times,
 weekly on chosen days, monthly on a day, each in the user's own time zone
 (`daily 08:00,18:30 tz Africa/Lagos`).
+
+## D38 - TK v2: automatic charging, welcome TK, buy any amount (2026-10-24)
+
+- No budgets to type. A task holds up to `XP_AGENT_AUTO_BUDGET_XP` (1,000)
+  of the balance, or the whole balance if lower, while it runs; only what
+  it uses is charged and the rest returns at once. Tasks start immediately.
+  Automations do the same per run.
+- Every account gets 300 TK once (`welcome` ledger entry keyed per user;
+  existing accounts receive it on their next sign-in).
+- 1 sat = 5 TK. Users type how much TK they want (minimum 500 TK = 100
+  sats; sats round up, so TK credited is always sats x 5).
+- Users choose Lightning or Bitcoin. Both pay the operator directly:
+  Bitcoin to a fresh address from `XP_ONCHAIN_XPUB` (watch-only); Lightning
+  to a per-purchase invoice from the operator's Breez Spark wallet running in
+  the API (`XP_TK_LIGHTNING_MNEMONIC`). The invoice is exact and unique, so a
+  payment can only credit its own purchase; the API checks every 15 s and on
+  each poll, and credits once (compare-and-set + `purchase:{intent}` key).
+  `XP_TK_PAYEE_USERNAME` is shown as "Paying to @name". The pay screen has a
+  QR, copy buttons, and "Pay with my Satish wallet" for both methods.
+- Trade-off: the Lightning phrase on the server can spend that wallet. Keep a
+  small float and sweep income out regularly.

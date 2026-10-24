@@ -2,7 +2,7 @@
   <div>
     <h1 class="page-title">⏱ Automations</h1>
     <p class="page-sub">
-      Repeat a task on a schedule. You set a spending cap per run and in total;
+      Repeat a task on a schedule. Each run takes TK only for what it uses;
       if something fails it pauses instead of retrying, and emails always wait
       for your approval.
     </p>
@@ -11,8 +11,6 @@
       <h2>New automation</h2>
       <div class="form-grid">
         <label>What should it do?<input v-model="form.objective" placeholder="Monitor supplier prices daily" /></label>
-        <label>Budget per run (TK)<input v-model="form.budgetPerRun" inputmode="numeric" /></label>
-        <label>Total budget (TK, optional)<input v-model="form.budgetTotal" inputmode="numeric" placeholder="-" /></label>
       </div>
       <div class="sched">
         <div class="seg">
@@ -60,7 +58,7 @@
               {{ describe(j.schedule) }} · {{ human(j.status) }}
               <span v-if="j.auto_paused_reason"> (paused: {{ j.auto_paused_reason }})</span>
               · next: {{ fmt(j.next_run_at) }}
-              · spent {{ j.total_spent_xp }}/{{ j.budget_total_xp ?? "∞" }} TK
+              · {{ j.total_spent_xp.toLocaleString() }} TK used
               · {{ j.run_count }} runs
             </div>
             <div v-if="j.last_run_status" class="small dim">
@@ -80,7 +78,7 @@
           <div v-for="r in runs" :key="r.id" class="small run-row">
             <span>Run {{ r.run_number }} · {{ human(r.trigger) }} ·
               <span class="badge" :data-status="r.status">{{ r.status }}</span>
-              · {{ r.xp_charged }}/{{ r.xp_budget_per_run }} TK
+              · {{ r.xp_charged }} TK
             </span>
             <span class="dim"> {{ fmt(r.started_at) }}<span v-if="r.error"> · {{ r.error }}</span></span>
           </div>
@@ -126,8 +124,6 @@ const creating = ref(false);
 
 const form = reactive({
   objective: "",
-  budgetPerRun: "20",
-  budgetTotal: "",
 });
 
 const tz = (() => {
@@ -227,8 +223,8 @@ async function create() {
     await api.createJob({
       objective: form.objective,
       schedule: scheduleExpr.value,
-      budget_per_run_xp: Math.max(1, Number(form.budgetPerRun) || 20),
-      budget_total_xp: form.budgetTotal ? Number(form.budgetTotal) : null,
+      budget_per_run_xp: 1000, // cap per run; only what's used is charged
+      budget_total_xp: null,
     });
     form.objective = "";
     flash("Job created.");

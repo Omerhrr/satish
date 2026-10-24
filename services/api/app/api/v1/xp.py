@@ -34,6 +34,7 @@ from xp_core.services.onchain import OnchainConfigError
 
 from app.deps import CurrentUser, DbSession
 from app.services import xp_service
+from app.services.tk_lightning import TkLightningUnavailable
 
 log = get_logger(__name__)
 router = APIRouter(prefix="/xp", tags=["xp"])
@@ -42,7 +43,15 @@ router = APIRouter(prefix="/xp", tags=["xp"])
 @router.get("/rate", response_model=RateOut)
 async def rate() -> RateOut:
     """Published sats->XP conversion (pricing_requirements #1)."""
-    return RateOut(**rate_disclosure(get_settings()))
+    s = get_settings()
+    return RateOut(
+        **rate_disclosure(s),
+        min_tk=s.tk_min_purchase,
+        max_tk=s.tk_max_purchase,
+        methods=xp_service.payment_methods(s),
+        payee_username=(s.tk_payee_username or "").lstrip("@") or None,
+        welcome_tk=s.tk_welcome_bonus,
+    )
 
 
 @router.get("/packs", response_model=list[PackOut])
@@ -114,14 +123,19 @@ async def create_purchase(
             pack_id=payload.pack_id,
             amount_sats=payload.amount_sats,
             description=payload.description,
+            tk_amount=payload.tk_amount,
+            method=payload.method,
         )
     except xp_service.UnknownPack as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except OnchainConfigError as exc:
-        log.error("onchain_misconfigured", error=str(exc))
-        raise HTTPException(status_code=503, detail="Payments are temporarily unavailable.") from exc
+    except (OnchainConfigError, TkLightningUnavailable) as exc:
+        log.error("payments_misconfigured", error=str(exc))
+        raise HTTPException(status_code=503, detail="That payment method isn't set up yet. Try the other one.") from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        log.error("purchase_create_failed", error=type(exc).__name__, detail=str(exc)[:300])
+        raise HTTPException(status_code=502, detail="Couldn't create the payment request. Please try again.") from exc
     await session.commit()
     out = xp_service.purchase_out(row)
     if out["payment_method"] == "onchain":
@@ -148,6 +162,13 @@ async def get_purchase(purchase_id: str, user: CurrentUser, session: DbSession) 
 
     row = await xp_service.get_owned_purchase(session, user, purchase_id)
     seen = None
+    from app.services import tk_lightning
+
+    if tk_lightning.is_tk_lightning(row) and row.status != "settled":
+        try:
+            await tk_lightning.settle_rows(session, [row], get_settings())
+        except Exception as exc:
+            log.warning("tk_lightning_check_failed", intent_id=row.id, error=type(exc).__name__)
     if onchain.is_onchain(row) and row.status != "settled":
         try:
             check = await onchain.settle_if_paid(session, row, get_settings())

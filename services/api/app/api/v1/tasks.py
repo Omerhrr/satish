@@ -120,12 +120,28 @@ async def estimate(payload: TaskCreateIn) -> TaskEstimateOut:
 async def create_task(
     payload: TaskCreateIn, user: CurrentUser, session: DbSession
 ) -> TaskOut:
-    """Create a task and atomically reserve its TK budget (task_charge_flow #2-3)."""
+    """Create a task and atomically reserve its TK budget (task_charge_flow #2-3).
+
+    With no budget given, up to agent_auto_budget_xp of the balance is held
+    while it runs; only what is used is charged, the rest goes straight back.
+    """
+    from xp_core.config import get_settings
+
+    budget = payload.budget_xp
+    if budget is None:
+        balance = (await ledger.get_or_create_account(session, user.id)).balance
+        budget = min(balance, get_settings().agent_auto_budget_xp)
+        if budget <= 0:
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail="You're out of TK. Buy more TK to keep using Satish AI.",
+            )
+    payload.budget_xp = budget
     task = Task(
         user_id=user.id,
         objective=payload.objective,
         status="planned",
-        budget_xp=payload.budget_xp,
+        budget_xp=budget,
     )
     session.add(task)
     await session.flush()

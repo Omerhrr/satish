@@ -3,8 +3,8 @@
     <header>
       <h1 class="page-title">Credits</h1>
       <p class="page-sub">
-        TK credits pay for Satish AI tasks. You buy them with bitcoin; they can't be sent
-        to anyone or turned back into sats.
+        TK pays for Satish AI. It's taken automatically as you use it. You buy it with
+        bitcoin or Lightning; it can't be sent to anyone or turned back into sats.
       </p>
     </header>
 
@@ -18,24 +18,32 @@
     </section>
 
     <section class="card">
-      <h2>Buy credits</h2>
+      <h2>Buy TK</h2>
+      <label class="field">
+        How much TK?
+        <input v-model.number="tkWanted" type="number" inputmode="numeric" :min="minTk" step="100" />
+      </label>
+      <div class="quick">
+        <button v-for="q in quick" :key="q" type="button" class="chipbtn" :class="{ on: tkWanted === q }" @click="tkWanted = q">{{ q.toLocaleString() }}</button>
+      </div>
       <p class="dim small">
-        Pick a pack, then pay from your Satish wallet in one tap (or any other
-        bitcoin wallet). Your TK arrives as soon as the payment is confirmed.
+        <template v-if="tkValid">
+          Costs <b>{{ satsFor.toLocaleString() }} sats</b><template v-if="naira(satsFor)"> ({{ naira(satsFor) }})</template>
+          <template v-if="tkCredited !== tkWanted"> · you'll get {{ tkCredited.toLocaleString() }} TK</template>
+        </template>
+        <template v-else>The minimum is {{ minTk.toLocaleString() }} TK ({{ Math.ceil(minTk / perSat).toLocaleString() }} sats).</template>
       </p>
-      <div class="packs">
-        <button
-          v-for="p in packs"
-          :key="p.pack_id"
-          class="btn pack sensitive-action"
-          :disabled="buying !== null"
-          @click="buy(p)"
-        >
-          <span v-if="buying === p.pack_id" class="spinner" />
-          <strong>{{ p.xp_amount.toLocaleString() }} TK</strong>
-          <span class="dim small">{{ p.amount_sats.toLocaleString() }} sats<template v-if="naira(p.amount_sats)"> · {{ naira(p.amount_sats) }}</template></span>
+
+      <div v-if="methods.length" class="seg" role="radiogroup" aria-label="Pay with">
+        <button v-for="m in methods" :key="m" type="button" role="radio" :aria-checked="method === m" :class="{ on: method === m }" @click="method = m">
+          {{ m === "lightning" ? "⚡ Lightning" : "₿ Bitcoin" }}
         </button>
       </div>
+      <p class="dim small">{{ method === "lightning" ? "Instant, tiny fees." : "On-chain: takes a few minutes, network fee applies." }}</p>
+      <button class="btn primary" :disabled="!tkValid || buying || !methods.length" @click="buy">
+        <span v-if="buying" class="spinner" /> Continue to payment
+      </button>
+      <p v-if="!methods.length && rate" class="small err">Payments aren't set up yet.</p>
       <p v-if="error" class="notice small">{{ error }}</p>
     </section>
 
@@ -45,34 +53,67 @@
         <p class="paid">✅ Paid. +{{ paying.xp_amount.toLocaleString() }} TK added to your balance.</p>
         <button class="btn" @click="paying = null">Done</button>
       </template>
+      <template v-else-if="paying.status === 'expired' && paying.payment_method === 'lightning'">
+        <p class="small err">This invoice expired. Start a new purchase.</p>
+        <button class="btn" @click="paying = null">Close</button>
+      </template>
       <template v-else>
         <p class="sub">
           You'll get <b>{{ paying.xp_amount.toLocaleString() }} TK</b> as soon as the payment arrives.
           <template v-if="paying.network === 'testnet'"> (Test network: use test coins.)</template>
         </p>
+        <p v-if="paying.payee_username" class="small payee">
+          Paying to <b>@{{ paying.payee_username }}</b>
+          <button class="linkbtn" @click="copy('@' + paying.payee_username, 'user')">{{ copiedWhat === "user" ? "Copied ✓" : "Copy" }}</button>
+        </p>
 
-        <div v-if="walletReady" class="from-wallet">
-          <b>Pay from my Satish wallet</b>
-          <span class="small dim">Balance: {{ w.spendable.value.toLocaleString() }} sats</span>
-          <template v-if="feeRates && quote">
-            <span class="small dim">Network fee about {{ quote.fee.toLocaleString() }} sats · total {{ (quote.amount + quote.fee).toLocaleString() }} sats</span>
-            <label class="field">Wallet password<input v-model="password" type="password" autocomplete="current-password" /></label>
-            <button class="btn primary" :disabled="sending || !password" @click="payFromWallet">
-              <span v-if="sending" class="spinner" /> Pay now
-            </button>
+        <div class="qr" v-html="qrSvg" />
+        <div class="addr mono">{{ payTarget }}</div>
+        <button class="btn small" @click="copy(payTarget, 'target')">
+          {{ copiedWhat === "target" ? "Copied ✓" : paying.payment_method === "lightning" ? "Copy invoice" : "Copy address" }}
+        </button>
+        <p class="small dim">
+          <template v-if="paying.payment_method === 'lightning'">Scan or paste this invoice in any Lightning wallet. It's for this purchase only, so we can match your payment.</template>
+          <template v-else>Send exactly {{ paying.amount_sats.toLocaleString() }} sats or more to this address.</template>
+        </p>
+
+        <!-- Pay with the in-app wallet -->
+        <div class="from-wallet">
+          <b>Pay with my Satish wallet</b>
+          <template v-if="!w.state.stored">
+            <span class="small dim">You don't have a Satish wallet yet.</span>
+            <NuxtLink class="btn small" to="/">Set up my wallet</NuxtLink>
           </template>
-          <span v-else-if="quoteError" class="small err">{{ quoteError }}</span>
-          <span v-else class="small dim"><span class="spinner" /> Getting network fee…</span>
+          <template v-else-if="paying.payment_method === 'lightning'">
+            <template v-if="!ln.st.open">
+              <label class="field">Wallet password<input v-model="password" type="password" autocomplete="current-password" /></label>
+              <button class="btn primary" :disabled="sending || !password" @click="openLightning">
+                <span v-if="sending" class="spinner" /> Unlock wallet
+              </button>
+            </template>
+            <template v-else>
+              <span class="small dim">Lightning balance: {{ (ln.st.balance ?? 0).toLocaleString() }} sats</span>
+              <span v-if="lnQuote" class="small dim">Fee {{ lnQuote.fee.toLocaleString() }} sats · total {{ (lnQuote.amount + lnQuote.fee).toLocaleString() }} sats</span>
+              <button class="btn primary" :disabled="sending || !lnQuote || lnShort" @click="payLightning">
+                <span v-if="sending" class="spinner" /> Pay now
+              </button>
+              <span v-if="lnShort" class="small err">Not enough in your Lightning wallet. Top it up, or pay with another wallet.</span>
+            </template>
+          </template>
+          <template v-else-if="walletReady">
+            <span class="small dim">Balance: {{ w.spendable.value.toLocaleString() }} sats</span>
+            <template v-if="feeRates && quote">
+              <span class="small dim">Network fee about {{ quote.fee.toLocaleString() }} sats · total {{ (quote.amount + quote.fee).toLocaleString() }} sats</span>
+              <label class="field">Wallet password<input v-model="password" type="password" autocomplete="current-password" /></label>
+              <button class="btn primary" :disabled="sending || !password" @click="payFromWallet">
+                <span v-if="sending" class="spinner" /> Pay now
+              </button>
+            </template>
+            <span v-else-if="quoteError" class="small err">{{ quoteError }}</span>
+            <span v-else class="small dim"><span class="spinner" /> Getting network fee…</span>
+          </template>
+          <span v-else class="small dim">{{ walletNote }}</span>
         </div>
-        <p v-else-if="walletNote" class="small dim">{{ walletNote }}</p>
-
-        <details class="other">
-          <summary class="small">Pay from another wallet</summary>
-          <div class="qr" v-html="qrSvg" />
-          <div class="addr mono">{{ paying.address }}</div>
-          <button class="btn small" @click="copy(paying.address!)">{{ copied ? "Copied ✓" : "Copy address" }}</button>
-          <p class="small dim">Send exactly {{ paying.amount_sats.toLocaleString() }} sats or more to this address.</p>
-        </details>
 
         <p class="small status">
           <span class="spinner" />
@@ -99,18 +140,10 @@
             <td>
               <span class="chip" :class="p.status">{{ human(p.status) }}</span>
               <button
-                v-if="p.status !== 'settled' && p.payment_method === 'onchain'"
+                v-if="p.status === 'pending' || (p.status === 'expired' && p.payment_method === 'onchain')"
                 class="btn small primary"
                 @click="openPay(p)"
               >Pay</button>
-              <button
-                v-else-if="p.status === 'pending'"
-                class="btn small sensitive-action"
-                :disabled="settling !== null"
-                @click="settle(p)"
-              >
-                <span v-if="settling === p.id" class="spinner" /> Confirm payment
-              </button>
             </td>
             <td>
               <button
@@ -126,20 +159,18 @@
           </tr>
         </tbody>
       </table></div>
-      <p v-if="purchases.some((p) => p.payment_method !== 'onchain')" class="dim small">
-        Older Lightning purchases here are demo payments; "Confirm payment" completes them.
-      </p>
     </section>
   </div>
 </template>
 
 <script setup lang="ts">
-import type { BalanceOut, PackOut, PurchaseOut, RateOut } from "@xp/shared-types";
+import type { BalanceOut, PurchaseOut, RateOut } from "@xp/shared-types";
 import { renderSVG } from "uqr";
 import type { FeeRates, SendPlan } from "~/lib/wallet-core";
 
 const api = useXpApi();
 const w = useWallet();
+const ln = useLightning();
 const { naira } = usePrice();
 
 // on-chain payment panel
@@ -149,7 +180,7 @@ const feeRates = ref<FeeRates | null>(null);
 const password = ref("");
 const sending = ref(false);
 const payError = ref("");
-const copied = ref(false);
+const copiedWhat = ref("");
 let poller: ReturnType<typeof setInterval> | null = null;
 
 const walletReady = computed(
@@ -173,9 +204,61 @@ const quote = computed<SendPlan | null>(() => {
 const quoteError = computed(() =>
   walletReady.value && feeRates.value && !quote.value ? "Not enough in your wallet for this amount plus the network fee." : "",
 );
-const qrSvg = computed(() =>
-  paying.value?.bolt11 ? renderSVG(paying.value.bolt11, { border: 2, whiteColor: "#ffffff", blackColor: "#0b0e11" }) : "",
-);
+const payTarget = computed(() => {
+  const p = paying.value;
+  if (!p) return "";
+  return p.payment_method === "lightning" ? p.bolt11 || "" : p.address || "";
+});
+const qrSvg = computed(() => {
+  const p = paying.value;
+  if (!p?.bolt11) return "";
+  // Lightning QR codes scan best as upper-case "LIGHTNING:" URIs.
+  const data = p.payment_method === "lightning" ? `LIGHTNING:${p.bolt11.toUpperCase()}` : p.bolt11;
+  return renderSVG(data, { border: 2, whiteColor: "#ffffff", blackColor: "#0b0e11" });
+});
+
+// Lightning: pay from the in-app wallet
+const lnPrep = shallowRef<unknown>(null);
+const lnQuote = ref<{ amount: number; fee: number } | null>(null);
+const lnShort = computed(() => !!lnQuote.value && lnQuote.value.amount + lnQuote.value.fee > (ln.st.balance ?? 0));
+async function prepareLightning() {
+  lnQuote.value = null;
+  lnPrep.value = null;
+  if (!paying.value?.bolt11 || !ln.st.open) return;
+  try {
+    const r = await ln.prepare(paying.value.bolt11);
+    lnPrep.value = r.prep;
+    lnQuote.value = r.quote;
+  } catch (e) {
+    payError.value = e instanceof Error ? e.message : "Couldn't read the invoice.";
+  }
+}
+async function openLightning() {
+  sending.value = true;
+  payError.value = "";
+  try {
+    await ln.unlockAll(password.value);
+    password.value = "";
+    await prepareLightning();
+  } catch (e) {
+    payError.value = e instanceof Error ? e.message : "Wrong password.";
+  } finally {
+    sending.value = false;
+  }
+}
+async function payLightning() {
+  if (!lnPrep.value) return;
+  sending.value = true;
+  payError.value = "";
+  try {
+    await ln.send(lnPrep.value as never, `tk-${paying.value?.id}`);
+    setTimeout(poll, 1200);
+  } catch (e) {
+    payError.value = e instanceof Error ? e.message : "The payment failed. Nothing was sent.";
+  } finally {
+    sending.value = false;
+  }
+}
 
 function stopPolling() {
   if (poller) clearInterval(poller);
@@ -201,7 +284,19 @@ async function openPay(p: PurchaseOut) {
   password.value = "";
   payError.value = "";
   stopPolling();
-  poller = setInterval(poll, 5000);
+  poller = setInterval(poll, p.payment_method === "lightning" ? 3000 : 5000);
+  if (p.payment_method === "lightning") {
+    nextTick(() => payCard.value?.scrollIntoView({ behavior: "smooth" }));
+    if (!ln.st.open && w.state.unlocked) {
+      try {
+        await ln.open();
+      } catch {
+        /* user can unlock with the password */
+      }
+    }
+    await prepareLightning();
+    return;
+  }
   nextTick(() => payCard.value?.scrollIntoView({ behavior: "smooth" }));
   if (w.state.stored && !w.state.lastSync) w.refresh();
   try {
@@ -226,55 +321,60 @@ async function payFromWallet() {
   }
 }
 
-async function copy(text: string) {
+async function copy(text: string, what: string) {
   try {
     await navigator.clipboard.writeText(text);
   } catch {
     /* ignore */
   }
-  copied.value = true;
-  setTimeout(() => (copied.value = false), 2000);
+  copiedWhat.value = what;
+  setTimeout(() => (copiedWhat.value = ""), 2000);
 }
 
 onBeforeUnmount(stopPolling);
 
 const rate = ref<RateOut | null>(null);
 const balance = ref<BalanceOut | null>(null);
-const packs = ref<PackOut[]>([]);
 const purchases = ref<PurchaseOut[]>([]);
-const buying = ref<string | null>(null);
+const buying = ref(false);
+const tkWanted = ref(500);
+const method = ref<"lightning" | "onchain">("lightning");
+const perSat = computed(() => rate.value?.xp_per_sat || 5);
+const minTk = computed(() => rate.value?.min_tk || 500);
+const methods = computed(() => (rate.value?.methods || []) as ("lightning" | "onchain")[]);
+const quick = computed(() => [minTk.value, 1000, 2500, 5000, 10000].filter((v, i, a) => a.indexOf(v) === i && v >= minTk.value));
+const tkValid = computed(() => Number.isFinite(tkWanted.value) && tkWanted.value >= minTk.value && tkWanted.value <= (rate.value?.max_tk || 5e7));
+const satsFor = computed(() => Math.ceil((tkWanted.value || 0) / perSat.value));
+const tkCredited = computed(() => satsFor.value * perSat.value);
+watch(methods, (m) => {
+  if (m.length && !m.includes(method.value)) method.value = m[0]!;
+});
 const settling = ref<string | null>(null);
 const receipting = ref<string | null>(null);
 const error = ref<string | null>(null);
 
 async function refresh() {
   try {
-    const [r, b, p, purchasesList] = await Promise.all([
-      api.rate(),
-      api.balance(),
-      api.packs(),
-      api.listPurchases(),
-    ]);
+    const [r, b, purchasesList] = await Promise.all([api.rate(), api.balance(), api.listPurchases()]);
     rate.value = r;
     balance.value = b;
-    packs.value = p;
     purchases.value = purchasesList;
   } catch (e) {
     error.value = e instanceof Error ? e.message : "failed to load billing data";
   }
 }
 
-async function buy(pack: PackOut) {
-  buying.value = pack.pack_id;
+async function buy() {
+  buying.value = true;
   error.value = null;
   try {
-    const created = await api.createPurchase({ pack_id: pack.pack_id, description: `TK pack ${pack.label}` });
+    const created = await api.createPurchase({ tk_amount: tkWanted.value, method: method.value, description: "TK purchase" });
     await refresh();
-    if (created.payment_method === "onchain") await openPay(created);
+    await openPay(created);
   } catch (e) {
     error.value = e instanceof Error ? e.message : "purchase failed";
   } finally {
-    buying.value = null;
+    buying.value = false;
   }
 }
 
@@ -334,6 +434,11 @@ onMounted(refresh);
   min-width: 150px;
 }
 .pay { border-color: var(--orange); }
+.quick, .seg { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+.chipbtn, .seg button { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--border); background: transparent; color: inherit; font-size: 14px; }
+.chipbtn.on, .seg button.on { background: var(--orange); border-color: transparent; color: #111; font-weight: 600; }
+.payee { display: flex; gap: 8px; align-items: center; }
+.linkbtn { background: none; border: 0; color: var(--orange); font-size: 13px; padding: 0; }
 .paid { color: var(--green); font-weight: 600; }
 .from-wallet { display: flex; flex-direction: column; gap: 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin: 10px 0; }
 .field { display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: var(--text-dim); }

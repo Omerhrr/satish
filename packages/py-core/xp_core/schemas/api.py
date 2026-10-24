@@ -96,6 +96,11 @@ class RateOut(BaseModel):
     xp_per_sat: int
     can_change: bool
     note: str
+    min_tk: int = 500
+    max_tk: int = 50_000_000
+    methods: list[str] = []  # payment methods the operator has set up
+    payee_username: str | None = None
+    welcome_tk: int = 0
 
 
 class PurchaseCreateIn(BaseModel):
@@ -103,6 +108,8 @@ class PurchaseCreateIn(BaseModel):
 
     pack_id: str | None = Field(default=None, max_length=64)
     amount_sats: int | None = Field(default=None, ge=100, le=100_000_000)
+    tk_amount: int | None = Field(default=None, ge=1, le=50_000_000)  # how much TK to buy
+    method: Literal["onchain", "lightning"] | None = None  # how the user pays
     description: str = Field(default="TK purchase", max_length=500)
 
 
@@ -123,6 +130,7 @@ class PurchaseOut(BaseModel):
     payment_method: str = "lightning"  # lightning | onchain
     address: str | None = None  # on-chain: where to pay
     network: str | None = None  # on-chain: mainnet | testnet
+    payee_username: str | None = None  # operator's Satish @username (display)
     seen_sats: int | None = None  # on-chain: amount seen so far (incl. unconfirmed)
 
 
@@ -162,7 +170,9 @@ class ReconcileOut(BaseModel):
 
 class TaskCreateIn(BaseModel):
     objective: str = Field(min_length=2, max_length=4000)
-    budget_xp: int = Field(gt=0, le=100_000)
+    # Optional: when omitted, Satish AI may use up to agent_auto_budget_xp of
+    # the balance and only what it actually uses is taken.
+    budget_xp: int | None = Field(default=None, gt=0, le=100_000)
     idempotency_key: str | None = Field(default=None, max_length=191)
 
 

@@ -81,7 +81,21 @@ class Settings(BaseSettings):
     # derives its display from it (published, and "can change" - clients must
     # re-check, never cache). The former sats_per_xp=10 setting contradicted
     # xp_per_sat=100 and was removed.
-    xp_per_sat: int = 100
+    xp_per_sat: int = 5  # 1 sat = 5 TK
+    tk_welcome_bonus: int = 300  # free TK every account gets once
+    tk_min_purchase: int = 500  # smallest TK purchase (= 100 sats at 5 TK/sat)
+    tk_max_purchase: int = 50_000_000
+    # Satish AI spends from the balance automatically: each task may use up to
+    # this much TK (less if the balance is lower); unused TK is never taken.
+    agent_auto_budget_xp: int = 1_000
+    # Where TK is paid: the operator's own wallets.
+    # Lightning: the operator's wallet phrase lets the server create invoices
+    # and see them paid (it can also spend - keep only a float there).
+    tk_lightning_mnemonic: str | None = None  # never logged
+    tk_lightning_network: str = "regtest"  # regtest | mainnet (mainnet needs breez_api_key)
+    breez_api_key: str | None = None
+    tk_lightning_storage_dir: str = "/data/tk-lightning"
+    tk_payee_username: str = ""  # shown to payers, e.g. "satish"
     # Published XP pack table (billing_flow #1: "chooses an XP pack or enters
     # an allowed amount"). Custom amounts within policy bounds also allowed.
     xp_pack_sats: list[int] = [1_000, 5_000, 20_000]
@@ -209,6 +223,7 @@ class Settings(BaseSettings):
     automation_run_stale_seconds: int = 3600
     # Operator caps on per-job budgets (user input is clamped to these).
     automation_max_budget_per_run_xp: int = 10_000
+    automation_use_remaining_balance: bool = True  # low balance: run with what's left
     automation_max_budget_total_xp: int = 100_000
 
     # worker

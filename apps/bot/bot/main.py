@@ -153,8 +153,9 @@ async def cmd_xp(message: Message) -> None:
 async def cmd_fund(message: Message) -> None:
     await _open_app(
         message,
-        "Open Satish, go to Buy TK and pick a pack. Pay from your Satish wallet "
-        "in one tap; your TK arrives as soon as the payment is seen.",
+        "Open Satish, go to Satish AI > Credits, choose how much TK you want "
+        "(1 sat = 5 TK, from 500 TK) and pay with Lightning or Bitcoin. Your "
+        "TK arrives as soon as the payment is seen.",
     )
 
 
@@ -163,8 +164,8 @@ async def cmd_research(message: Message) -> None:
     await _open_app(
         message,
         "Open Satish, go to Tasks and describe what you need: compare products, "
-        "find suppliers, research a car, or any question. You approve the "
-        "budget before anything starts.",
+        "find suppliers, research a car, or any question. It takes TK only "
+        "for what it uses, and sends the result here.",
     )
 
 

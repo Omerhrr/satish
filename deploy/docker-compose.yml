@@ -14,6 +14,9 @@ x-env: &env
   # Live research: Brave if XP_BRAVE_SEARCH_API_KEY is set, otherwise keyless web search.
   XP_RESEARCH_SEARCH_MODE: ${XP_RESEARCH_SEARCH_MODE:-auto}
   XP_RESEARCH_FETCH_MODE: ${XP_RESEARCH_FETCH_MODE:-http}
+  # TK purchases over Lightning go to the operator wallet (XP_TK_LIGHTNING_MNEMONIC in .env).
+  XP_TK_LIGHTNING_NETWORK: ${LIGHTNING_NETWORK:-regtest}
+  XP_BREEZ_API_KEY: ${BREEZ_API_KEY:-}
   XP_ARTIFACT_DIR: /data/artifacts
   XP_PDF_STORAGE_DIR: /data/artifacts
   XP_WALLET_DATA_DIR: /data/wallets

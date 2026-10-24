@@ -5,8 +5,8 @@
       <NuxtLink to="/billing" class="credit-chip">{{ balance !== null ? balance.toLocaleString() + " TK" : "… TK" }}</NuxtLink>
     </div>
     <p class="page-sub">
-      Research, price comparisons and written reports with sources. You set a budget;
-      you only pay for what it uses and the rest comes back.
+      Research, price comparisons and written reports with sources. It takes TK from
+      your balance only for what it actually uses.
       <NuxtLink to="/ai">What can it do?</NuxtLink>
     </p>
 
@@ -17,7 +17,6 @@
 
     <section class="card">
       <h2>New task</h2>
-      <p class="sub">Nothing runs until you approve the budget.</p>
       <form @submit.prevent="submit">
         <label class="field">
           What do you need?
@@ -30,13 +29,11 @@
             maxlength="4000"
           />
         </label>
-        <label class="field">
-          Budget (TK)
-          <input v-model.number="budget" type="number" min="1" max="100000" required />
-          <span v-if="budgetWorth" class="small dim">That's up to {{ budgetWorth }}. Unused TK comes back.</span>
-        </label>
+        <p v-if="balance !== null && balance <= 0" class="small" style="color: var(--red)">
+          You're out of TK. <NuxtLink to="/billing">Buy TK</NuxtLink> to keep going.
+        </p>
         <button class="btn primary" type="submit" :disabled="creating">
-          <span v-if="creating" class="spinner" /> Create task
+          <span v-if="creating" class="spinner" /> Ask Satish
         </button>
         <span v-if="createError" class="small" style="color: var(--red); margin-left: 10px">{{ createError }}</span>
       </form>
@@ -62,7 +59,7 @@
         <div v-if="t.error" class="small task-err">{{ t.error }}</div>
         <div v-if="t.delivered" class="small delivered">✓ Sent to your Telegram chat with Satish, including any files.</div>
         <div class="task-foot">
-          <span class="small dim">{{ t.actual_xp.toLocaleString() }} of {{ t.budget_xp.toLocaleString() }} TK used</span>
+          <span class="small dim">{{ ["completed", "failed", "cancelled"].includes(t.status) ? `${t.actual_xp.toLocaleString()} TK used` : "" }}</span>
           <span class="task-acts">
             <button
               v-if="['planned', 'awaiting_approval'].includes(t.status)"
@@ -82,7 +79,7 @@
       </div>
       <div class="notice small">
         The assistant plans the work, uses only approved tools, and never goes
-        over your budget. If it needs your OK for something (like sending an
+        over what you have. If it needs your OK for something (like sending an
         email), it pauses here until you approve.
       </div>
     </section>
@@ -200,15 +197,9 @@ const loading = ref(true);
 const creating = ref(false);
 const createError = ref("");
 const objective = ref("");
-const budget = ref(1000);
 const balance = ref<number | null>(null);
 const tkPerSat = ref<number | null>(null);
 const { naira } = usePrice();
-const budgetWorth = computed(() => {
-  if (!tkPerSat.value || !budget.value) return "";
-  const sats = Math.ceil(budget.value / tkPerSat.value);
-  return `${sats.toLocaleString()} sats` + (naira(sats) ? ` (${naira(sats)})` : "");
-});
 async function loadCredits() {
   try {
     const b = await api.balance();
@@ -298,9 +289,11 @@ async function submit() {
   creating.value = true;
   createError.value = "";
   try {
-    await api.createTask({ objective: objective.value, budget_xp: budget.value });
+    const t = await api.createTask({ objective: objective.value });
     objective.value = "";
+    await api.runTask(t.id); // starts straight away; TK is taken only for what it uses
     await refresh();
+    await loadCredits();
   } catch (e) {
     createError.value = String(e);
   } finally {
@@ -345,10 +338,9 @@ async function showResult(id: string) {
 const receiptLine = computed(() => {
   const r = result.value?.xp_receipt;
   if (!r) return "";
-  const base = `budget ${r.budget_xp.toLocaleString()} TK · charged ${r.actual_xp.toLocaleString()} TK · released ${r.released_xp.toLocaleString()} TK · ${r.status.replace("_", " ")}`;
-  const balance = r.balance_after !== null ? ` · balance after ${r.balance_after.toLocaleString()} TK` : "";
-  const entry = r.charge_entry_id ? ` · entry ${r.charge_entry_id.slice(0, 8)}…` : "";
-  return base + balance + entry;
+  const base = `Used ${r.actual_xp.toLocaleString()} TK`;
+  const balance = r.balance_after !== null ? ` · ${r.balance_after.toLocaleString()} TK left` : "";
+  return base + balance;
 });
 
 async function decide(approvalId: string, approve: boolean) {

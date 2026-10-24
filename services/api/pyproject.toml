@@ -10,6 +10,7 @@ dependencies = [
     "orjson>=3.10",
     "redis>=5.2",
     "alembic>=1.14",
+    "breez-sdk-spark>=0.27.2",  # operator Lightning wallet for TK purchases
 ]
 
 [build-system]

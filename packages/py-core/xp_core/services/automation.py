@@ -614,6 +614,9 @@ async def process_job(
     account = (
         await session.execute(select(XpAccount).where(XpAccount.user_id == job.user_id))
     ).scalar_one_or_none()
+    # Automatic charging: a run may use whatever TK is left, up to its cap.
+    if account is not None and 0 < account.balance < budget and settings.automation_use_remaining_balance:
+        budget = int(account.balance)
     if account is None or account.balance < budget:
         balance = int(account.balance) if account is not None else 0
         run = AutomationRun(

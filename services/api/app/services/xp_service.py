@@ -67,15 +67,31 @@ async def create_purchase(
     pack_id: str | None,
     amount_sats: int | None,
     description: str,
+    tk_amount: int | None = None,
+    method: str | None = None,
 ) -> PaymentIntent:
     """Create the payment intent + invoice for a pack or custom amount.
 
     Delegates invoice creation to the lightning service so the receive
     lifecycle stays single-sourced. Nothing is credited here.
     """
-    sats = resolve_pack_sats(settings, pack_id=pack_id, amount_sats=amount_sats)
-    if settings.payment_mode == "onchain":
+    method = method or ("onchain" if settings.payment_mode == "onchain" else "lightning")
+    if tk_amount is not None:
+        if tk_amount < settings.tk_min_purchase:
+            raise ValueError(f"The minimum purchase is {settings.tk_min_purchase:,} TK.")
+        if tk_amount > settings.tk_max_purchase:
+            raise ValueError(f"The maximum purchase is {settings.tk_max_purchase:,} TK.")
+        sats = -(-tk_amount // settings.xp_per_sat)  # round up: never under-charge
+    else:
+        sats = resolve_pack_sats(settings, pack_id=pack_id, amount_sats=amount_sats)
+    if method == "onchain":
         return await onchain.create_intent(session, user=user, settings=settings, amount_sats=sats)
+    from app.services import tk_lightning
+
+    if tk_lightning.available(settings):
+        return await tk_lightning.create_intent(
+            session, user=user, settings=settings, amount_sats=sats, xp_amount=sats * settings.xp_per_sat
+        )
     return await lightning_service.create_receive_intent(
         session,
         user=user,
@@ -99,6 +115,23 @@ async def _purchase_entry(
     ).scalar_one_or_none()
 
 
+def _payee() -> str | None:
+    from xp_core.config import get_settings
+
+    return (get_settings().tk_payee_username or "").lstrip("@") or None
+
+
+def payment_methods(settings: Settings) -> list[str]:
+    from app.services import tk_lightning
+
+    out = []
+    if settings.onchain_xpub:
+        out.append("onchain")
+    if tk_lightning.available(settings) or settings.lightning_mode != "canned" or settings.dev_mode:
+        out.append("lightning")
+    return out
+
+
 def purchase_out(row: PaymentIntent) -> dict:
     """Map an intent to the purchase/receipt view (only receive direction)."""
     return {
@@ -114,6 +147,7 @@ def purchase_out(row: PaymentIntent) -> dict:
         "ledger_entry_id": None,
         "balance_after": None,
         "payment_method": "onchain" if onchain.is_onchain(row) else "lightning",
+        "payee_username": _payee(),
         "address": onchain.intent_address(row),
         "network": None,
     }
