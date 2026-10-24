@@ -149,10 +149,34 @@ class WorkerSettings:
 AI_QUEUE = "satish:ai"
 
 
+AI_ALIVE_KEY = f"{AI_QUEUE}:alive"
+AI_ALIVE_TTL = 180  # seconds; refreshed every minute, so it never lapses while the worker runs
+
+
+async def _mark_ai_alive(ctx: dict[str, Any]) -> None:
+    """Our own heartbeat for the app's "is Satish AI online?" check.
+    (arq's built-in one expires between its writes.)"""
+    import time
+
+    redis = ctx.get("redis")
+    if redis is not None:
+        await redis.set(AI_ALIVE_KEY, str(int(time.time())), ex=AI_ALIVE_TTL)
+
+
+async def ai_startup(ctx: dict[str, Any]) -> None:
+    await startup(ctx)
+    await _mark_ai_alive(ctx)
+
+
+async def ai_heartbeat_and_watchdog(ctx: dict[str, Any]) -> dict[str, Any]:
+    await _mark_ai_alive(ctx)
+    return await stale_task_watchdog(ctx)
+
+
 def _build_ai_cron_jobs() -> tuple:
     from arq.cron import cron
 
-    return (cron(stale_task_watchdog, minute=set(range(60)), run_at_startup=True, timeout=55),)
+    return (cron(ai_heartbeat_and_watchdog, minute=set(range(60)), run_at_startup=True, timeout=55),)
 
 
 class AIWorkerSettings:
@@ -163,7 +187,7 @@ class AIWorkerSettings:
     queue_name = AI_QUEUE
     redis_settings = _redis_settings()
     cron_jobs = _build_ai_cron_jobs()
-    on_startup = startup
+    on_startup = ai_startup
     on_shutdown = shutdown
     max_jobs = 4
     job_timeout = get_settings().agent_task_timeout_seconds

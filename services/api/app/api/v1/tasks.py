@@ -88,14 +88,15 @@ async def read_ai_status() -> dict:
 
         r = aioredis.from_url(settings.redis_url)
         try:
-            beat = await r.get(f"{AI_QUEUE}:health-check")
+            alive = await r.get(f"{AI_QUEUE}:alive")  # refreshed every minute, lasts 3
+            beat = await r.get(f"{AI_QUEUE}:health-check")  # arq's own: short-lived, has counts
         finally:
             await r.aclose()
     except Exception:
         return {"online": False, "queued": 0, "running": 0, "mode": "unreachable"}
-    if not beat:
+    if not alive and not beat:
         return {"online": False, "queued": 0, "running": 0, "mode": "worker"}
-    text = beat.decode() if isinstance(beat, bytes) else str(beat)
+    text = (beat.decode() if isinstance(beat, bytes) else str(beat)) if beat else ""
     nums = dict(part.split("=", 1) for part in text.split() if "=" in part)
 
     def num(k: str) -> int:
