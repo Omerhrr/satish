@@ -956,3 +956,33 @@ dropped, plain prose treated as the answer); greetings and general-knowledge
 questions are answered directly in one call; research tasks run their tools
 and then a second call writes the answer from the (untrusted) results. The
 full answer is stored with the task and shown in the app.
+
+## D36 - Satish AI is isolated from the wallet (2026-10-24)
+
+Satish AI has no wallet tools, no wallet wording in its prompt, and its code
+may not import wallet modules (handles, on-chain, Lightning, wallet alerts).
+`tests/test_ai_isolation.py` enforces all three. Paying someone by @username
+is a wallet feature and never goes through the AI. The AI worker's Redis is
+addressed as `satish-redis` because the api container also joins booklet's
+network, where `redis` resolved to booklet's Redis and jobs never arrived.
+
+## D37 - Real research, results delivered to Telegram (2026-10-24)
+
+Research is live by default in production: Brave Search when
+`XP_BRAVE_SEARCH_API_KEY` is set, otherwise keyless web search; pages are
+fetched over HTTP behind the FetchPolicy wall and a bounded excerpt
+(untrusted data) is shown to the model. The planner re-plans after each
+search/fetch, so it reads real URLs from the results instead of guessed
+placeholders, and never repeats an identical step. PDFs include the written
+report as well as the source appendix.
+
+A finished task is sent to the user's Telegram chat with the bot (answer as
+messages, files as documents). Once Telegram accepts them, our copies of the
+files are deleted and the task's answer, page facts and plan are scrubbed, so
+history lives in Telegram. If delivery fails nothing is removed and the app
+offers "Send to my Telegram chat". Users can delete a task or clear all
+finished ones; the bare row stays because TK ledger entries reference it.
+
+Automations accept every N minutes/hours/days, daily at several times,
+weekly on chosen days, monthly on a day, each in the user's own time zone
+(`daily 08:00,18:30 tz Africa/Lagos`).

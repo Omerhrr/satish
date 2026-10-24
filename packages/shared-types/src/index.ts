@@ -97,6 +97,7 @@ export interface TaskOut {
   status: TaskStatus;
   error?: string | null;
   queued?: boolean; // handed to Satish AI but not started yet
+  delivered?: boolean; // result sent to the user's Telegram chat
   budget_xp: number;
   reserved_xp: number;
   actual_xp: number;

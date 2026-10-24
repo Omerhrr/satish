@@ -55,6 +55,9 @@ export interface XpClient {
   listTasks: () => Promise<TaskOut[]>;
   createTask: (payload: TaskCreateIn) => Promise<TaskOut>;
   cancelTask: (taskId: string) => Promise<TaskOut>;
+  deleteTask: (taskId: string) => Promise<void>;
+  deliverTask: (taskId: string) => Promise<TaskOut>;
+  clearTasks: () => Promise<{ deleted: number }>;
   rate: () => Promise<RateOut>;
   packs: () => Promise<PackOut[]>;
   estimateTask: (objective: string) => Promise<TaskEstimateOut>;
@@ -244,6 +247,7 @@ export function createXpClient(config: XpClientConfig = {}): XpClient {
       }
       throw new Error(friendlyError(res.status, detail));
     }
+    if (res.status === 204) return undefined as T;
     return (await res.json()) as T;
   }
 
@@ -277,6 +281,9 @@ export function createXpClient(config: XpClientConfig = {}): XpClient {
       request<TaskOut>("/api/v1/tasks", { method: "POST", body: JSON.stringify(payload) }),
     cancelTask: (taskId) =>
       request<TaskOut>(`/api/v1/tasks/${taskId}/cancel`, { method: "POST" }),
+    deliverTask: (taskId) => request<TaskOut>(`/api/v1/tasks/${taskId}/deliver`, { method: "POST" }),
+    deleteTask: (taskId) => request<void>(`/api/v1/tasks/${taskId}`, { method: "DELETE" }),
+    clearTasks: () => request<{ deleted: number }>("/api/v1/tasks/clear", { method: "POST" }),
     rate: () => request<RateOut>("/api/v1/xp/rate"),
     packs: () => request<PackOut[]>("/api/v1/xp/packs"),
     estimateTask: (objective) =>

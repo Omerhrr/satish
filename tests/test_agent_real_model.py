@@ -64,3 +64,40 @@ async def test_unknown_tools_are_dropped():
     m = Scripted(json.dumps({"plan": [{"step": 1, "tool": "hack.the.planet"}], "answer": "fallback"}))
     plan = await PlanRunner(m, default_registry()).draft_plan("x")
     assert plan["plan"] == [] and plan["answer"] == "fallback"
+
+
+class Iterative:
+    """A real-model stand-in that re-plans: search first, then read real URLs."""
+
+    iterative = True
+
+    def __init__(self, replies):
+        self.replies = list(replies)
+        self.prompts: list[str] = []
+
+    async def complete(self, messages, tools=None, json_mode=False):
+        self.prompts.append(messages[-1]["content"])
+        content = self.replies.pop(0) if json_mode and self.replies else ("Answer." if not json_mode else '{"plan": []}')
+        return {
+            "content": content, "tool_calls": [], "finish_reason": "stop", "model": "deepseek-flash", "revision_id": "t",
+            "usage": {"prompt_tokens": 5, "completion_tokens": 5, "cache_hit_tokens": 0, "estimated_cost_usd": 0.0},
+        }
+
+
+async def test_iterative_research_replans_with_real_urls_and_skips_placeholders_and_duplicates():
+    first = json.dumps({"plan": [
+        {"tool": "web.search", "arguments": {"query": "rice price Kaduna"}},
+        {"tool": "web.fetch_page", "arguments": {"url": "<top result>"}},
+    ]})
+    after_search = json.dumps({"plan": [
+        {"tool": "web.search", "arguments": {"query": "rice price Kaduna"}},  # duplicate: dropped
+        {"tool": "web.fetch_page", "arguments": {"url": "https://news.example.ng/rice"}},
+    ]})
+    m = Iterative([first, after_search, '{"plan": []}'])
+    result = await PlanRunner(m, default_registry()).run("rice prices in Kaduna", scopes={"research:read"}, budget_xp=100)
+    ran = [(s["tool"], s.get("status")) for s in result.steps]
+    assert ran[0][0] == "web.search"
+    assert [t for t, _ in ran].count("web.search") == 1
+    assert len(ran) == 2 and ran[1][0] == "web.fetch_page"
+    assert "Steps already done" in m.prompts[1]
+    assert result.report["answer"] == "Answer."

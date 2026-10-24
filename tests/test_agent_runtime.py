@@ -118,8 +118,8 @@ def test_registry_has_no_key_material():
         "communication",
         "automation",
     }
-    assert "seed phrases" in SYSTEM_POLICY
-    assert "private keys" in SYSTEM_POLICY
+    assert "seed phrase" not in SYSTEM_POLICY.lower()  # AI is isolated from the wallet (D36)
+    assert "private key" not in SYSTEM_POLICY.lower()
 
 
 def test_registry_has_no_budget_mutation_tool():

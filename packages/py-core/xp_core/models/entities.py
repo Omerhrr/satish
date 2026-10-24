@@ -200,6 +200,11 @@ class Task(Base):
     started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Result sent to the user's Telegram chat; our copy is scrubbed (D37).
+    delivered: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    # Deleted by the user: content scrubbed, hidden from lists. The row stays
+    # because TK ledger entries reference it.
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 class TaskStep(Base):

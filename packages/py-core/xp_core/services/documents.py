@@ -61,6 +61,8 @@ class ReportSpec:
     limitations: list[str] = field(default_factory=list)
     task_id: str = ""
     mode_notes: list[str] = field(default_factory=list)
+    # The written report (the model's findings, built from the fetched pages).
+    body: list[str] = field(default_factory=list)
 
 
 # quality checks
@@ -132,6 +134,29 @@ def render_report_html(spec: ReportSpec) -> str:
     limitations_html = "".join(f"<li>{esc(item)}</li>" for item in spec.limitations)
     modes_html = "".join(f"<li>{esc(m)}</li>" for m in spec.mode_notes)
 
+    def _block(text: str) -> str:
+        out, items = [], []
+        for raw in str(text).splitlines():
+            line = raw.strip()
+            if line.startswith(("- ", "* ", "• ")):
+                items.append(f"<li>{esc(line[2:].strip())}</li>")
+                continue
+            if items:
+                out.append("<ul>" + "".join(items) + "</ul>")
+                items = []
+            if not line:
+                continue
+            if line.startswith("#"):
+                out.append(f"<h3>{esc(line.lstrip('#').strip())}</h3>")
+            else:
+                out.append(f"<p>{esc(line.replace('**', ''))}</p>")
+        if items:
+            out.append("<ul>" + "".join(items) + "</ul>")
+        return "".join(out)
+
+    body_html = "".join(_block(b) for b in spec.body if str(b).strip())
+    report_html = f"<h2>Report</h2>{body_html}" if body_html else ""
+
     doc = f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"><style>
   @page {{ size: A4; margin: 2cm 2.2cm;
@@ -153,10 +178,14 @@ def render_report_html(spec: ReportSpec) -> str:
   .limit {{ margin-top: 22px; padding: 10px 12px; background: #f6f7f9;
             border-left: 3px solid #f7931a; }}
   .limit ul {{ margin: 6px 0 0; }}
+  h3 {{ font-size: 12.5px; margin: 14px 0 4px; }}
+  p {{ margin: 0 0 7px; }}
 </style></head><body>
   <div class="brand">SATISH · RESEARCH REPORT</div>
   <h1>{esc(spec.title)}</h1>
   <div class="meta">Goal: {esc(spec.goal)}<br>Generated {esc(spec.generated_at.strftime('%Y-%m-%d %H:%M UTC'))} · task {esc(spec.task_id)}</div>
+
+  {report_html}
 
   <h2>Findings (cited claims)</h2>
   <ul>{claims_html}</ul>

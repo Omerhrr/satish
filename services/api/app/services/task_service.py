@@ -36,7 +36,7 @@ async def get_owned_task(session: AsyncSession, user_id: str, task_id: str) -> T
     task = (
         await session.execute(select(Task).where(Task.id == task_id, Task.user_id == user_id))
     ).scalar_one_or_none()
-    if task is None:
+    if task is None or task.deleted_at is not None:
         raise HTTPException(status_code=404, detail="task not found")
     return task
 

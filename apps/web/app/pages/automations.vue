@@ -11,13 +11,36 @@
       <h2>New automation</h2>
       <div class="form-grid">
         <label>What should it do?<input v-model="form.objective" placeholder="Monitor supplier prices daily" /></label>
-        <label>Schedule<input v-model="form.schedule" placeholder="every 1h · daily 09:30 · hourly" /></label>
         <label>Budget per run (TK)<input v-model="form.budgetPerRun" inputmode="numeric" /></label>
         <label>Total budget (TK, optional)<input v-model="form.budgetTotal" inputmode="numeric" placeholder="-" /></label>
       </div>
-      <p class="small dim">
-        Examples: <code>every 6h</code>, <code>daily 09:30</code> (UTC), <code>hourly</code>.
-      </p>
+      <div class="sched">
+        <div class="seg">
+          <button v-for="k in kinds" :key="k.key" type="button" :class="{ on: sched.kind === k.key }" @click="sched.kind = k.key">{{ k.label }}</button>
+        </div>
+        <div v-if="sched.kind === 'every'" class="sched-row">
+          Every <input v-model="sched.n" class="num" inputmode="numeric" />
+          <select v-model="sched.unit"><option value="m">minutes</option><option value="h">hours</option><option value="d">days</option></select>
+        </div>
+        <div v-if="sched.kind === 'weekly'" class="days">
+          <button v-for="d in weekdays" :key="d" type="button" :class="{ on: sched.days.includes(d) }" @click="toggleDay(d)">{{ d }}</button>
+        </div>
+        <div v-if="sched.kind === 'monthly'" class="sched-row">
+          On day <input v-model="sched.dom" class="num" inputmode="numeric" /> of each month
+        </div>
+        <div v-if="['daily', 'weekly', 'monthly'].includes(sched.kind)" class="sched-row times">
+          At
+          <span v-for="(t, i) in sched.times" :key="i" class="time">
+            <input v-model="sched.times[i]" type="time" />
+            <button v-if="sched.times.length > 1" type="button" class="x" aria-label="Remove time" @click="sched.times.splice(i, 1)">×</button>
+          </span>
+          <button v-if="sched.times.length < 12" type="button" class="btn ghost small-btn" @click="sched.times.push('18:00')">+ time</button>
+        </div>
+        <div v-if="sched.kind === 'custom'" class="sched-row">
+          <input v-model="sched.custom" placeholder="weekly mon,fri 09:00,17:00" style="flex: 1" />
+        </div>
+        <p class="small dim">{{ describe(scheduleExpr) }}<span v-if="sched.kind !== 'every'"> · your time ({{ tz }})</span></p>
+      </div>
       <button class="btn" :disabled="creating || !form.objective" @click="create">
         <span v-if="creating" class="spinner" /> Create automation
       </button>
@@ -34,7 +57,7 @@
           <div>
             <div class="small"><b>{{ j.objective }}</b></div>
             <div class="small dim">
-              {{ j.schedule }} · {{ human(j.status) }}
+              {{ describe(j.schedule) }} · {{ human(j.status) }}
               <span v-if="j.auto_paused_reason"> (paused: {{ j.auto_paused_reason }})</span>
               · next: {{ fmt(j.next_run_at) }}
               · spent {{ j.total_spent_xp }}/{{ j.budget_total_xp ?? "∞" }} TK
@@ -103,15 +126,80 @@ const creating = ref(false);
 
 const form = reactive({
   objective: "",
-  schedule: "daily 09:30",
   budgetPerRun: "20",
   budgetTotal: "",
 });
 
+const tz = (() => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  } catch {
+    return "UTC";
+  }
+})();
+const kinds = [
+  { key: "every", label: "Repeat" },
+  { key: "daily", label: "Daily" },
+  { key: "weekly", label: "Weekly" },
+  { key: "monthly", label: "Monthly" },
+  { key: "custom", label: "Custom" },
+];
+const weekdays = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+const sched = reactive({
+  kind: "daily",
+  n: "30",
+  unit: "m",
+  days: ["mon", "fri"] as string[],
+  dom: "1",
+  times: ["09:00"] as string[],
+  custom: "",
+});
+function toggleDay(d: string) {
+  const i = sched.days.indexOf(d);
+  if (i >= 0) {
+    if (sched.days.length > 1) sched.days.splice(i, 1);
+  } else sched.days.push(d);
+}
+const scheduleExpr = computed(() => {
+  const times = [...new Set(sched.times.filter(Boolean))].sort().join(",");
+  const zone = tz && tz !== "UTC" ? ` tz ${tz}` : "";
+  switch (sched.kind) {
+    case "every":
+      return `every ${Math.max(1, Number(sched.n) || 1)}${sched.unit}`;
+    case "daily":
+      return `daily ${times}${zone}`;
+    case "weekly":
+      return `weekly ${weekdays.filter((d) => sched.days.includes(d)).join(",")} ${times}${zone}`;
+    case "monthly":
+      return `monthly ${Math.min(28, Math.max(1, Number(sched.dom) || 1))} ${times}${zone}`;
+    default:
+      return sched.custom.trim();
+  }
+});
+function describe(expr: string): string {
+  const e = (expr || "").trim();
+  const zone = / tz (\S+)$/.exec(e);
+  const body = zone ? e.slice(0, zone.index) : e;
+  const at = (t: string) => t.split(",").join(", ");
+  let m: RegExpExecArray | null;
+  if (body === "hourly") return "Every hour";
+  if ((m = /^every (\d+)([smhd])$/.exec(body))) {
+    const n = Number(m[1]);
+    const unit = { s: "second", m: "minute", h: "hour", d: "day" }[m[2] as "s" | "m" | "h" | "d"];
+    return n === 1 ? `Every ${unit}` : `Every ${n} ${unit}s`;
+  }
+  if ((m = /^daily (.+)$/.exec(body))) return `Every day at ${at(m[1])}${zone ? "" : " UTC"}`;
+  if ((m = /^weekly (\S+) (.+)$/.exec(body))) return `Every ${m[1].split(",").join(", ")} at ${at(m[2])}${zone ? "" : " UTC"}`;
+  if ((m = /^monthly (\d+) (.+)$/.exec(body))) return `Day ${m[1]} of each month at ${at(m[2])}${zone ? "" : " UTC"}`;
+  return e || "Pick a schedule";
+}
+
 function fmt(iso: string | null): string {
   if (!iso) return "-";
   try {
-    return new Date(iso).toLocaleString();
+    // The API sends UTC without a zone marker; read it as UTC.
+    const utc = /[zZ]|[+-]\d{2}:?\d{2}$/.test(iso) ? iso : iso + "Z";
+    return new Date(utc).toLocaleString([], { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
   } catch {
     return iso;
   }
@@ -138,7 +226,7 @@ async function create() {
   try {
     await api.createJob({
       objective: form.objective,
-      schedule: form.schedule,
+      schedule: scheduleExpr.value,
       budget_per_run_xp: Math.max(1, Number(form.budgetPerRun) || 20),
       budget_total_xp: form.budgetTotal ? Number(form.budgetTotal) : null,
     });
@@ -193,6 +281,7 @@ onMounted(load);
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
+  min-width: 0;
   gap: 10px;
   margin: 12px 0;
 }
@@ -203,12 +292,83 @@ onMounted(load);
   font-size: 12px;
   color: var(--dim, #8899aa);
 }
+.form-grid label:first-child {
+  grid-column: 1 / -1;
+}
 .form-grid input {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
   padding: 8px 10px;
   border: 1px solid rgba(148, 163, 184, 0.35);
   border-radius: 8px;
   background: transparent;
   color: inherit;
+}
+.sched {
+  margin: 4px 0 14px;
+}
+.seg,
+.days {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.seg button,
+.days button {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+  text-transform: capitalize;
+}
+.seg button.on,
+.days button.on {
+  background: var(--accent, #f7931a);
+  border-color: transparent;
+  color: #111;
+  font-weight: 600;
+}
+.sched-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+.sched-row input,
+.sched-row select {
+  padding: 7px 9px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+}
+.sched-row .num {
+  width: 64px;
+}
+.time {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.x {
+  border: 0;
+  background: none;
+  color: inherit;
+  font-size: 18px;
+  padding: 0 4px;
+  opacity: 0.6;
+}
+.small-btn {
+  height: auto;
+  min-height: 0;
+  padding: 5px 10px;
+  font-size: 12px;
 }
 .job {
   padding: 12px 0;

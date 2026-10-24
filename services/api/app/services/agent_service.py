@@ -18,7 +18,7 @@ dsh_integration is enforced by DETERMINISTIC backend code:
 - Scope wall: scopes come from server-side policy, never from content;
   untrusted material is wrapped by the adapter's UNTRUSTED markers and
   cannot expand permissions (acceptance #4).
-- No key material: the registry contains no wallet/signing/seed tools and
+- Isolated from the wallet: no wallet code, data or tools are reachable here and
   the runtime injects no credentials into the agent context (acceptance #1).
 """
 
@@ -467,6 +467,18 @@ async def run_agent_task(
                     )
                 )
                 await session.commit()
+                # Send the result to the user's Telegram chat; on success our
+                # copy (files + text) is removed - history lives in Telegram.
+                try:
+                    from app.services.telegram_delivery import deliver_task
+
+                    delivery = await deliver_task(
+                        session, task, settings, answer=str((result.report or {}).get("answer") or "")
+                    )
+                    log.info("task_delivery", task_id=task_id, **{k: v for k, v in delivery.items() if k != "files"})
+                except Exception as exc:  # never fail a finished task over delivery
+                    await session.rollback()
+                    log.warning("task_delivery_error", task_id=task_id, error=type(exc).__name__)
             elif result.status == "awaiting_approval":
                 task.status = "awaiting_approval"
                 await session.commit()

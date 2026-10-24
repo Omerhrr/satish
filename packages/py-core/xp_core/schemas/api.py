@@ -180,6 +180,7 @@ class TaskOut(BaseModel):
     cancelled_at: datetime | None
     error: str | None = None  # plain-language reason when status == failed
     queued: bool = False  # handed to the AI worker but not started yet
+    delivered: bool = False  # result sent to the user's Telegram chat
 
 
 # task events / approvals

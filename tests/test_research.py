@@ -585,4 +585,27 @@ async def test_brave_search_provider_parses_and_fails_honestly():
     assert out.results == [] and "429" in out.disclosure
 
     from research_adapter.providers import CannedSearchProvider
-    assert isinstance(make_search_provider("brave", [], api_key=None), CannedSearchProvider)
+    assert type(make_search_provider("brave", [], api_key=None)).__name__ == "KeylessWebSearchProvider"  # live, keyless
+
+
+async def test_keyless_web_search_parses_results_and_fails_honestly():
+    import httpx
+    from research_adapter.providers import KeylessWebSearchProvider
+
+    page = (
+        '<div><a rel="nofollow" class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.ng%2Frice&amp;rut=x">'
+        'Rice <b>prices</b></a><a class="result__snippet" href="#">Bag of rice is &#8358;80,000</a></div>'
+        '<div><a class="result__a" href="https://duckduckgo.com/y.js?ad_domain=x">Ad</a></div>'
+        '<div><a class="result__a" href="https://second.example.com/a">Second</a></div>'
+    )
+
+    def ok(request):
+        return httpx.Response(200, text=page)
+
+    out = await KeylessWebSearchProvider(transport=httpx.MockTransport(ok)).search("rice price", 5)
+    assert [r.url for r in out.results] == ["https://example.ng/rice", "https://second.example.com/a"]
+    assert out.results[0].title == "Rice prices" and "80,000" in out.results[0].snippet
+    assert out.mode == "web"
+
+    bad = await KeylessWebSearchProvider(transport=httpx.MockTransport(lambda r: httpx.Response(503))).search("x")
+    assert bad.results == [] and "503" in bad.disclosure

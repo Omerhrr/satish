@@ -8,7 +8,12 @@ name: satish
 
 x-env: &env
   XP_DATABASE_URL: sqlite+aiosqlite:////data/xp.db
-  XP_REDIS_URL: redis://redis:6379/0
+  # "satish-redis", not "redis": api/web also join booklet's network, where the
+  # name "redis" can resolve to booklet's own Redis instead of ours.
+  XP_REDIS_URL: redis://satish-redis:6379/0
+  # Live research: Brave if XP_BRAVE_SEARCH_API_KEY is set, otherwise keyless web search.
+  XP_RESEARCH_SEARCH_MODE: ${XP_RESEARCH_SEARCH_MODE:-auto}
+  XP_RESEARCH_FETCH_MODE: ${XP_RESEARCH_FETCH_MODE:-http}
   XP_ARTIFACT_DIR: /data/artifacts
   XP_PDF_STORAGE_DIR: /data/artifacts
   XP_WALLET_DATA_DIR: /data/wallets
@@ -92,6 +97,9 @@ services:
   redis:
     image: redis:7-alpine
     command: ["redis-server", "--appendonly", "yes"]
+    networks:
+      default:
+        aliases: [satish-redis]
     volumes:
       - redis_data:/data
     healthcheck:

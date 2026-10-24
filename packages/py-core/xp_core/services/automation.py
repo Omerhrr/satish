@@ -7,8 +7,8 @@ limits where configured" and "Failed jobs do not silently repeat
 consequential actions".
 
 Design rules (all enforced in THIS module, never by the model):
-- Deterministic schedule grammar: ``every <n><s|m|h|d>`` (>= 60s),
-  ``daily HH:MM`` (UTC), plus the aliases ``hourly`` and ``daily``.
+- Deterministic schedule grammar (see parse_schedule): every N minutes/
+  hours/days, daily/weekly/monthly at one or more times, optional time zone.
   Anything else is a loud refusal.
 - Every attempt is recorded as an ``AutomationRun`` row - success, failure,
   or skip, always with its reason.
@@ -59,43 +59,98 @@ class JobValidationError(ValueError):
     """Raised for invalid budgets/conditions on job creation."""
 
 
-Every = re.compile(r"^every (\d+)([smhd])$")
-Daily = re.compile(r"^daily (\d{2}):(\d{2})$")
+Every = re.compile(r"^every (\d+)\s*([smhd])$")
+_TIMES = r"(\d{1,2}:\d{2}(?:\s*,\s*\d{1,2}:\d{2})*)"
+Daily = re.compile(rf"^daily {_TIMES}$")
+Weekly = re.compile(rf"^weekly ([a-z]{{3}}(?:\s*,\s*[a-z]{{3}})*) {_TIMES}$")
+Monthly = re.compile(rf"^monthly (\d{{1,2}}) {_TIMES}$")
+_TZ = re.compile(r"\s+tz\s+([A-Za-z_]+(?:/[A-Za-z_+\-0-9]+){0,2})$")
 _UNIT_SECONDS = {"s": 1, "m": 60, "h": 3600, "d": 86400}
+_DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 
 
 @dataclass(slots=True)
 class Schedule:
     expr: str
-    kind: str  # every | daily
+    kind: str  # every | daily | weekly | monthly
     seconds: int | None = None
     hour: int | None = None
     minute: int | None = None
+    times: list[tuple[int, int]] | None = None
+    weekdays: list[int] | None = None
+    day_of_month: int | None = None
+    tz: str = "UTC"
+
+
+def _times(text: str) -> list[tuple[int, int]]:
+    out = []
+    for part in text.split(","):
+        h, m = (int(x) for x in part.strip().split(":"))
+        if h > 23 or m > 59:
+            raise ScheduleError("times must be valid HH:MM")
+        out.append((h, m))
+    if len(out) > 24:
+        raise ScheduleError("at most 24 times a day")
+    return sorted(set(out))
 
 
 def parse_schedule(expr: str) -> Schedule:
-    """Parse the published schedule grammar. Anything else raises ScheduleError."""
-    text = (expr or "").strip().lower()
+    """Parse the published schedule grammar. Anything else raises ScheduleError.
+
+    every <n><s|m|h|d>             (>= 60s)        every 15m, every 2h
+    daily HH:MM[,HH:MM...]                          daily 08:00,18:30
+    weekly mon[,tue...] HH:MM[,...]                 weekly mon,fri 09:00
+    monthly <day 1-28> HH:MM[,...]                  monthly 1 07:00
+    aliases: hourly, daily. Any of the timed forms may end with
+    ``tz Area/City`` (default UTC), e.g. ``daily 08:00 tz Africa/Lagos``.
+    """
+    raw = (expr or "").strip()
+    tz = "UTC"
+    tzm = _TZ.search(raw)
+    if tzm:
+        tz = tzm.group(1)
+        raw = raw[: tzm.start()]
+        try:
+            from zoneinfo import ZoneInfo
+
+            ZoneInfo(tz)
+        except Exception as exc:
+            raise ScheduleError(f"unknown time zone {tz!r}") from exc
+    text = " ".join(raw.lower().split())
+    suffix = f" tz {tz}" if tzm else ""
     if text == "hourly":
         return Schedule(expr="hourly", kind="every", seconds=3600)
     if text == "daily":
-        return Schedule(expr="daily", kind="daily", hour=0, minute=0)
+        text = "daily 00:00"
     m = Every.match(text)
     if m:
         n, unit = int(m.group(1)), m.group(2)
         seconds = n * _UNIT_SECONDS[unit]
         if seconds < 60:
             raise ScheduleError("minimum cadence is 60 seconds")
-        return Schedule(expr=text, kind="every", seconds=seconds)
+        return Schedule(expr=f"every {n}{unit}", kind="every", seconds=seconds)
     m = Daily.match(text)
     if m:
-        hour, minute = int(m.group(1)), int(m.group(2))
-        if hour > 23 or minute > 59:
-            raise ScheduleError("daily time must be a valid HH:MM in UTC")
-        return Schedule(expr=text, kind="daily", hour=hour, minute=minute)
+        times = _times(m.group(1))
+        return Schedule(expr=text + suffix, kind="daily", hour=times[0][0], minute=times[0][1], times=times, tz=tz)
+    m = Weekly.match(text)
+    if m:
+        names = [d.strip() for d in m.group(1).split(",")]
+        if any(d not in _DAYS for d in names):
+            raise ScheduleError("weekdays are mon tue wed thu fri sat sun")
+        times = _times(m.group(2))
+        return Schedule(expr=text + suffix, kind="weekly", times=times,
+                        weekdays=sorted({_DAYS.index(d) for d in names}), tz=tz)
+    m = Monthly.match(text)
+    if m:
+        day = int(m.group(1))
+        if not 1 <= day <= 28:
+            raise ScheduleError("monthly day must be 1-28")
+        return Schedule(expr=text + suffix, kind="monthly", times=_times(m.group(2)), day_of_month=day, tz=tz)
     raise ScheduleError(
-        "unsupported schedule; use 'every <n><s|m|h|d>' (>= 60s), "
-        "'daily HH:MM' (UTC), 'hourly', or 'daily'"
+        "unsupported schedule; use 'every <n><m|h|d>' (>= 1 minute), 'daily HH:MM[,HH:MM]', "
+        "'weekly mon,fri HH:MM', 'monthly <1-28> HH:MM' (optionally ending 'tz Africa/Lagos'), "
+        "'hourly', or 'daily'"
     )
 
 
@@ -105,13 +160,21 @@ def next_run_after(expr: str, after: datetime) -> datetime:
     if sched.kind == "every":
         assert sched.seconds is not None
         return after + timedelta(seconds=sched.seconds)
-    assert sched.hour is not None and sched.minute is not None
-    candidate = after.replace(
-        hour=sched.hour, minute=sched.minute, second=0, microsecond=0
-    )
-    if candidate <= after:
-        candidate += timedelta(days=1)
-    return candidate
+    from zoneinfo import ZoneInfo
+
+    zone = ZoneInfo(sched.tz)
+    local_after = after.replace(tzinfo=UTC).astimezone(zone)
+    for day_offset in range(0, 62):
+        day = (local_after + timedelta(days=day_offset)).date()
+        if sched.kind == "weekly" and day.weekday() not in (sched.weekdays or []):
+            continue
+        if sched.kind == "monthly" and day.day != sched.day_of_month:
+            continue
+        for h, m in sched.times or []:
+            cand = datetime(day.year, day.month, day.day, h, m, tzinfo=zone).astimezone(UTC).replace(tzinfo=None)
+            if cand > after:
+                return cand
+    raise ScheduleError("schedule never fires")  # pragma: no cover
 
 
 VALID_CONDITION_KEYS = {"notify_on", "balance_below_xp"}

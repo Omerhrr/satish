@@ -43,7 +43,10 @@
     </section>
 
     <section class="card">
-      <h2>Tasks <span class="dim">({{ tasks.length }})</span></h2>
+      <div class="list-head">
+        <h2>Tasks <span class="dim">({{ tasks.length }})</span></h2>
+        <button v-if="finishedCount" class="btn ghost small" @click="clearFinished">Clear finished</button>
+      </div>
       <p v-if="loading" class="small dim" style="margin-top: 8px"><span class="spinner" /> Loading…</p>
       <p v-else-if="tasks.length === 0" class="small dim" style="margin-top: 8px">No tasks yet. Ask for something above, or try a free sample report on <NuxtLink to="/ai">What can it do?</NuxtLink></p>
       <div v-for="t in tasks" :key="t.id" class="task">
@@ -57,6 +60,7 @@
         </div>
         <div v-else-if="t.status === 'running'" class="small working"><span class="spinner" /> Working on it…</div>
         <div v-if="t.error" class="small task-err">{{ t.error }}</div>
+        <div v-if="t.delivered" class="small delivered">✓ Sent to your Telegram chat with Satish, including any files.</div>
         <div class="task-foot">
           <span class="small dim">{{ t.actual_xp.toLocaleString() }} of {{ t.budget_xp.toLocaleString() }} TK used</span>
           <span class="task-acts">
@@ -70,7 +74,8 @@
               {{ t.status === "awaiting_approval" ? "Resume" : "Run" }}
             </button>
             <button v-if="['planned', 'running'].includes(t.status)" class="btn small" @click="showEvents(t.id)">Progress</button>
-            <button v-if="['completed', 'failed', 'cancelled'].includes(t.status)" class="btn small" @click="showResult(t.id)">Result</button>
+            <button v-if="['completed', 'failed', 'cancelled'].includes(t.status) && !t.delivered" class="btn small" @click="showResult(t.id)">Result</button>
+            <button v-if="['completed', 'failed', 'cancelled', 'awaiting_approval'].includes(t.status)" class="btn small ghost" aria-label="Delete task" @click="remove(t.id)">Delete</button>
             <button v-if="!['completed', 'failed', 'cancelled'].includes(t.status)" class="btn sensitive-action small ghost" @click="cancel(t.id)">Cancel</button>
           </span>
         </div>
@@ -113,6 +118,11 @@
       <p class="small" style="margin: 6px 0">
         <div class="answer">{{ result.answer || result.deliverable || "-" }}</div>
       </p>
+
+      <button class="btn primary small" :disabled="sending" @click="sendToChat">
+        <span v-if="sending" class="spinner" /> Send to my Telegram chat
+      </button>
+      <p class="small dim" style="margin: 4px 0 0">Your files open best from the chat. Once sent, we delete our copy.</p>
 
       <h3 class="small" style="margin: 14px 0 4px">Your files (private)</h3>
       <ul class="small">
@@ -348,6 +358,46 @@ async function decide(approvalId: string, approve: boolean) {
   await refresh();
 }
 
+const sending = ref(false);
+async function sendToChat() {
+  const id = (result.value as { task_id?: string } | null)?.task_id;
+  if (!id) return;
+  sending.value = true;
+  try {
+    await api.deliverTask(id);
+    result.value = null;
+    await refresh();
+  } catch (e) {
+    alert(e instanceof Error ? e.message : String(e));
+  } finally {
+    sending.value = false;
+  }
+}
+
+const finishedCount = computed(() => tasks.value.filter((t) => ["completed", "failed", "cancelled"].includes(t.status)).length);
+
+async function remove(id: string) {
+  if (!window.confirm("Delete this task? Its answer and files are removed for good.")) return;
+  try {
+    await api.deleteTask(id);
+    if (result.value && (result.value as { task_id?: string }).task_id === id) result.value = null;
+    await refresh();
+  } catch (e) {
+    alert(e instanceof Error ? e.message : String(e));
+  }
+}
+
+async function clearFinished() {
+  if (!window.confirm(`Delete ${finishedCount.value} finished task(s)? This can't be undone.`)) return;
+  try {
+    await api.clearTasks();
+    result.value = null;
+    await refresh();
+  } catch (e) {
+    alert(e instanceof Error ? e.message : String(e));
+  }
+}
+
 async function cancel(id: string) {
   try {
     await api.cancelTask(id);
@@ -362,6 +412,8 @@ onBeforeUnmount(() => poller && clearTimeout(poller));
 </script>
 
 <style scoped>
+.list-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.delivered { color: var(--green, #22c55e); margin: 4px 0; }
 .answer { white-space: pre-wrap; line-height: 1.6; font-size: 15px; margin: 4px 0 10px; }
 .offline { background: var(--orange-soft); color: var(--orange); border-radius: 12px; padding: 10px 14px; margin-bottom: 12px; font-size: 14px; }
 .ask-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }

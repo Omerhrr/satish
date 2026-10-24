@@ -159,6 +159,68 @@ class BraveSearchProvider:
         return SearchOutcome(mode="brave", results=results, disclosure="live web search results from Brave Search")
 
 
+DDG_ENDPOINT = "https://html.duckduckgo.com/html/"
+_DDG_RESULT = re.compile(
+    r'<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>(.*?)</a>(.*?)(?=<a[^>]+class="result__a"|$)', re.S
+)
+_DDG_SNIPPET = re.compile(r'class="result__snippet"[^>]*>(.*?)</a>', re.S)
+
+
+def _ddg_url(href: str) -> str:
+    from urllib.parse import parse_qs, unquote, urlparse
+
+    href = html.unescape(href)
+    if href.startswith("//"):
+        href = "https:" + href
+    u = urlparse(href)
+    if u.netloc.endswith("duckduckgo.com") and u.path.startswith("/l/"):
+        target = parse_qs(u.query).get("uddg", [""])[0]
+        return unquote(target)
+    return href
+
+
+class KeylessWebSearchProvider:
+    """Live web search with no API key (DuckDuckGo's HTML results page).
+
+    Used when no Brave key is set, so research works out of the box. Ads and
+    tracking links are dropped; failures return zero results honestly.
+    """
+
+    def __init__(self, *, transport: httpx.AsyncBaseTransport | None = None, region: str = "") -> None:
+        self.transport = transport
+        self.region = region
+
+    async def search(self, query: str, limit: int = 5) -> SearchOutcome:
+        data = {"q": query[:400]}
+        if self.region:
+            data["kl"] = self.region
+        headers = {"User-Agent": "Mozilla/5.0 (compatible; SatishResearch/1.0)", "Accept": "text/html"}
+        try:
+            async with httpx.AsyncClient(timeout=12, transport=self.transport, follow_redirects=True) as client:
+                resp = await client.post(DDG_ENDPOINT, data=data, headers=headers)
+            if resp.status_code != 200:
+                log.warning("web_search_failed", status=resp.status_code)
+                return SearchOutcome(mode="web", disclosure=f"live search failed (HTTP {resp.status_code}); no results used")
+            body = resp.text
+        except httpx.HTTPError as exc:
+            log.warning("web_search_failed", error=str(exc))
+            return SearchOutcome(mode="web", disclosure="live search was unreachable; no results used")
+        results: list[SearchListing] = []
+        seen: set[str] = set()
+        for href, title, rest in _DDG_RESULT.findall(body):
+            url = _ddg_url(href)
+            if not url.startswith(("http://", "https://")) or "duckduckgo.com" in url or url in seen:
+                continue
+            if "ad_domain" in href or "/y.js" in href:
+                continue
+            seen.add(url)
+            m = _DDG_SNIPPET.search(rest)
+            results.append(SearchListing(url=url, title=_plain(title), snippet=_plain(m.group(1) if m else "")[:300]))
+            if len(results) >= max(1, limit):
+                break
+        return SearchOutcome(mode="web", results=results, disclosure="live web search results")
+
+
 # fetch
 
 
@@ -329,12 +391,12 @@ def make_search_provider(
 ) -> SearchProvider:
     if mode == "canned":
         return CannedSearchProvider(corpus)
-    if mode == "brave":
-        if not api_key:
-            log.warning("brave_search_key_missing", fallback="canned")
-            return CannedSearchProvider(corpus)
-        return BraveSearchProvider(api_key, **kwargs)
-    raise ValueError(f"search mode {mode!r} must be 'canned' or 'brave'")
+    if mode in ("brave", "auto", "web"):
+        if mode != "web" and api_key:
+            return BraveSearchProvider(api_key, **kwargs)
+        region = str(kwargs.pop("country", "") or "")
+        return KeylessWebSearchProvider(region=f"{region.lower()}-en" if region else "", **kwargs)
+    raise ValueError(f"search mode {mode!r} must be 'canned', 'auto', 'brave' or 'web'")
 
 
 def make_fetch_provider(
@@ -354,6 +416,7 @@ __all__ = [
     "FetchOutcome",
     "FetchProvider",
     "HttpFetchProvider",
+    "KeylessWebSearchProvider",
     "SearchListing",
     "SearchOutcome",
     "SearchProvider",
