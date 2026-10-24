@@ -7,6 +7,7 @@ inline in a thread so the full flow still works with zero infrastructure.
 
 from __future__ import annotations
 
+import contextlib
 import inspect
 
 from xp_core.config import get_settings
@@ -115,13 +116,16 @@ async def enqueue_agent_task_job(*, task_id: str, resume: bool = False) -> str:
             job = await pool.enqueue_job(
                 "run_agent_task_job", task_id=task_id, resume=resume, _queue_name=AI_QUEUE
             )
-            await pool.close()
             assert job is not None
-            if await _ai_worker_alive(settings):
-                return job.job_id
-            log.warning("ai_worker_offline_running_in_api", task_id=task_id)
-            _run_in_background(task_id, resume)
-            return f"api:{task_id}"
+            if not await _ai_worker_alive(settings):
+                await pool.close()
+                log.warning("ai_worker_offline_running_in_api", task_id=task_id)
+                _run_in_background(task_id, resume)
+                return f"api:{task_id}"
+            # Safety net: if no worker has picked the job up within a few
+            # seconds (whatever the reason), the API runs it instead.
+            _watch_pickup(pool, job, task_id, resume)
+            return job.job_id
         except Exception as exc:
             log.error("arq_enqueue_failed_running_in_api", error=str(exc))
             _run_in_background(task_id, resume)
@@ -133,6 +137,34 @@ async def enqueue_agent_task_job(*, task_id: str, resume: bool = False) -> str:
     if inspect.iscoroutine(result):
         result = await result
     return f"inline:{task_id}"
+
+
+PICKUP_GRACE_SECONDS = 6
+
+
+def _watch_pickup(pool, job, task_id: str, resume: bool) -> None:
+    import asyncio
+
+    from arq.jobs import JobStatus
+
+    async def watch() -> None:
+        try:
+            await asyncio.sleep(PICKUP_GRACE_SECONDS)
+            status = await job.status()
+            if status in (JobStatus.queued, JobStatus.deferred):
+                log.warning("ai_worker_did_not_pick_up_running_in_api", task_id=task_id, job_status=str(status))
+                # If a worker picks it up later, the exactly-once claim makes it skip.
+                _run_in_background(task_id, resume)
+        except Exception as exc:
+            log.error("pickup_watch_failed_running_in_api", task_id=task_id, error=str(exc))
+            _run_in_background(task_id, resume)
+        finally:
+            with contextlib.suppress(Exception):
+                await pool.close()
+
+    t = asyncio.get_running_loop().create_task(watch())
+    _background.add(t)
+    t.add_done_callback(_background.discard)
 
 
 def _run_in_background(task_id: str, resume: bool) -> None:
