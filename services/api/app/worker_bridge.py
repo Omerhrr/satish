@@ -84,8 +84,26 @@ async def enqueue_receipt_pdf_job(*, artifact_id: str, purchase_id: str) -> str:
     return f"inline:{artifact_id}"
 
 
+async def _ai_worker_alive(settings) -> bool:
+    try:
+        import redis.asyncio as aioredis
+
+        r = aioredis.from_url(settings.redis_url)
+        try:
+            return bool(await r.get(f"{AI_QUEUE}:alive") or await r.get(f"{AI_QUEUE}:health-check"))
+        finally:
+            await r.aclose()
+    except Exception:
+        return False
+
+
+_background: set = set()  # keeps API-run tasks referenced until they finish
+
+
 async def enqueue_agent_task_job(*, task_id: str, resume: bool = False) -> str:
-    """Agent execution; same dual transport. Inline dev runs to completion."""
+    """Hand a task to the AI worker. If no AI worker is alive, run it in the
+    background inside the API instead, so Satish AI keeps working either way
+    (the job is still queued: whichever starts first runs it, exactly once)."""
     settings = get_settings()
     if settings.redis_url:
         try:
@@ -99,9 +117,15 @@ async def enqueue_agent_task_job(*, task_id: str, resume: bool = False) -> str:
             )
             await pool.close()
             assert job is not None
-            return job.job_id
+            if await _ai_worker_alive(settings):
+                return job.job_id
+            log.warning("ai_worker_offline_running_in_api", task_id=task_id)
+            _run_in_background(task_id, resume)
+            return f"api:{task_id}"
         except Exception as exc:
-            log.error("arq_enqueue_failed_falling_back_inline", error=str(exc))
+            log.error("arq_enqueue_failed_running_in_api", error=str(exc))
+            _run_in_background(task_id, resume)
+            return f"api:{task_id}"
 
     from worker.jobs.agent import run_agent_task_job
 
@@ -109,3 +133,22 @@ async def enqueue_agent_task_job(*, task_id: str, resume: bool = False) -> str:
     if inspect.iscoroutine(result):
         result = await result
     return f"inline:{task_id}"
+
+
+def _run_in_background(task_id: str, resume: bool) -> None:
+    import asyncio
+
+    from worker.jobs.agent import run_agent_task_job
+
+    async def go() -> None:
+        try:
+            await asyncio.wait_for(
+                run_agent_task_job({}, task_id=task_id, resume=resume),
+                timeout=get_settings().agent_task_timeout_seconds,
+            )
+        except Exception as exc:  # the watchdog returns the TK if this dies
+            log.error("api_run_failed", task_id=task_id, error=str(exc))
+
+    t = asyncio.get_running_loop().create_task(go())
+    _background.add(t)
+    t.add_done_callback(_background.discard)

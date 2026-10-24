@@ -24,8 +24,13 @@ async def run_agent_task_job(
     resume / restart recovery).
     """
     setup_logging(get_settings().log_level)
-    from app.services.agent_service import run_agent_task
+    from app.services.agent_service import TaskNotRunnable, run_agent_task
     from xp_core.db import get_session_factory
 
     settings = get_settings()
-    return await run_agent_task(get_session_factory(), task_id, settings, resume=resume)
+    try:
+        return await run_agent_task(get_session_factory(), task_id, settings, resume=resume)
+    except TaskNotRunnable as exc:
+        # Already finished elsewhere (e.g. the API ran it while this worker was down).
+        log.info("agent_task_skipped", task_id=task_id, reason=str(exc))
+        return {"task_id": task_id, "status": "skipped", "reason": str(exc)}

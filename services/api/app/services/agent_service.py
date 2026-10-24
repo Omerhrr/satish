@@ -384,6 +384,17 @@ async def run_agent_task(
             )
             skip = {int(i) for i in done}
 
+        if not resume:
+            # Exactly one runner per task: the AI worker and the API fallback may
+            # both get the same task; only the first to set started_at runs it.
+            claimed = await session.execute(
+                update(Task).where(Task.id == task_id, Task.started_at.is_(None)).values(started_at=datetime.now(UTC))
+            )
+            await session.commit()
+            if not claimed.rowcount:
+                log.info("agent_task_already_claimed", task_id=task_id)
+                return {"task_id": task_id, "status": "skipped", "reason": "already started elsewhere"}
+            await session.refresh(task)
         task.status = "running"
         task.started_at = task.started_at or datetime.now(UTC)
         await append_event(
