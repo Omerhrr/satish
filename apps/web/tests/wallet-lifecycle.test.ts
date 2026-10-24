@@ -209,7 +209,7 @@ describe("quick sync", () => {
     const full = await scanAddresses(X, T, c1.api, undefined, { poolGap: 5 });
     const c2 = chainWith(funded);
     const q = await quickScan(X, T, c2.api, full);
-    expect(c2.calls()).toBeLessThanOrEqual(7); // 2 used + 2 receive + 1 change + 2 pool
+    expect(c2.calls()).toBeLessThanOrEqual(9); // 2 used + 2 receive + 1 change + 2 pool + 2 TK income
     expect(q.needFull).toBe(false);
     expect(q.addresses.filter((a) => a.txCount).reduce((s, a) => s + a.confirmed, 0)).toBe(12_000);
   });
@@ -219,5 +219,30 @@ describe("quick sync", () => {
     const full = await scanAddresses(X, T, chainWith(funded).api, undefined, { poolGap: 5 });
     funded.set(addressAt(X, T, 0, 1), 1000);
     expect((await quickScan(X, T, chainWith(funded).api, full)).needFull).toBe(true);
+  });
+});
+
+describe("TK income range", () => {
+  test("a TK payment at 0/5003 is found and keeps pool logic separate", async () => {
+    const { addressAt, scanAddresses, quickScan, Esplora, TK_START, POOL_START } = await import("../app/lib/wallet-core");
+    const net = T;
+    const { walletDescriptors } = await import("../app/lib/wallet-core");
+    void walletDescriptors;
+    const xpub = accountXpub("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about", net);
+    const paid = addressAt(xpub, net, 0, TK_START + 3);
+    // Same address the server derives (xp_core onchain, BIP84 test vector seed).
+    expect(addressAt(xpub, net, 0, 0)).toBe("tb1q6rz28mcfaxtmd6v789l9rrlrusdprr9pqcpvkl");
+    const fetchImpl = async (url: string) => {
+      const used = url.includes(paid);
+      const stats = { funded_txo_sum: used ? 2500 : 0, spent_txo_sum: 0, tx_count: used ? 1 : 0 };
+      const empty = { funded_txo_sum: 0, spent_txo_sum: 0, tx_count: 0 };
+      return new Response(JSON.stringify({ chain_stats: stats, mempool_stats: empty }));
+    };
+    const api = new Esplora("https://x", fetchImpl as never, { minGapMs: 0 });
+    const full = await scanAddresses(xpub, net, api, undefined, { poolGap: 5 });
+    expect(full.find((a) => a.index === TK_START + 3)?.confirmed).toBe(2500);
+    expect(full.filter((a) => a.index >= POOL_START && a.index < TK_START).every((a) => a.txCount === 0)).toBe(true);
+    const q = await quickScan(xpub, net, api, full);
+    expect(q.addresses.some((a) => a.index === TK_START + 4)).toBe(true); // looks one past the last TK payment
   });
 });

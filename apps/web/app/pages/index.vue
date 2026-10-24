@@ -974,6 +974,8 @@
           <div class="words">
             <div v-for="(word, i) in shownWords" :key="i" class="word"><span>{{ i + 1 }}</span>{{ word }}</div>
           </div>
+          <button class="btn" @click="copyPhrase">{{ phraseCopied ? "Copied ✓ (cleared in 60s)" : "Copy recovery phrase" }}</button>
+          <p class="small dim">Paste it only where you mean to, like your server settings. Anyone who sees it can take your bitcoin.</p>
           <button class="btn primary" @click="go('home')">Done</button>
         </template>
       </section>
@@ -2020,6 +2022,23 @@ async function cloudOn() {
 async function cloudOff() {
   if (!window.confirm("Turn off Telegram backup? Your backup will be deleted from Telegram. Keep your 12 words safe.")) return;
   await w.disableCloud();
+}
+
+const phraseCopied = ref(false);
+let phraseClear: ReturnType<typeof setTimeout> | null = null;
+async function copyPhrase() {
+  await copy(shownWords.value.join(" "));
+  phraseCopied.value = true;
+  if (phraseClear) clearTimeout(phraseClear);
+  // Don't leave the phrase sitting on the clipboard.
+  phraseClear = setTimeout(async () => {
+    phraseCopied.value = false;
+    try {
+      await navigator.clipboard.writeText("");
+    } catch {
+      /* not allowed when the app is in the background */
+    }
+  }, 60_000);
 }
 
 async function copy(text: string) {

@@ -125,7 +125,7 @@ def payment_methods(settings: Settings) -> list[str]:
     from app.services import tk_lightning
 
     out = []
-    if settings.onchain_xpub:
+    if settings.tk_onchain_xpub:
         out.append("onchain")
     if tk_lightning.available(settings) or settings.lightning_mode != "canned" or settings.dev_mode:
         out.append("lightning")

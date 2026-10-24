@@ -12,7 +12,7 @@ import {
   Esplora, NETWORKS, accountXpub, buildHistory, decryptPhrase, encryptPhrase, nextUnused,
   normalizePhrase, planSend, scanAddresses, quickScan, sameStats,
   walletPrivateKeys, addressWif, sweepAddresses, planSweep, signSweep, type SweepInput, signPlan, signTx, planBump, walletDescriptors, historyCsv, checkContact,
-  identityFromPhrase, signPoolAddresses, verifyPoolAddress, signSparkAddress, verifySparkAddress, normalizeSpark, normalizeUsername, POOL_START,
+  identityFromPhrase, signPoolAddresses, verifyPoolAddress, signSparkAddress, verifySparkAddress, normalizeSpark, normalizeUsername, POOL_START, TK_START,
   type AddressInfo, type BumpPlan, type EsploraTx, type Contact, type EncryptedSecret, type FeeRates, type HistoryItem, type NetworkName, type SendPlan, type Utxo,
 } from "~/lib/wallet-core";
 
@@ -343,7 +343,7 @@ export function useWallet() {
     try {
       // The username's pool range comes back in parallel; it only matters if it grew.
       const handleP = xpApi.handleMe(netName).then(setHandle).catch(() => undefined);
-      const knownPoolMax = Math.max(-1, ...state.addresses.filter((a) => a.index >= POOL_START && a.txCount > 0).map((a) => a.index));
+      const knownPoolMax = Math.max(-1, ...state.addresses.filter((a) => a.index >= POOL_START && a.index < TK_START && a.txCount > 0).map((a) => a.index));
       const issued = () => (state.handle && state.handle.issuedMax >= POOL_START ? state.handle.issuedMax : -1);
       const used0 = state.addresses.filter((a) => a.txCount > 0);
       const haveCache = used0.every((a) => txCache[a.address]);
@@ -352,7 +352,7 @@ export function useWallet() {
       if (!full) {
         const q = await quickScan(xpub, net, api, state.addresses, Math.max(issued(), knownPoolMax));
         await handleP;
-        full = q.needFull || issued() > Math.max(knownPoolMax, ...q.addresses.filter((a) => a.index >= POOL_START).map((a) => a.index));
+        full = q.needFull || issued() > Math.max(knownPoolMax, ...q.addresses.filter((a) => a.index >= POOL_START && a.index < TK_START).map((a) => a.index));
         addresses = q.addresses;
       }
       if (full) {

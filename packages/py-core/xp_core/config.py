@@ -92,6 +92,11 @@ class Settings(BaseSettings):
     # Lightning: the operator's wallet phrase lets the server create invoices
     # and see them paid (it can also spend - keep only a float there).
     tk_lightning_mnemonic: str | None = None  # never logged
+    # Simplest setup: the 12 words of the owner's own Satish wallet. TK paid by
+    # Bitcoin lands in that wallet's on-chain side (addresses 0/5000+), TK paid
+    # by Lightning lands in its Lightning side. Overrides the two settings
+    # above/below when set. Never logged.
+    tk_wallet_mnemonic: str | None = None
     tk_lightning_network: str = "regtest"  # regtest | mainnet (mainnet needs breez_api_key)
     breez_api_key: str | None = None
     tk_lightning_storage_dir: str = "/data/tk-lightning"
@@ -198,6 +203,19 @@ class Settings(BaseSettings):
     # Operator's BIP84 account PUBLIC key (xpub/tpub/zpub/vpub). The server
     # can derive and watch addresses but never spend. Keep the phrase offline.
     onchain_xpub: str | None = None
+
+    @property
+    def tk_onchain_xpub(self) -> str | None:
+        """Account xpub TK addresses come from (own Satish wallet if set)."""
+        if self.tk_wallet_mnemonic:
+            from xp_core.services.onchain import xpub_from_mnemonic
+
+            return xpub_from_mnemonic(self.tk_wallet_mnemonic, self.onchain_network)
+        return self.onchain_xpub
+
+    @property
+    def tk_ln_mnemonic(self) -> str | None:
+        return self.tk_wallet_mnemonic or self.tk_lightning_mnemonic
     onchain_network: Literal["mainnet", "testnet"] = "testnet"  # testnet = testnet4
     onchain_esplora_url: str | None = None  # default: mempool.space for the network
     onchain_min_conf: int = 1  # 0 accepts unconfirmed payments (demo only)

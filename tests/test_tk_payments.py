@@ -94,3 +94,42 @@ async def test_task_without_budget_uses_balance_automatically(client, session, d
 async def test_task_without_tk_is_refused_kindly(client):
     r = await client.post("/api/v1/tasks", json={"objective": "hello"})
     assert r.status_code == 402 and "Buy more TK" in r.json()["detail"]
+
+
+async def test_own_satish_wallet_receives_bitcoin_tk_at_5000_plus(client, monkeypatch):
+    from xp_core.services.onchain import TK_START, derive_address, xpub_from_mnemonic
+
+    s = get_settings()
+    words = "abandon " * 11 + "about"
+    monkeypatch.setattr(s, "tk_wallet_mnemonic", words)
+    monkeypatch.setattr(s, "onchain_network", "testnet")
+    r = (await client.get("/api/v1/xp/rate")).json()
+    assert "onchain" in r["methods"] and "lightning" in r["methods"]  # one phrase sets up both
+    a = (await client.post("/api/v1/xp/purchases", json={"tk_amount": 500, "method": "onchain"})).json()
+    b = (await client.post("/api/v1/xp/purchases", json={"tk_amount": 500, "method": "onchain"})).json()
+    xpub = xpub_from_mnemonic(words, "testnet")
+    assert a["address"] == derive_address(xpub, "testnet", TK_START)
+    assert b["address"] == derive_address(xpub, "testnet", TK_START + 1)
+
+
+async def test_old_unpaid_address_is_reused(client, session, monkeypatch):
+    from datetime import UTC, datetime, timedelta
+
+    from xp_core.services import onchain
+
+    s = get_settings()
+    monkeypatch.setattr(s, "tk_wallet_mnemonic", "abandon " * 11 + "about")
+    first = (await client.post("/api/v1/xp/purchases", json={"tk_amount": 500, "method": "onchain"})).json()
+    row = await session.get(PaymentIntent, first["id"])
+    row.status = "expired"
+    row.expires_at = datetime.now(UTC) - timedelta(days=2)
+    await session.commit()
+
+    async def nothing(client, base, address, min_conf):
+        return onchain.PaymentCheck(address=address)
+
+    monkeypatch.setattr(onchain, "check_address", nothing)
+    again = (await client.post("/api/v1/xp/purchases", json={"tk_amount": 500, "method": "onchain"})).json()
+    assert again["address"] == first["address"]
+    await session.refresh(row)
+    assert row.provider_reference.startswith("released:")

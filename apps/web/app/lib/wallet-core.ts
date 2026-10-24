@@ -458,6 +458,10 @@ export async function scanAddresses(
     gapScan(0, 0, -1, GAP_LIMIT),
     gapScan(1, 0, -1, CHANGE_GAP),
     gapScan(0, POOL_START, extra && extra.to >= POOL_START ? extra.to : POOL_START - 1, opts.poolGap ?? GAP_LIMIT),
+    // TK income: when this wallet is set as the Satish owner's payout wallet,
+    // the server hands out 0/5000+ to people buying TK. Cheap for everyone else
+    // (one batch of 5 empty addresses).
+    gapScan(0, TK_START, TK_START - 1, Math.min(opts.poolGap ?? 5, 20)),
   ]);
   return out.sort((a, b) => a.change - b.change || a.index - b.index);
 }
@@ -477,8 +481,11 @@ export async function quickScan(
   const byKey = new Map(known.map((a) => [`${a.change}/${a.index}`, a]));
   const want = new Map<string, { change: 0 | 1; index: number; fresh: boolean }>();
   for (const a of known) if (a.txCount > 0) want.set(`${a.change}/${a.index}`, { change: a.change, index: a.index, fresh: false });
-  const lastUsed = (change: 0 | 1, pool: boolean) =>
-    Math.max(pool ? POOL_START - 1 : -1, ...known.filter((a) => a.change === change && (a.index >= POOL_START) === pool && a.txCount > 0).map((a) => a.index));
+  const range = (i: number) => (i >= TK_START ? "tk" : i >= POOL_START ? "pool" : "main");
+  const lastUsedIn = (change: 0 | 1, r: "main" | "pool" | "tk") =>
+    Math.max(r === "tk" ? TK_START - 1 : r === "pool" ? POOL_START - 1 : -1,
+      ...known.filter((a) => a.change === change && range(a.index) === r && a.txCount > 0).map((a) => a.index));
+  const lastUsed = (change: 0 | 1, pool: boolean) => lastUsedIn(change, pool ? "pool" : "main");
   const ahead = (change: 0 | 1, from: number, n: number) => {
     for (let i = from; i < from + n; i++) if (!want.has(`${change}/${i}`)) want.set(`${change}/${i}`, { change, index: i, fresh: true });
   };
@@ -486,6 +493,7 @@ export async function quickScan(
   ahead(1, lastUsed(1, false) + 1, 1); // next change address
   const poolFrom = lastUsed(0, true) + 1;
   ahead(0, poolFrom, Math.max(2, poolTo - poolFrom + 1)); // @username addresses handed out so far
+  ahead(0, lastUsedIn(0, "tk") + 1, 2); // TK income addresses (owner's payout wallet only)
   const looked = await Promise.all(
     [...want.values()].map(async (w) => {
       const address = addressAt(xpub, net, w.change, w.index);
@@ -982,6 +990,7 @@ function randomId(): string {
  */
 
 export const IDENTITY_CHAIN = 7;
+export const TK_START = 5000; // TK purchase addresses (owner's payout wallet), see xp_core onchain.TK_START
 export const POOL_START = 1000; // username addresses live at 0/1000+, away from the Receive screen's 0/0..
 
 export function identityFromPhrase(phrase: string, net: NetworkInfo): { privHex: string; pubHex: string } {

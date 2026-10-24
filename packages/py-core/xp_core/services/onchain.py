@@ -58,6 +58,28 @@ def esplora_url(settings: Settings) -> str:
     return (settings.onchain_esplora_url or DEFAULT_ESPLORA[settings.onchain_network]).rstrip("/")
 
 
+# TK addresses live at receive index 5000+ of the owner's wallet, away from
+# the addresses the Satish app hands out itself (0/0.. and the @username
+# pool at 0/1000..), so the owner's own payments are never mistaken for a
+# purchase. The Satish app gap-scans this range too.
+TK_START = 5000
+# An unpaid request's address is reused once it has been expired this long
+# and the chain shows nothing ever arrived, which keeps the range compact so
+# the owner's wallet always finds payments.
+REUSE_AFTER = timedelta(hours=24)
+
+
+def xpub_from_mnemonic(mnemonic: str, network: str) -> str:
+    """BIP84 account xpub m/84'/coin'/0' - the same keys the Satish app uses."""
+    from embit import bip39
+
+    seed = bip39.mnemonic_to_seed(" ".join(mnemonic.lower().split()))
+    net = _net(network)
+    root = bip32.HDKey.from_seed(seed, version=net["xprv"])
+    coin = 0 if network == "mainnet" else 1
+    return root.derive(f"m/84h/{coin}h/0h").to_public().to_base58(version=net["xpub"])
+
+
 def derive_address(xpub: str, network: str, index: int) -> str:
     """Receive address m/.../0/index for a BIP84 account xpub (any version bytes)."""
     try:
@@ -112,25 +134,47 @@ async def check_address(
     return out
 
 
+async def _free_address(session: AsyncSession, settings: Settings, xpub: str) -> str:
+    """Lowest TK address with no live request on it; old unpaid ones are reused."""
+    rows = (
+        await session.execute(
+            select(PaymentIntent.provider_reference, PaymentIntent.status, PaymentIntent.expires_at, PaymentIntent.id)
+            .where(PaymentIntent.provider_reference.like(f"{REF_PREFIX}%"))
+        )
+    ).all()
+    by_addr = {r[0][len(REF_PREFIX):]: r for r in rows}
+    now = datetime.now(UTC)
+    for index in range(TK_START, TK_START + 100_000):
+        address = derive_address(xpub, settings.onchain_network, index)
+        row = by_addr.get(address)
+        if row is None:
+            return address
+        _ref, status_, expires, intent_id = row
+        exp = expires.replace(tzinfo=UTC) if expires is not None and expires.tzinfo is None else expires
+        if status_ == "expired" and exp is not None and now - exp > REUSE_AFTER:
+            try:
+                async with httpx.AsyncClient(timeout=10) as client:
+                    seen = await check_address(client, esplora_url(settings), address, 0)
+            except Exception:
+                continue
+            if seen.seen_sats == 0:
+                # Free it: the old request keeps its row but no longer owns the address.
+                await session.execute(
+                    update(PaymentIntent)
+                    .where(PaymentIntent.id == intent_id)
+                    .values(provider_reference=f"released:{intent_id}", status="expired")
+                )
+                return address
+    raise OnchainConfigError("no free TK address")  # pragma: no cover
+
+
 async def create_intent(
     session: AsyncSession, *, user: User, settings: Settings, amount_sats: int
 ) -> PaymentIntent:
-    if not settings.onchain_xpub:
-        raise OnchainConfigError("on-chain payments need XP_ONCHAIN_XPUB")
-    used = (
-        await session.execute(
-            select(func.count()).select_from(PaymentIntent).where(PaymentIntent.provider_reference.like(f"{REF_PREFIX}%"))
-        )
-    ).scalar_one()
-    index = int(used)
-    for _ in range(50):  # skip any index already taken (concurrent creates)
-        address = derive_address(settings.onchain_xpub, settings.onchain_network, index)
-        taken = (
-            await session.execute(select(PaymentIntent.id).where(PaymentIntent.provider_reference == REF_PREFIX + address))
-        ).scalar_one_or_none()
-        if taken is None:
-            break
-        index += 1
+    xpub = settings.tk_onchain_xpub
+    if not xpub:
+        raise OnchainConfigError("on-chain payments need XP_TK_WALLET_MNEMONIC or XP_ONCHAIN_XPUB")
+    address = await _free_address(session, settings, xpub)
     row = PaymentIntent(
         user_id=user.id,
         provider_reference=REF_PREFIX + address,
@@ -140,11 +184,11 @@ async def create_intent(
         direction="receive",
         bolt11=bip21(address, amount_sats),
         expires_at=datetime.now(UTC) + timedelta(minutes=settings.onchain_request_ttl_minutes),
-        idempotency_key=f"receive:{REF_PREFIX}{address}",
+        idempotency_key=f"receive:{REF_PREFIX}{address}:{datetime.now(UTC).timestamp():.6f}",
     )
     session.add(row)
     await session.flush()
-    log.info("onchain_request_created", intent_id=row.id, index=index, network=settings.onchain_network)
+    log.info("onchain_request_created", intent_id=row.id, network=settings.onchain_network)
     return row
 
 

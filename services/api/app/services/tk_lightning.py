@@ -69,7 +69,7 @@ class BreezPayeeWallet:
             self._sdk = await b.connect(
                 b.ConnectRequest(
                     config=config,
-                    seed=b.Seed.MNEMONIC(mnemonic=s.tk_lightning_mnemonic or "", passphrase=None),
+                    seed=b.Seed.MNEMONIC(mnemonic=" ".join((s.tk_ln_mnemonic or "").lower().split()), passphrase=None),
                     storage_dir=storage,
                 )
             )
@@ -119,7 +119,7 @@ _wallet: PayeeWallet | None = None
 def get_wallet(settings: Settings) -> PayeeWallet:
     global _wallet
     if _wallet is None:
-        if not settings.tk_lightning_mnemonic:
+        if not settings.tk_ln_mnemonic:
             raise TkLightningUnavailable("Lightning TK payments need XP_TK_LIGHTNING_MNEMONIC")
         _wallet = BreezPayeeWallet(settings)
     return _wallet
@@ -132,7 +132,7 @@ def set_wallet(wallet: PayeeWallet | None) -> None:
 
 
 def available(settings: Settings) -> bool:
-    return bool(settings.tk_lightning_mnemonic) or _wallet is not None
+    return bool(settings.tk_ln_mnemonic) or _wallet is not None
 
 
 def is_tk_lightning(row: PaymentIntent) -> bool:

@@ -128,7 +128,7 @@ def create_app() -> FastAPI:
             redis=bool(settings.redis_url),
             rate_limit_backend=settings.rate_limit_backend,
         )
-        if settings.tk_lightning_mnemonic:
+        if settings.tk_ln_mnemonic:
             import asyncio
 
             from app.services import tk_lightning

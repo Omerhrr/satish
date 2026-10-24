@@ -1007,3 +1007,15 @@ weekly on chosen days, monthly on a day, each in the user's own time zone
   QR, copy buttons, and "Pay with my Satish wallet" for both methods.
 - Trade-off: the Lightning phrase on the server can spend that wallet. Keep a
   small float and sweep income out regularly.
+
+## D39 - TK paid into the owner's own Satish wallet (2026-10-24)
+
+`XP_TK_WALLET_MNEMONIC` takes the 12 words of the owner's Satish wallet and
+sets up both methods: Bitcoin addresses come from the same BIP84 account
+(m/84'/coin'/0'), Lightning invoices from the same Spark wallet. TK addresses
+use receive index 5000+, apart from the app's own Receive addresses (0/0..)
+and the @username pool (0/1000..), so the owner's personal payments can never
+be mistaken for a purchase. Expired, never-paid addresses are reused after a
+day, keeping the range compact; the Satish app scans 0/5000+ (one batch of
+five for everyone else) so the owner sees the income. Same addresses on both
+sides verified against the BIP84 test vector.
