@@ -111,7 +111,7 @@
     <section v-if="result" class="card">
       <h2>Result</h2>
       <p class="small" style="margin: 6px 0">
-        <strong>Answer:</strong> {{ result.deliverable || "-" }}
+        <div class="answer">{{ result.answer || result.deliverable || "-" }}</div>
       </p>
 
       <h3 class="small" style="margin: 14px 0 4px">Your files (private)</h3>
@@ -362,6 +362,7 @@ onBeforeUnmount(() => poller && clearTimeout(poller));
 </script>
 
 <style scoped>
+.answer { white-space: pre-wrap; line-height: 1.6; font-size: 15px; margin: 4px 0 10px; }
 .offline { background: var(--orange-soft); color: var(--orange); border-radius: 12px; padding: 10px 14px; margin-bottom: 12px; font-size: 14px; }
 .ask-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .credit-chip { flex: none; font-size: 13px; font-weight: 700; color: var(--orange); background: var(--orange-soft); border-radius: 999px; padding: 4px 12px; }

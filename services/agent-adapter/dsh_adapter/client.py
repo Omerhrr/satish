@@ -134,13 +134,13 @@ class DeepSeekChatClient:
         return status in RETRYABLE_STATUS_CODES
 
     async def complete(
-        self, messages: list[dict[str, str]], tools: list[dict[str, Any]] | None = None
+        self, messages: list[dict[str, str]], tools: list[dict[str, Any]] | None = None, json_mode: bool = False
     ) -> dict[str, Any]:
         backoff_base = float(self.revision.limits.get("retry_backoff_base_seconds", 0.5))
         last_exc: Exception | None = None
         for attempt in range(self.max_retries + 1):
             try:
-                return await self._complete_once(messages, tools)
+                return await self._complete_once(messages, tools, json_mode)
             except Exception as exc:
                 if not self._is_retryable(exc) or attempt >= self.max_retries:
                     raise
@@ -156,7 +156,7 @@ class DeepSeekChatClient:
         raise last_exc  # pragma: no cover - loop always returns or raises
 
     async def _complete_once(
-        self, messages: list[dict[str, str]], tools: list[dict[str, Any]] | None = None
+        self, messages: list[dict[str, str]], tools: list[dict[str, Any]] | None = None, json_mode: bool = False
     ) -> dict[str, Any]:
         client = self._ensure()
         kwargs: dict[str, Any] = {
@@ -170,6 +170,8 @@ class DeepSeekChatClient:
         # goes through extra_body per the official OpenAI-SDK guidance.
         thinking_type = "enabled" if self.thinking_enabled else "disabled"
         kwargs["extra_body"] = {"thinking": {"type": thinking_type}}
+        if json_mode:
+            kwargs["response_format"] = {"type": "json_object"}
         if tools:
             kwargs["tools"] = tools
             kwargs["tool_choice"] = "auto"
@@ -219,8 +221,20 @@ class StubChatClient:
     revision_id: str = "stub"
 
     async def complete(
-        self, messages: list[dict[str, str]], tools: list[dict[str, Any]] | None = None
+        self, messages: list[dict[str, str]], tools: list[dict[str, Any]] | None = None, json_mode: bool = True
     ) -> dict[str, Any]:
+        usage = {"prompt_tokens": 0, "completion_tokens": 0, "cache_hit_tokens": 0, "estimated_cost_usd": 0.0}
+        if not json_mode:  # the "write the final answer" stage
+            req = ""
+            for m in reversed(messages):
+                if m.get("role") == "user":
+                    req = m.get("content", "").split("\n", 1)[0].replace("User request:", "").strip()
+                    break
+            return {
+                "content": f"This is a sample answer for \"{req[:100]}\". Satish AI is in demo mode on this server "
+                "(no AI key is set), so it can't research for real yet.",
+                "tool_calls": [], "finish_reason": "stop", "model": self.model, "revision_id": self.revision_id, "usage": usage,
+            }
         goal = ""
         for m in reversed(messages):
             if m.get("role") == "user":

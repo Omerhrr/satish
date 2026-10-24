@@ -268,6 +268,7 @@ class TaskResultOut(BaseModel):
     deliverable: str | None
     completed_at: datetime | None
     artifacts: list[ResultArtifactOut]
+    answer: str | None = None  # the full reply written for the user
     sources: list[ResultSourceOut]
     conflicts: list[dict[str, Any]]
     gaps: list[str]

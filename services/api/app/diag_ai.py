@@ -52,7 +52,7 @@ async def main() -> None:
                 line(False, "AI worker heartbeat: none (is the ai-worker service running?)")
             if beat:
                 line(None, f"AI worker says: {beat.decode() if isinstance(beat, bytes) else beat}")
-        except Exception as exc:  # noqa: BLE001 - this is a diagnostic
+        except Exception as exc:
             line(False, f"Redis error: {type(exc).__name__}: {exc}")
 
     print("\nOne real AI call (\"Reply with the word OK\")...", flush=True)
@@ -71,8 +71,34 @@ async def main() -> None:
             line(False, "that was the built-in demo AI, not DeepSeek: set XP_DEEPSEEK_API_KEY")
     except TimeoutError:
         line(False, "AI call took over 120s (DeepSeek too slow or unreachable from this server)")
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         line(False, f"AI call failed: {type(exc).__name__}: {str(exc)[:300]}")
+
+
+    await recent_tasks()
+
+
+async def recent_tasks() -> None:
+    """The last few tasks with their full technical error and steps."""
+    from sqlalchemy import select
+    from xp_core.db import get_session_factory
+    from xp_core.models.entities import Task, TaskEvent
+
+    print("\nLast 3 tasks:", flush=True)
+    async with get_session_factory()() as session:
+        tasks = (await session.execute(select(Task).order_by(Task.created_at.desc()).limit(3))).scalars().all()
+        if not tasks:
+            print("  (none)")
+        for t in tasks:
+            print(f"\n- {t.created_at:%H:%M:%S} {t.status!s:>10}  \"{t.objective[:60]}\"  spent {t.actual_xp}/{t.budget_xp} TK")
+            if t.error:
+                print(f"  error: {t.error[:1500]}")
+            events = (
+                await session.execute(select(TaskEvent).where(TaskEvent.task_id == t.id).order_by(TaskEvent.seq))
+            ).scalars().all()
+            for e in events[-12:]:
+                payload = str(e.payload or "")[:400]
+                print(f"  {e.seq:>3} {e.event_type:<28} {payload}")
 
 
 if __name__ == "__main__":

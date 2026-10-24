@@ -172,6 +172,7 @@ export interface ScoredOut {
 }
 
 export interface TaskResultOut {
+  answer?: string | null;
   task_id: string;
   status: TaskStatus;
   objective: string;

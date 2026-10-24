@@ -270,7 +270,7 @@ async def test_runner_records_model_usage_in_report(revision):
     )
     assert result.status == "completed"
     summary = result.report["model_usage"]
-    assert summary["model_calls"] == 1
+    assert summary["model_calls"] == 2  # plan, then the written answer
     assert summary["estimated_cost_usd"] == 0.0
     assert summary["prompt_tokens"] == 0
 

@@ -360,10 +360,21 @@ async def build_task_result(
         status=receipt_status,
     )
 
+    done_event = (
+        await session.execute(
+            select(TaskEvent)
+            .where(TaskEvent.task_id == task.id, TaskEvent.event_type == "task.completed")
+            .order_by(TaskEvent.seq.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    answer = ((done_event.payload or {}).get("answer") if done_event else None) or None
+
     return TaskResultOut(
         task_id=task.id,
         status=task.status,
         objective=task.objective,
+        answer=answer,
         deliverable=task.deliverable,
         completed_at=task.completed_at,
         artifacts=artifacts,

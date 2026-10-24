@@ -339,6 +339,7 @@ class DbPersistenceHooks(PersistenceHooks):
             "task.completed",
             {
                 "deliverable": report.get("deliverable"),
+                "answer": (report.get("answer") or "")[:20000],
                 "spent_xp": report.get("spent_xp"),
                 "sources": report.get("sources", []),
                 "model_usage": report.get("model_usage"),
@@ -452,7 +453,7 @@ async def run_agent_task(
                 task.actual_xp = actual
                 task.status = "completed"
                 task.completed_at = datetime.now(UTC)
-                task.deliverable = result.deliverable
+                task.deliverable = (result.deliverable or "")[:255] or None
                 session.add(
                     AuditEvent(
                         actor_type="system",

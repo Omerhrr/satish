@@ -941,3 +941,18 @@ worker's heartbeat (`GET /tasks/ai-status`); 2-character objectives allowed;
 SDK retries off (45 s timeout); failure messages say what went wrong (AI key
 refused, out of credit, couldn't reach the AI service). Verified with real
 Redis + both workers: "hello" goes queued -> running (0.5 s) -> done (2.6 s).
+
+## D35 - Satish AI with a real model (2026-10-24)
+
+The agent loop had only ever run against the built-in stub (KL-01). With
+DeepSeek it broke in three ways: tool names such as `web.search` were sent as
+function names (the API only allows letters, digits, `_` and `-`), the plan
+request offered functions while asking for JSON (real models answer with a
+function call or prose, which parsed into an empty plan), and nothing wrote
+an answer from the results. Now: tools are described in the prompt and the
+plan is requested with `response_format: json_object`; replies are parsed
+robustly (code fences, loose tool names like `web_search`, unknown tools
+dropped, plain prose treated as the answer); greetings and general-knowledge
+questions are answered directly in one call; research tasks run their tools
+and then a second call writes the answer from the (untrusted) results. The
+full answer is stored with the task and shown in the app.
