@@ -508,7 +508,9 @@ def build_product_registry(
         title: str, sections: list[str] | None = None
     ) -> dict[str, Any]:
         spec, _records = await _build_report_spec(session, task, settings, title)
-        spec.body = [str(x)[:6000] for x in (sections or []) if str(x).strip()][:20]
+        from dsh_adapter.runner import no_dashes
+
+        spec.body = [no_dashes(str(x))[:6000] for x in (sections or []) if str(x).strip()][:20]
         try:
             data = render_report_pdf(spec)
         except DocumentQualityError as exc:

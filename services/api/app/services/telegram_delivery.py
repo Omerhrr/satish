@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from xp_core.config import Settings
 from xp_core.logging import get_logger
 from xp_core.models.entities import Artifact, ResearchSource, Task, TaskEvent, TelegramAccount
+from dsh_adapter.runner import no_dashes
 from xp_core.services.storage import LocalStorage
 
 log = get_logger(__name__)
@@ -77,7 +78,7 @@ async def deliver_task(
     header = f"✅ Satish AI · {task.objective[:120]}"
     try:
         async with httpx.AsyncClient(timeout=60, transport=transport) as client:
-            for i, chunk in enumerate(split_message(_plain(answer or task.deliverable or "Done."))):
+            for i, chunk in enumerate(split_message(no_dashes(_plain(answer or task.deliverable or "Done.")))):
                 text = f"{header}\n\n{chunk}" if i == 0 else chunk
                 r = await client.post(f"{base}/sendMessage", json={"chat_id": chat_id, "text": text,
                                                                    "disable_web_page_preview": True})

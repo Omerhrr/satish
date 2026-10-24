@@ -55,6 +55,15 @@ class RunResult:
     report: dict[str, Any] = field(default_factory=dict)
 
 
+def no_dashes(text: str) -> str:
+    """House style: no em/en dashes in anything Satish AI writes."""
+    import re
+
+    text = re.sub(r"\s*\u2014\s*", ", ", text or "")
+    text = re.sub(r"(?<=\d)\u2013(?=\d)", "-", text)
+    return re.sub(r"\s*\u2013\s*", ", ", text)
+
+
 class PlanRunner:
     def __init__(
         self,
@@ -218,12 +227,12 @@ class PlanRunner:
         }
         answer = parsed.get("answer")
         if isinstance(answer, str) and answer.strip():
-            plan["answer"] = answer.strip()
+            plan["answer"] = no_dashes(answer.strip())
         if not plan["plan"] and "answer" not in plan:
             # Model ignored the format: treat its text as the answer rather than failing.
             text = (response.get("content") or "").strip()
             if text and not text.startswith("{"):
-                plan["answer"] = text
+                plan["answer"] = no_dashes(text)
         plan["model_usage"] = self._usage_summary()
         await self.persistence.on_plan(plan)
         return plan
@@ -305,7 +314,7 @@ class PlanRunner:
             },
         ]
         response = await self._ask(messages, json_mode=False)
-        return (response.get("content") or "").strip()
+        return no_dashes((response.get("content") or "").strip())
 
     async def execute_step(
         self,

@@ -101,3 +101,11 @@ async def test_iterative_research_replans_with_real_urls_and_skips_placeholders_
     assert len(ran) == 2 and ran[1][0] == "web.fetch_page"
     assert "Steps already done" in m.prompts[1]
     assert result.report["answer"] == "Answer."
+
+
+def test_no_dashes_house_style():
+    from dsh_adapter.client import SYSTEM_POLICY
+    from dsh_adapter.runner import no_dashes
+
+    assert no_dashes("Rice — about N80,000 — rose 5–10%") == "Rice, about N80,000, rose 5-10%"
+    assert "—" not in SYSTEM_POLICY and "em dash" in SYSTEM_POLICY
