@@ -10,6 +10,11 @@
       <NuxtLink to="/ai">What can it do?</NuxtLink>
     </p>
 
+    <div v-if="aiStatus && !aiStatus.online" class="offline" role="status">
+      Satish AI is offline right now. Tasks you start will wait for it, and if it doesn't start
+      within 3 minutes your TK is returned.
+    </div>
+
     <section class="card">
       <h2>New task</h2>
       <p class="sub">Nothing runs until you approve the budget.</p>
@@ -21,7 +26,7 @@
             rows="3"
             placeholder="e.g. Compare prices of a 50kg bag of rice in Kaduna markets and make me a PDF report"
             required
-            minlength="8"
+            minlength="2"
             maxlength="4000"
           />
         </label>
@@ -47,7 +52,10 @@
           <span class="small dim">{{ shortTime(t.created_at) }}</span>
         </div>
         <p class="task-obj">{{ t.objective }}</p>
-        <div v-if="t.status === 'running'" class="small working"><span class="spinner" /> Working on it…</div>
+        <div v-if="t.status === 'running' && t.queued" class="small working">
+          <span class="spinner" /> Waiting to start…<template v-if="aiStatus && !aiStatus.online"> Satish AI is offline right now.</template>
+        </div>
+        <div v-else-if="t.status === 'running'" class="small working"><span class="spinner" /> Working on it…</div>
         <div v-if="t.error" class="small task-err">{{ t.error }}</div>
         <div class="task-foot">
           <span class="small dim">{{ t.actual_xp.toLocaleString() }} of {{ t.budget_xp.toLocaleString() }} TK used</span>
@@ -208,9 +216,7 @@ const pendingApprovals = ref<ApprovalOut[]>([]);
 const result = ref<TaskResultOut | null>(null);
 
 function shortTime(iso: string) {
-  return new Date(iso).toLocaleString(undefined, {
-    month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
-  });
+  return niceDate(new Date(iso.endsWith("Z") || iso.includes("+") ? iso : iso + "Z").getTime() / 1000);
 }
 
 function compact(payload: Record<string, unknown>): string {
@@ -219,8 +225,18 @@ function compact(payload: Record<string, unknown>): string {
 
 let poller: ReturnType<typeof setTimeout> | null = null;
 
+const aiStatus = ref<{ online: boolean; queued: number; running: number } | null>(null);
+async function loadAiStatus() {
+  try {
+    aiStatus.value = await api.aiStatus();
+  } catch {
+    /* unknown: show nothing */
+  }
+}
+
 async function refresh() {
   void loadCredits();
+  void loadAiStatus();
   loading.value = true;
   try {
     tasks.value = await api.listTasks();
@@ -239,6 +255,7 @@ function schedulePoll() {
     try {
       const before = new Map(tasks.value.map((t) => [t.id, t.status]));
       tasks.value = await api.listTasks();
+      void loadAiStatus();
       if (eventTask.value) await loadEvents(eventTask.value);
       const finished = tasks.value.find((t) => before.get(t.id) === "running" && t.status === "completed");
       if (finished) await showResult(finished.id);
@@ -345,6 +362,7 @@ onBeforeUnmount(() => poller && clearTimeout(poller));
 </script>
 
 <style scoped>
+.offline { background: var(--orange-soft); color: var(--orange); border-radius: 12px; padding: 10px 14px; margin-bottom: 12px; font-size: 14px; }
 .ask-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .credit-chip { flex: none; font-size: 13px; font-weight: 700; color: var(--orange); background: var(--orange-soft); border-radius: 999px; padding: 4px 12px; }
 .task { padding: 12px 0; border-bottom: 1px solid var(--border); }

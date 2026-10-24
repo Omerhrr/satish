@@ -97,19 +97,21 @@ def _build_cron_jobs() -> tuple:
         ),
         cron(
             run_scheduled_jobs_job,
+            timeout=55,
             minute=set(range(0, 60, sweep_minutes)) if sweep_minutes < 60 else None,
             run_at_startup=True,
         ),
         cron(
             relay_notifications_job,
+            timeout=55,
             minute=set(range(0, 60, relay_minutes)) if relay_minutes < 60 else None,
             run_at_startup=True,
         ),
         # On-chain XP payments: check open payment requests every minute.
-        cron(onchain_payment_sweep, minute=set(range(60)), run_at_startup=True),
-        cron(payment_request_sweep, minute=set(range(60)), run_at_startup=True),
-        cron(stale_task_watchdog, minute=set(range(60)), run_at_startup=True),
-        cron(wallet_alert_sweep, minute=set(range(60)), run_at_startup=True),
+        cron(onchain_payment_sweep, minute=set(range(60)), run_at_startup=True, timeout=55),
+        cron(payment_request_sweep, minute=set(range(60)), run_at_startup=True, timeout=55),
+        cron(stale_task_watchdog, minute=set(range(60)), run_at_startup=True, timeout=55),
+        cron(wallet_alert_sweep, minute=set(range(60)), run_at_startup=True, timeout=55),
         # Retention sweep (phase 10): privacy windows, daily at 03:17 UTC.
         cron(run_retention_sweep_job, minute=17, hour=3, run_at_startup=False),
     )
@@ -142,3 +144,28 @@ class WorkerSettings:
     job_timeout = get_settings().agent_task_timeout_seconds  # bounded execution
     keep_result = 3600
     health_check_interval = 30
+
+
+AI_QUEUE = "satish:ai"
+
+
+def _build_ai_cron_jobs() -> tuple:
+    from arq.cron import cron
+
+    return (cron(stale_task_watchdog, minute=set(range(60)), run_at_startup=True, timeout=55),)
+
+
+class AIWorkerSettings:
+    """Dedicated worker for Satish AI tasks (its own queue and slots), so a
+    task never waits behind the minute-by-minute payment/alert sweeps."""
+
+    functions = (run_agent_task_job, generate_pdf_report)
+    queue_name = AI_QUEUE
+    redis_settings = _redis_settings()
+    cron_jobs = _build_ai_cron_jobs()
+    on_startup = startup
+    on_shutdown = shutdown
+    max_jobs = 4
+    job_timeout = get_settings().agent_task_timeout_seconds
+    keep_result = 3600
+    health_check_interval = 20

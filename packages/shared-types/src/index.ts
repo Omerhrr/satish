@@ -96,6 +96,7 @@ export interface TaskOut {
   objective: string;
   status: TaskStatus;
   error?: string | null;
+  queued?: boolean; // handed to Satish AI but not started yet
   budget_xp: number;
   reserved_xp: number;
   actual_xp: number;

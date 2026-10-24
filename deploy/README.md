@@ -59,3 +59,11 @@ docker compose down                        # stop (data volume is kept)
   default and refused outright when `XP_ENV=staging|prod`.
 - `XP_DEMO_LIGHTNING_SETTLE=true` lets the demo "settle" button credit XP with
   the canned (fake) Lightning provider. Turn it off before taking real payments.
+
+
+### Services
+
+`api`, `worker` (payments, alerts, automations), `ai-worker` (Satish AI tasks,
+its own queue), `bot`, `web`, `redis`. After `docker compose up -d --build`,
+`docker compose ps` should list all six as running. If Satish AI tasks say
+"Waiting to start", check `docker compose logs ai-worker --tail 50`.

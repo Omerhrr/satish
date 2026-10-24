@@ -161,7 +161,7 @@ class ReconcileOut(BaseModel):
 
 
 class TaskCreateIn(BaseModel):
-    objective: str = Field(min_length=8, max_length=4000)
+    objective: str = Field(min_length=2, max_length=4000)
     budget_xp: int = Field(gt=0, le=100_000)
     idempotency_key: str | None = Field(default=None, max_length=191)
 
@@ -179,6 +179,7 @@ class TaskOut(BaseModel):
     completed_at: datetime | None
     cancelled_at: datetime | None
     error: str | None = None  # plain-language reason when status == failed
+    queued: bool = False  # handed to the AI worker but not started yet
 
 
 # task events / approvals

@@ -914,3 +914,30 @@ Audit of every screen at phone size, then fixes:
 - **Detail:** day-first dates without seconds ("22 Oct, 09:00"); sentence-
   case table headers; emoji removed from headings; visible keyboard focus;
   reduced-motion respected; clear offline message.
+
+## D34 - Satish AI tasks that never finished (2026-10-24)
+
+**Symptom:** every task, even "hello", stayed on "Working on it…" forever.
+
+**Causes found:**
+1. Pressing Run marks a task `running`, but `started_at` was only set when a
+   worker actually began it. The safety watchdog only looked at `started_at`,
+   so a task no worker ever picked up was invisible to it: stuck forever,
+   TK held.
+2. AI tasks shared the one arq worker (4 slots) with seven every-minute
+   sweeps (payments, requests, alerts, relay, automations, watchdog). A slow
+   sweep (e.g. alerts when mempool.space is slow) holds slots while new
+   minute runs keep queueing, so AI tasks can wait behind them indefinitely.
+3. "hello" couldn't even be created: objectives needed 8+ characters, and
+   the browser's own warning isn't shown inside Telegram.
+4. The AI client stacked the OpenAI SDK's own retries on top of ours.
+
+**Fixes:** a dedicated `ai-worker` service on its own queue (`satish:ai`);
+every-minute sweeps get a 55 s time limit; `tasks.queued_at` is recorded on
+Run and the watchdog also stops tasks not started within 3 minutes (and old
+stuck ones), returning their TK with a plain message; the app shows
+"Waiting to start…" vs "Working on it…" and an "offline" banner from the AI
+worker's heartbeat (`GET /tasks/ai-status`); 2-character objectives allowed;
+SDK retries off (45 s timeout); failure messages say what went wrong (AI key
+refused, out of credit, couldn't reach the AI service). Verified with real
+Redis + both workers: "hello" goes queued -> running (0.5 s) -> done (2.6 s).

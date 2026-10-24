@@ -196,6 +196,7 @@ class Task(Base):
     deliverable: Mapped[str | None] = mapped_column(String(255), nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    queued_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)  # handed to the AI worker
     started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

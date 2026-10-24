@@ -51,6 +51,16 @@ services:
       api:
         condition: service_healthy
 
+  # Satish AI tasks run here, on their own queue, so they never wait behind
+  # the background sweeps in "worker".
+  ai-worker:
+    <<: *python
+    working_dir: /app/services/worker
+    command: ["arq", "worker.settings.AIWorkerSettings"]
+    depends_on:
+      api:
+        condition: service_healthy
+
   bot:
     <<: *python
     working_dir: /app/apps/bot

@@ -120,6 +120,7 @@ export interface XpClient {
   handleLightningPublish: (body: { network: string; identity_pubkey: string; ln_network: string; spark_address: string; signature: string }) => Promise<HandleLightningOut>;
   handleLightning: (username: string, network: string) => Promise<HandleLightningOut>;
   alertsStatus: (network: string) => Promise<WalletAlertsOut>;
+  aiStatus: () => Promise<{ online: boolean; queued: number; running: number; mode: string }>;
   alertsSet: (body: { network: string; enabled: boolean; addresses?: string[] }) => Promise<WalletAlertsOut>;
   alertsWatch: (body: { network: string; addresses: string[] }) => Promise<WalletAlertsOut>;
 }
@@ -383,6 +384,7 @@ export function createXpClient(config: XpClientConfig = {}): XpClient {
     handleLightningPublish: (body) => request("/api/v1/handles/lightning", { method: "POST", body: JSON.stringify(body) }),
     handleLightning: (username, network) =>
       request(`/api/v1/handles/${encodeURIComponent(username)}/lightning?network=${network}`),
+    aiStatus: () => request("/api/v1/tasks/ai-status"),
     alertsStatus: (network) => request(`/api/v1/wallet/alerts?network=${network}`),
     alertsSet: (body) => request("/api/v1/wallet/alerts", { method: "PUT", body: JSON.stringify(body) }),
     alertsWatch: (body) => request("/api/v1/wallet/alerts/addresses", { method: "POST", body: JSON.stringify(body) }),

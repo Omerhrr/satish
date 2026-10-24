@@ -49,6 +49,7 @@ def _task_out(t: Task) -> TaskOut:
         completed_at=t.completed_at,
         cancelled_at=t.cancelled_at,
         error=_friendly_error(t),
+        queued=t.status == "running" and t.started_at is None,
     )
 
 
@@ -56,9 +57,54 @@ def _friendly_error(t: Task) -> str | None:
     """People see a plain reason; the technical one stays in the logs/events."""
     if t.status != "failed" or not t.error:
         return None
-    if t.error.startswith("This task"):
+    if t.error.startswith(("This task", "Satish AI")):
         return t.error
+    e = t.error.lower()
+    if any(k in e for k in ("authentication", "401", "invalid api key", "incorrect api key")):
+        return "Satish AI isn't set up correctly right now (its AI key was refused). Your TK was returned."
+    if any(k in e for k in ("insufficient balance", "402", "quota")):
+        return "Satish AI's AI service is out of credit right now. Your TK was returned; please try again later."
+    if any(k in e for k in ("timeout", "timed out", "connection", "connect", "503", "502", "overloaded", "429")):
+        return "Satish AI couldn't reach its AI service in time. Your TK was returned; please try again."
     return "Something went wrong while working on this task. Any unused TK was returned; please try again."
+
+
+@router.get("/ai-status")
+async def ai_status(user: CurrentUser) -> dict:
+    """Is the Satish AI worker running, and how busy is it? (from its heartbeat)."""
+    return await read_ai_status()
+
+
+async def read_ai_status() -> dict:
+    from xp_core.config import get_settings
+
+    from app.worker_bridge import AI_QUEUE
+
+    settings = get_settings()
+    if not settings.redis_url:
+        return {"online": True, "queued": 0, "running": 0, "mode": "inline"}
+    try:
+        import redis.asyncio as aioredis
+
+        r = aioredis.from_url(settings.redis_url)
+        try:
+            beat = await r.get(f"{AI_QUEUE}:health-check")
+        finally:
+            await r.aclose()
+    except Exception:
+        return {"online": False, "queued": 0, "running": 0, "mode": "unreachable"}
+    if not beat:
+        return {"online": False, "queued": 0, "running": 0, "mode": "worker"}
+    text = beat.decode() if isinstance(beat, bytes) else str(beat)
+    nums = dict(part.split("=", 1) for part in text.split() if "=" in part)
+
+    def num(k: str) -> int:
+        try:
+            return int(nums.get(k, 0))
+        except ValueError:
+            return 0
+
+    return {"online": True, "queued": num("queued"), "running": num("j_ongoing"), "mode": "worker"}
 
 
 @router.post("/estimate", response_model=TaskEstimateOut)
@@ -238,6 +284,7 @@ async def run_task(task_id: str, user: CurrentUser, session: DbSession) -> TaskO
         )
     resume = task.status == "awaiting_approval"
     task.status = "running"
+    task.queued_at = datetime.now(UTC).replace(tzinfo=None)
     await session.commit()
 
     from app.worker_bridge import enqueue_agent_task_job

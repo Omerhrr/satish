@@ -14,6 +14,8 @@ from xp_core.logging import get_logger
 
 log = get_logger(__name__)
 
+AI_QUEUE = "satish:ai"
+
 
 async def enqueue_pdf_job(
     *, artifact_id: str, title: str, sections: list[str], metadata: dict, user_id: str
@@ -91,8 +93,9 @@ async def enqueue_agent_task_job(*, task_id: str, resume: bool = False) -> str:
             from arq.connections import RedisSettings
 
             pool = await create_pool(RedisSettings.from_dsn(settings.redis_url))
+            # Own queue + own worker: AI tasks never wait behind the minute-by-minute sweeps.
             job = await pool.enqueue_job(
-                "run_agent_task_job", task_id=task_id, resume=resume
+                "run_agent_task_job", task_id=task_id, resume=resume, _queue_name=AI_QUEUE
             )
             await pool.close()
             assert job is not None

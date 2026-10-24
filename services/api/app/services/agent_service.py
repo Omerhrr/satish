@@ -32,7 +32,7 @@ from app.services.task_events import append_event, load_events
 from dsh_adapter.client import make_chat_client
 from dsh_adapter.evaluation import evaluate_run
 from dsh_adapter.runner import PersistenceHooks, PlanRunner
-from sqlalchemy import select, update
+from sqlalchemy import and_, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from xp_core.config import Settings, get_settings
 from xp_core.logging import get_logger
@@ -516,6 +516,8 @@ async def run_agent_task(
 
 
 STALE_GRACE_SECONDS = 120
+NOT_STARTED_SECONDS = 180
+NOT_STARTED_MESSAGE = "Satish AI couldn't start your task in time. Your TK was returned; please try again."
 STALE_MESSAGE = "This task took too long and was stopped. Your TK was returned; please try again."
 
 
@@ -524,15 +526,27 @@ async def fail_stale_tasks(session_factory, settings: Settings, *, now: datetime
     to mark itself failed. Stop such tasks and return their held TK."""
     now = now or datetime.now(UTC)
     cutoff = (now - timedelta(seconds=settings.agent_task_timeout_seconds + STALE_GRACE_SECONDS)).replace(tzinfo=None)
+    never_started_cutoff = (now - timedelta(seconds=NOT_STARTED_SECONDS)).replace(tzinfo=None)
+    legacy_cutoff = (now - timedelta(seconds=settings.agent_task_timeout_seconds + STALE_GRACE_SECONDS)).replace(tzinfo=None)
     stopped = 0
     async with session_factory() as session:
         stale = (
-            await session.execute(select(Task).where(Task.status == "running", Task.started_at < cutoff))
+            await session.execute(
+                select(Task).where(
+                    Task.status == "running",
+                    or_(
+                        Task.started_at < cutoff,  # started, then killed mid-way
+                        and_(Task.started_at.is_(None), Task.queued_at < never_started_cutoff),  # never picked up
+                        and_(Task.started_at.is_(None), Task.queued_at.is_(None), Task.created_at < legacy_cutoff),
+                    ),
+                )
+            )
         ).scalars().all()
         for task in stale:
+            reason = STALE_MESSAGE if task.started_at is not None else NOT_STARTED_MESSAGE
             moved = await session.execute(
                 update(Task).where(Task.id == task.id, Task.status == "running").values(
-                    status="failed", error=STALE_MESSAGE, completed_at=now
+                    status="failed", error=reason, completed_at=now
                 )
             )
             if not moved.rowcount:
@@ -541,7 +555,7 @@ async def fail_stale_tasks(session_factory, settings: Settings, *, now: datetime
             if task.reserved_xp > 0:
                 await ledger.release_reservation(session, user_id=task.user_id, task_id=task.id, amount=task.reserved_xp)
                 task.reserved_xp = 0
-            await append_event(session, task.id, "task.failed", {"error": STALE_MESSAGE, "reason": "timeout"})
+            await append_event(session, task.id, "task.failed", {"error": reason, "reason": "timeout" if task.started_at else "not_started"})
             await session.commit()
             stopped += 1
             log.warning("agent_task_stale_stopped", task_id=task.id)

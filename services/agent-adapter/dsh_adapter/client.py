@@ -117,8 +117,10 @@ class DeepSeekChatClient:
         if self._client is None:
             from openai import AsyncOpenAI
 
+            # Our own retry loop (complete()) is the only one: the SDK's built-in
+            # retries would multiply it (3 x 3 attempts x 60 s per call).
             self._client = AsyncOpenAI(
-                api_key=self.api_key, base_url=self.base_url, timeout=60.0
+                api_key=self.api_key, base_url=self.base_url, timeout=45.0, max_retries=0
             )
         return self._client
 
@@ -224,6 +226,13 @@ class StubChatClient:
             if m.get("role") == "user":
                 goal = m.get("content", "")
                 break
+        # The planner prompt is "Goal: ...\nConstraints: ...\nReturn JSON...": keep only the goal,
+        # so the user never sees our instructions echoed back.
+        for line in goal.splitlines():
+            if line.startswith("Goal:"):
+                goal = line[5:].strip()
+                break
+        goal = goal.splitlines()[0].strip() if goal else ""
         return {
             "content": json.dumps(
                 {
@@ -245,7 +254,7 @@ class StubChatClient:
                         },
                     ],
                     "estimated_xp": 10,
-                    "deliverable": f"Research report: {goal[:120]}",
+                    "deliverable": f"Sample report for \"{goal[:100]}\" (Satish AI is in demo mode: no AI key is set on this server)",
                     "mode": "stub",
                 }
             ),

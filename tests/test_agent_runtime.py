@@ -717,3 +717,68 @@ async def test_stale_running_task_is_stopped_and_refunded(session, dev_user):
     assert fresh.status == "running"
     assert acct.balance == 1000  # held XP returned
     assert (await fail_stale_tasks(get_session_factory(), get_settings())) == {"stopped": 0}
+
+
+async def test_task_the_worker_never_started_is_stopped_and_refunded(session, dev_user):
+    """The bug behind 'Working on it...' forever: a task handed to the worker
+    but never picked up has no started_at, so the old watchdog never saw it."""
+    from datetime import UTC, datetime, timedelta
+
+    from app.api.v1.tasks import _task_out
+    from app.services.agent_service import NOT_STARTED_MESSAGE, fail_stale_tasks
+    from sqlalchemy import select
+    from xp_core.config import get_settings
+    from xp_core.db import get_session_factory
+    from xp_core.models.entities import Task, XpAccount
+    from xp_core.services import ledger
+
+    acct = (await session.execute(select(XpAccount).where(XpAccount.user_id == dev_user.id))).scalar_one_or_none()
+    if acct is None:
+        acct = XpAccount(user_id=dev_user.id, balance=500)
+        session.add(acct)
+    else:
+        acct.balance = 500
+    await session.flush()
+    now = datetime.now(UTC)
+    lost = Task(user_id=dev_user.id, objective="hello", budget_xp=200, status="planned")
+    session.add(lost)
+    await session.flush()
+    await ledger.reserve_budget(session, user_id=dev_user.id, task_id=lost.id, amount=200)
+    lost.reserved_xp = 200
+    lost.status = "running"
+    lost.queued_at = (now - timedelta(minutes=5)).replace(tzinfo=None)
+    just_queued = Task(user_id=dev_user.id, objective="just now", budget_xp=1, status="running", queued_at=now.replace(tzinfo=None))
+    legacy = Task(user_id=dev_user.id, objective="old stuck one", budget_xp=1, status="running",
+                  created_at=(now - timedelta(hours=2)).replace(tzinfo=None))
+    session.add_all([just_queued, legacy])
+    await session.commit()
+
+    assert _task_out(just_queued).queued is True  # the app shows "Waiting to start"
+    out = await fail_stale_tasks(get_session_factory(), get_settings())
+    assert out == {"stopped": 2}
+    for t in (lost, just_queued, legacy, acct):
+        await session.refresh(t)
+    assert lost.status == "failed" and lost.error == NOT_STARTED_MESSAGE and lost.reserved_xp == 0
+    assert legacy.status == "failed"
+    assert just_queued.status == "running"
+    assert acct.balance == 500  # TK returned
+    assert _task_out(lost).error == NOT_STARTED_MESSAGE
+
+
+def test_failure_reasons_are_specific_and_plain():
+    from app.api.v1.tasks import _friendly_error
+    from xp_core.models.entities import Task
+
+    def msg(err: str) -> str:
+        return _friendly_error(Task(objective="x", budget_xp=1, status="failed", error=err)) or ""
+
+    assert "AI key was refused" in msg("AuthenticationError: Error code: 401 - invalid api key")
+    assert "out of credit" in msg("Error code: 402 - Insufficient Balance")
+    assert "couldn't reach" in msg("APITimeoutError: Request timed out.")
+    assert "Something went wrong" in msg("ValueError: boom")
+
+
+async def test_ai_status_inline_mode_is_online():
+    from app.api.v1.tasks import read_ai_status
+
+    assert (await read_ai_status())["online"] is True
