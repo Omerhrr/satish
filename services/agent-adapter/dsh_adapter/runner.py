@@ -72,8 +72,15 @@ class PlanRunner:
         persistence: PersistenceHooks | None = None,
         max_steps: int = 12,
         should_cancel: Callable[[], Awaitable[bool]] | None = None,
+        language: str | None = None,
+        context: str | None = None,
     ) -> None:
         self.client = client
+        # Answer in the user's language (e.g. "Hausa"); tools still search in
+        # whatever language finds the best sources.
+        self.language = (language or "").strip()[:40] or None
+        # Extra background for this user (memory, earlier messages in a chat).
+        self.context = (context or "").strip()[:6000] or None
         self.registry = registry
         self.persistence = persistence or NullPersistence()
         self.max_steps = max_steps
@@ -199,7 +206,7 @@ class PlanRunner:
     async def draft_plan(self, goal: str, constraints: dict[str, Any] | None = None) -> dict[str, Any]:
         """Stage 1-3: goal + constraints -> direct answer, or a tool plan."""
         messages = [
-            {"role": "system", "content": SYSTEM_POLICY},
+            {"role": "system", "content": self._system()},
             {
                 "role": "user",
                 "content": (
@@ -238,6 +245,17 @@ class PlanRunner:
         return plan
 
 
+    def _system(self) -> str:
+        out = SYSTEM_POLICY
+        if self.language and self.language.lower() != "english":
+            out += (
+                f"\n- Write every reply to the user in {self.language}. Keep numbers, prices, "
+                "names and source titles as they are. Search the web in whatever language finds the best sources."
+            )
+        if self.context:
+            out += "\n\nAbout this user and the conversation so far (from Satish, not from the web):\n" + self.context
+        return out
+
     REPLAN_AFTER = {"web.search", "web.fetch_page"}
     max_replans = 6
     _PLACEHOLDER = __import__("re").compile(r"<[^>]{2,}>|FILL_|from step|TBD|placeholder|example\.(com|test)", __import__("re").I)
@@ -267,7 +285,7 @@ class PlanRunner:
             default=str,
         )[-14000:]
         messages = [
-            {"role": "system", "content": SYSTEM_POLICY},
+            {"role": "system", "content": self._system()},
             {
                 "role": "user",
                 "content": (
@@ -297,7 +315,7 @@ class PlanRunner:
             default=str,
         )[:16000]
         messages = [
-            {"role": "system", "content": SYSTEM_POLICY},
+            {"role": "system", "content": self._system()},
             {
                 "role": "user",
                 "content": (

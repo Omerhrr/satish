@@ -10,7 +10,7 @@ venv/
 .ruff_cache/
 build/
 dist/
-docs/
+
 # Databases & local data
 data/
 !tests/data/
@@ -39,3 +39,7 @@ dist/
 # Wallet tooling (50MB+ bitcoind binary + regtest state; fetch via make or docs)
 .tools/
 !deploy/.env.example
+dump.rdb
+apps/extension/dist/
+apps/extension/satish-extension.zip
+apps/web/dist

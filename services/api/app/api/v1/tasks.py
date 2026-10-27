@@ -142,6 +142,7 @@ async def create_task(
         objective=payload.objective,
         status="planned",
         budget_xp=budget,
+        language=payload.language,
     )
     session.add(task)
     await session.flush()

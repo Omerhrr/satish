@@ -8,6 +8,7 @@
   "scripts": {
     "dev:web": "bun --cwd apps/web dev",
     "build:web": "bun --cwd apps/web build",
-    "typecheck": "bun --cwd apps/web typecheck"
+    "typecheck": "bun --cwd apps/web typecheck",
+    "build:extension": "node apps/extension/build.mjs"
   }
 }

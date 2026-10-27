@@ -1,7 +1,7 @@
 <template>
   <div>
     <header>
-      <h1 class="page-title">Credits</h1>
+      <h1 class="page-title">{{ t("cr.title") }}</h1>
       <p class="page-sub">
         TK pays for Satish AI. It's taken automatically as you use it. You buy it with
         bitcoin or Lightning; it can't be sent to anyone or turned back into sats.
@@ -10,7 +10,7 @@
 
     <section class="card">
       <div class="head-row">
-        <h2>Your credits</h2>
+        <h2>{{ t("cr.yours") }}</h2>
         <NuxtLink class="small" to="/tk">TK history</NuxtLink>
       </div>
       <div class="balance-big">{{ balance ? balance.balance_xp.toLocaleString() + " TK" : "…" }}</div>
@@ -18,9 +18,9 @@
     </section>
 
     <section class="card">
-      <h2>Buy TK</h2>
+      <h2>{{ t("cr.buy") }}</h2>
       <label class="field">
-        How much TK?
+        {{ t("cr.howMuch") }}
         <input v-model.number="tkWanted" type="number" inputmode="numeric" :min="minTk" step="100" />
       </label>
       <div class="quick">
@@ -41,7 +41,7 @@
       </div>
       <p class="dim small">{{ method === "lightning" ? "Instant, tiny fees." : "On-chain: takes a few minutes, network fee applies." }}</p>
       <button class="btn primary" :disabled="!tkValid || buying || !methods.length" @click="buy">
-        <span v-if="buying" class="spinner" /> Continue to payment
+        <span v-if="buying" class="spinner" /> {{ t("cr.continue") }}
       </button>
       <p v-if="!methods.length && rate" class="small err">Payments aren't set up yet.</p>
       <p v-if="error" class="notice small">{{ error }}</p>
@@ -169,6 +169,7 @@ import { renderSVG } from "uqr";
 import type { FeeRates, SendPlan } from "~/lib/wallet-core";
 
 const api = useXpApi();
+const { t } = useI18n();
 const w = useWallet();
 const ln = useLightning();
 const { naira } = usePrice();

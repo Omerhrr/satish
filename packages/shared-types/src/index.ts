@@ -193,6 +193,7 @@ export interface TaskResultOut {
 export interface TaskCreateIn {
   objective: string;
   budget_xp?: number | null; // omit: Satish AI charges only what it uses
+  language?: string | null; // answer in this language, e.g. "Hausa"
   idempotency_key?: string | null;
 }
 

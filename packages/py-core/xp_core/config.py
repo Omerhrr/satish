@@ -63,6 +63,7 @@ class Settings(BaseSettings):
     telegram_bot_token: str | None = None
     telegram_init_data_max_age_seconds: int = 86400
     mini_app_url: str = "https://t.me/XPDevBot/app"
+    telegram_bot_username: str | None = None  # without @, shown on the extension sign-in screen
     # Notification relay (phase 9, KL-06): "canned" records a deterministic
     # local receipt and states that nothing was transmitted; "bot_api" sends
     # for real and refuses to construct without a bot token.
@@ -75,6 +76,8 @@ class Settings(BaseSettings):
     # sessions and authorization checks"). The Mini App re-exchanges fresh
     # initData on every launch, so a short TTL costs nothing in UX.
     session_ttl_hours: int = 24
+    extension_session_ttl_hours: int = 24 * 30  # browser extension stays signed in
+    cors_allow_extensions: bool = True  # chrome-extension:// / moz-extension:// origins
 
     # pricing
     # ONE canonical conversion: XP credited per satoshi paid. Every surface

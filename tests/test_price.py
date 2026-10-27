@@ -49,3 +49,21 @@ async def test_endpoint_503_without_any_price(monkeypatch, session, dev_user):
         price._cache.update(btc_ngn=1.5e8, btc_usd=1e5, at=__import__("time").time())
         r = await c.get("/api/v1/price/btc")
         assert r.status_code == 200 and r.json()["btc_ngn"] == 1.5e8
+
+
+async def test_rates_cover_every_currency():
+    import httpx
+
+    from app.api.v1 import price
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if "coingecko" in request.url.host:
+            return httpx.Response(200, json={"bitcoin": {"usd": 100_000, "ngn": 160_000_000}})
+        return httpx.Response(200, json={"rates": {"USD": 1, "GHS": 15.5, "KES": 129, "NGN": 1500}})
+
+    price._rates.clear()
+    r = await price.current_rates(transport=httpx.MockTransport(handler))
+    btc = r["btc"]
+    assert btc["NGN"] == 160_000_000  # market rate from CoinGecko, not the official one
+    assert btc["GHS"] == 100_000 * 15.5 and btc["KES"] == 100_000 * 129
+    price._rates.clear()

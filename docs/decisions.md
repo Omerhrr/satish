@@ -1019,3 +1019,43 @@ be mistaken for a purchase. Expired, never-paid addresses are reused after a
 day, keeping the range compact; the Satish app scans 0/5000+ (one batch of
 five for everyone else) so the owner sees the income. Same addresses on both
 sides verified against the BIP84 test vector.
+
+## D40 - Two modes: Telegram Mini App and browser extension (2026-10-27)
+
+One Nuxt app, two builds. `SATISH_TARGET=extension` (apps/extension/build.mjs)
+makes a Manifest V3 side-panel extension: hash routing, no Telegram SDK, no
+inline scripts or import map (moved to files for the extension CSP),
+`wasm-unsafe-eval` for the Lightning module. `usePlatform()` holds the
+differences. Sign-in links the extension to the user's Telegram account: the
+extension shows a code, the user sends `/link CODE` to the bot, the bot
+confirms with a key derived from the bot token, and the extension (polling
+with a secret only it holds) receives a 30-day session once. Same account,
+TK and tasks; the wallet stays per device. Extension-only extras use context
+menus, not content scripts: "Ask Satish AI about this page/selection" and
+"Pay with Satish" for lightning:/bitcoin: links and selected invoices.
+Verified by loading the built extension in Chromium.
+
+## D41 - Money in your language and currency, chat AI, social features (2026-10-27)
+
+- Amounts: `GET /price/rates` gives BTC in every currency (CoinGecko market
+  rates first, open.er-api.com cross rates for the rest). `AmountInput` lets
+  people type sats or any currency in send, receive and request; what is sent
+  is always the sats shown at that moment.
+- Languages: 12 (en, pcm, ha, yo, ig, fr, ar RTL, sw, pt, es, am, zu) via a
+  small built-in translator; main screens translated, the rest falls back to
+  English. Satish AI answers in the user's language (task.language, Telegram
+  language_code in chat). Nigerian-language strings need native review.
+- Satish AI chat in Telegram: private messages become tasks in a thread
+  (`tg-<id>`); the last turns (24 h) give follow-up context; memories
+  (auto-extracted or "remember ...") are visible and deletable; /new, /forget.
+  PDFs and text files sent to the bot are read in memory and answered.
+  New tools: `data.rates` (live rates) and `math.calculate` (exact maths).
+- Price alerts (fire once via the relay) and savings goals (progress computed
+  on the phone; the server never sees balances).
+- Group pay: `/pay ₦2000 @musa` and `/split ₦10000 @a @b dinner` post cards
+  with a Mini App link (start param `gp_<id>`); payers pay from their own
+  wallet and the card ticks them off.
+- Social recovery: the phrase's entropy split 2-of-3 with Shamir over
+  GF(256), with a checksum so wrong pieces are caught. Shares are sent to
+  trusted people via Telegram's share sheet; restore accepts any 2.
+- Daily spending limit (per device): over it, Send waits 30 seconds.

@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "Satish: bitcoin wallet + AI",
+  "short_name": "Satish",
+  "version": "0.1.0",
+  "description": "Your self-custodial bitcoin and Lightning wallet, and Satish AI research, in your browser. Same account as Satish on Telegram.",
+  "icons": { "16": "icons/16.png", "32": "icons/32.png", "48": "icons/48.png", "128": "icons/128.png" },
+  "action": { "default_title": "Open Satish", "default_icon": { "16": "icons/16.png", "32": "icons/32.png" } },
+  "side_panel": { "default_path": "index.html" },
+  "background": { "service_worker": "background.js" },
+  "permissions": ["sidePanel", "contextMenus", "storage", "activeTab", "scripting"],
+  "host_permissions": ["__API_ORIGIN__/*"],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  }
+}

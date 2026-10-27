@@ -98,8 +98,7 @@
       </div>
       <template v-if="recvMode === 'invoice' && !shown">
         <p class="sub">Create an invoice anyone can pay from any Lightning wallet.</p>
-        <label class="field">Amount in sats (optional)<input v-model="amount" inputmode="numeric" placeholder="e.g. 2000" /></label>
-        <span v-if="naira(Number(amount) || 0)" class="small dim">{{ naira(Number(amount)) }}</span>
+        <div class="field">Amount (optional): sats or your money<AmountInput v-model="amount" placeholder="e.g. 2000" label="Invoice amount" /></div>
         <label class="field">What's it for? (optional)<input v-model="desc" maxlength="80" placeholder="e.g. lunch" /></label>
         <p v-if="error" class="err">{{ error }}</p>
         <div class="stack">
@@ -141,11 +140,10 @@
         <input v-model="acceptChange" type="checkbox" />
         <span>⚠️ @{{ toUser.username }} has a different wallet than last time. Only continue if they told you they changed wallets.</span>
       </label>
-      <label v-if="parsed && needsAmount" class="field">
-        Amount in sats
-        <input v-model="amount" inputmode="numeric" :placeholder="rangeHint" />
-        <span v-if="naira(Number(amount) || 0)" class="small dim">{{ naira(Number(amount)) }}</span>
-      </label>
+      <div v-if="parsed && needsAmount" class="field">
+        Amount: sats or your money
+        <AmountInput v-model="amount" :placeholder="rangeHint" label="Amount to send" />
+      </div>
       <p class="small dim">Available: {{ (ln.st.balance ?? 0).toLocaleString() }} sats</p>
       <p v-if="error" class="err">{{ error }}</p>
       <button v-if="fallbackUser" class="btn small" @click="emit('pay-user-onchain', fallbackUser)">Pay @{{ fallbackUser }} from Bitcoin instead</button>

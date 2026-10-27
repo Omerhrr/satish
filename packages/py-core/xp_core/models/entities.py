@@ -12,6 +12,7 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import (
+    Float,
     JSON,
     BigInteger,
     Boolean,
@@ -69,6 +70,23 @@ class Session(Base):
     # Phase-2 hardening: visibility + audit for the session lifecycle UI.
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_via: Mapped[str] = mapped_column(String(32), default="miniapp")
+
+
+class DeviceLink(Base):
+    """Browser-extension sign-in: the extension shows a short code, the user
+    sends ``/link CODE`` to the bot, and the extension (polling with a secret
+    only it knows) receives a session for the same Telegram account."""
+
+    __tablename__ = "device_links"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    code: Mapped[str] = mapped_column(String(12), index=True)
+    poll_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime)
+    linked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
 # wallets
@@ -205,6 +223,94 @@ class Task(Base):
     # Deleted by the user: content scrubbed, hidden from lists. The row stays
     # because TK ledger entries reference it.
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    language: Mapped[str | None] = mapped_column(String(40), nullable=True)  # answer language
+    # Telegram conversation this task belongs to (chat mode), for follow-ups.
+    thread_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+
+
+class AiMemory(Base):
+    """Something Satish AI remembers about a user (they can see and delete it)."""
+
+    __tablename__ = "ai_memories"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    text: Mapped[str] = mapped_column(String(300))
+    source: Mapped[str] = mapped_column(String(16), default="auto")  # auto | user
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class PriceAlert(Base):
+    """'Tell me when bitcoin goes above ₦150m' - checked every minute,
+    sent once via Telegram, then switched off."""
+
+    __tablename__ = "price_alerts"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    currency: Mapped[str] = mapped_column(String(8))
+    direction: Mapped[str] = mapped_column(String(8))  # above | below
+    target: Mapped[float] = mapped_column(Float)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    triggered_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class SavingsGoal(Base):
+    """'₦50k school fees by December' - progress is computed on the phone
+    from the wallet balance (the server never sees it); this row only holds
+    the goal so it follows the user across devices."""
+
+    __tablename__ = "savings_goals"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    name: Mapped[str] = mapped_column(String(80))
+    target_amount: Mapped[float] = mapped_column(Float)
+    currency: Mapped[str] = mapped_column(String(8))  # SAT or a fiat code
+    deadline: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    weekly_reminder: Mapped[bool] = mapped_column(Boolean, default=False)
+    reached_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class GroupPayment(Base):
+    """A payment card posted in a Telegram group by the Satish bot.
+
+    kind=pay: "/pay ₦2000 @musa" - one payment to @musa.
+    kind=split: "/split ₦10000 @a @b dinner" - everyone named pays their
+    share to the person who split it. People tap the card, pay from their
+    own wallet in the Mini App, and the card ticks them off. Keys never
+    touch the chat; the server only records who said they paid."""
+
+    __tablename__ = "group_payments"
+
+    id: Mapped[str] = mapped_column(String(16), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(8))  # pay | split
+    creator_user_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    to_username: Mapped[str] = mapped_column(String(32))  # Satish @username that gets paid
+    amount_sats: Mapped[int] = mapped_column(BigInteger)  # per person
+    display: Mapped[str] = mapped_column(String(64))  # "₦2,500" as typed
+    note: Mapped[str | None] = mapped_column(String(140), nullable=True)
+    participants: Mapped[list | None] = mapped_column(JSON, nullable=True)  # telegram usernames (split)
+    paid: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # who -> txid/ref
+    chat_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    message_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class ChatTurn(Base):
+    """Recent turns of a Telegram chat with Satish AI, kept briefly (24 h) so
+    follow-up questions make sense. The full history lives in Telegram."""
+
+    __tablename__ = "chat_turns"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    thread_id: Mapped[str] = mapped_column(String(36), index=True)
+    role: Mapped[str] = mapped_column(String(12))  # user | assistant
+    text: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
 
 
 class TaskStep(Base):

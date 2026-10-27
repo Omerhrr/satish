@@ -174,6 +174,7 @@ class TaskCreateIn(BaseModel):
     # the balance and only what it actually uses is taken.
     budget_xp: int | None = Field(default=None, gt=0, le=100_000)
     idempotency_key: str | None = Field(default=None, max_length=191)
+    language: str | None = Field(default=None, max_length=40)  # e.g. "Hausa"
 
 
 class TaskOut(BaseModel):

@@ -61,6 +61,17 @@ async def payment_request_sweep(ctx: dict[str, Any]) -> dict[str, Any]:
         return await sweep_requests(session, get_settings())
 
 
+async def price_alert_sweep(ctx: dict[str, Any]) -> dict[str, Any]:
+    """Fire bitcoin price alerts (sent to Telegram by the relay sweep)."""
+    from app.api.v1.money import sweep_price_alerts
+    from app.api.v1.price import current_rates
+    from xp_core.db import get_session_factory
+
+    rates = await current_rates()
+    async with get_session_factory()() as session:
+        return {"fired": await sweep_price_alerts(session, dict(rates.get("btc") or {}))}
+
+
 async def wallet_alert_sweep(ctx: dict[str, Any]) -> dict[str, Any]:
     """Queue Telegram messages for bitcoin arriving at watched wallet addresses."""
     from xp_core.db import get_session_factory
@@ -112,6 +123,7 @@ def _build_cron_jobs() -> tuple:
         cron(payment_request_sweep, minute=set(range(60)), run_at_startup=True, timeout=55),
         cron(stale_task_watchdog, minute=set(range(60)), run_at_startup=True, timeout=55),
         cron(wallet_alert_sweep, minute=set(range(60)), run_at_startup=True, timeout=55),
+        cron(price_alert_sweep, minute=set(range(60)), run_at_startup=True, timeout=55),
         # Retention sweep (phase 10): privacy windows, daily at 03:17 UTC.
         cron(run_retention_sweep_job, minute=17, hour=3, run_at_startup=False),
     )

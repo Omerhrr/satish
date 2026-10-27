@@ -1,9 +1,17 @@
 // Satish Telegram Mini App - Nuxt 4 configuration.
 // SPA mode: Telegram Mini Apps load inside a webview where SSR adds no value
 // and complicates auth; the app talks to the FastAPI service directly.
+// Two builds from one app: the Telegram Mini App (default) and the Satish
+// browser extension (SATISH_TARGET=extension, see scripts/build-extension.mjs).
+const isExtension = process.env.SATISH_TARGET === "extension";
+
 export default defineNuxtConfig({
   compatibilityDate: "2025-07-15",
   ssr: false,
+  // Extension pages are files (chrome-extension://id/index.html): hash routes.
+  router: isExtension ? { options: { hashMode: true } } : {},
+  // Import maps must be inline, which extension pages forbid.
+  experimental: isExtension ? { entryImportMap: false } : {},
   // Serve pre-compressed files (the Lightning module is 12 MB raw, about 4 MB with brotli).
   nitro: { compressPublicAssets: { gzip: true, brotli: true } },
   devtools: { enabled: false },
@@ -17,6 +25,8 @@ export default defineNuxtConfig({
       // Direct mode (local dev on your machine): full API origin.
       apiBase: process.env.NUXT_PUBLIC_API_BASE || "http://127.0.0.1:8001",
       appName: "Satish",
+      // "telegram" (Mini App) or "extension" (browser extension build).
+      platform: isExtension ? "extension" : "telegram",
       // Wallet network: "testnet" (default, free test coins) or "mainnet".
       bitcoinNetwork: process.env.NUXT_PUBLIC_BITCOIN_NETWORK || "testnet",
       // Optional custom Esplora API; defaults to mempool.space for the network.
@@ -34,7 +44,7 @@ export default defineNuxtConfig({
   },
   app: {
     head: {
-      title: "Satish - your bitcoin wallet in Telegram",
+      title: isExtension ? "Satish" : "Satish - your bitcoin wallet in Telegram",
       htmlAttrs: { lang: "en" },
       meta: [
         { charset: "utf-8" },
@@ -46,7 +56,8 @@ export default defineNuxtConfig({
             "Satish: a self-custodial bitcoin wallet in Telegram. Send, receive, pay by @username, and pay an AI assistant with bitcoin."
         }
       ],
-      script: [{ src: "https://telegram.org/js/telegram-web-app.js" }],
+      // Extensions may not load remote scripts; Telegram's SDK is only for the Mini App.
+      script: isExtension ? [] : [{ src: "https://telegram.org/js/telegram-web-app.js" }],
       link: [
         {
           rel: "icon",

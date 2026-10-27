@@ -103,11 +103,12 @@ async def create_session(
     settings: Settings | None = None,
     *,
     created_via: str = "miniapp",
+    ttl_hours: int | None = None,
 ) -> tuple[str, Session]:
     """Issue a short-lived bearer session; only the SHA-256 hash is persisted."""
     s = settings or get_settings()
     token = new_id() + new_id().replace("-", "")
-    expires = datetime.now(UTC) + timedelta(hours=max(1, s.session_ttl_hours))
+    expires = datetime.now(UTC) + timedelta(hours=max(1, ttl_hours or s.session_ttl_hours))
     row = Session(
         user_id=user_id,
         token_hash=hash_token(token),

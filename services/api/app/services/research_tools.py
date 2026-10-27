@@ -1035,6 +1035,79 @@ def build_product_registry(
     register_commerce_tools(
         registry, session=session, task=task, settings=settings, corpus=commerce_corpus
     )
+    # Live market data and exact arithmetic (no guessing numbers).
+    async def data_rates(base: str = "BTC", quote: str = "NGN", amount: float = 1.0) -> dict[str, Any]:
+        from app.api.v1.price import current_rates
+
+        btc = dict((await current_rates()).get("btc") or {})
+        b, q = base.upper().strip(), quote.upper().strip()
+        if not btc:
+            return {"status": "unavailable", "disclosure": "live rates are unavailable right now"}
+
+        def in_usd(code: str) -> float | None:  # value of 1 unit in USD
+            if code == "BTC":
+                return btc.get("USD")
+            return (btc["USD"] / btc[code]) if btc.get(code) and btc.get("USD") else None
+
+        bu, qu = in_usd(b), in_usd(q)
+        if not bu or not qu:
+            return {"status": "unknown_currency", "known": sorted(btc)[:80]}
+        rate = bu / qu
+        return {
+            "status": "ok",
+            "base": b,
+            "quote": q,
+            "rate": rate,
+            "amount": amount,
+            "converted": amount * rate,
+            "source": "CoinGecko (market) + open.er-api.com, refreshed every few minutes",
+        }
+
+    registry.register(
+        ToolSpec(
+            name="data.rates",
+            category="research",
+            description=(
+                "Live exchange rates between currencies and BTC (market rates, e.g. NGN parallel/market, "
+                "USD, EUR, GHS, KES). Use for any price conversion instead of guessing."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "base": {"type": "string", "description": "e.g. BTC, USD"},
+                    "quote": {"type": "string", "description": "e.g. NGN"},
+                    "amount": {"type": "number"},
+                },
+                "required": ["base", "quote"],
+            },
+            required_scope="research:read",
+            max_cost_xp=1,
+            timeout_seconds=15,
+            handler=data_rates,
+        )
+    )
+
+    async def math_calculate(expression: str) -> dict[str, Any]:
+        from app.services.safe_math import evaluate
+
+        try:
+            return {"status": "ok", "expression": expression, "result": evaluate(expression)}
+        except ValueError as exc:
+            return {"status": "error", "reason": str(exc)}
+
+    registry.register(
+        ToolSpec(
+            name="math.calculate",
+            category="research",
+            description="Exact arithmetic: + - * / ** % ( ), round(), min(), max(), sum(), abs(). Use it for totals, margins and percentages.",
+            input_schema={"type": "object", "properties": {"expression": {"type": "string"}}, "required": ["expression"]},
+            required_scope="research:read",
+            max_cost_xp=0,
+            timeout_seconds=5,
+            handler=math_calculate,
+        )
+    )
+
     return registry
 
 

@@ -1,12 +1,11 @@
 <template>
   <div>
     <div class="ask-head">
-      <h1 class="page-title">Ask Satish AI</h1>
+      <h1 class="page-title">{{ t("ai.title") }}</h1>
       <NuxtLink to="/billing" class="credit-chip">{{ balance !== null ? balance.toLocaleString() + " TK" : "… TK" }}</NuxtLink>
     </div>
     <p class="page-sub">
-      Research, price comparisons and written reports with sources. It takes TK from
-      your balance only for what it actually uses.
+      {{ t("ai.sub") }}
       <NuxtLink to="/ai">What can it do?</NuxtLink>
     </p>
 
@@ -19,21 +18,21 @@
       <h2>New task</h2>
       <form @submit.prevent="submit">
         <label class="field">
-          What do you need?
+          {{ t("ai.need") }}
           <textarea
             v-model="objective"
             rows="3"
-            placeholder="e.g. Compare prices of a 50kg bag of rice in Kaduna markets and make me a PDF report"
+            :placeholder="t('ai.placeholder')"
             required
             minlength="2"
             maxlength="4000"
           />
         </label>
         <p v-if="balance !== null && balance <= 0" class="small" style="color: var(--red)">
-          You're out of TK. <NuxtLink to="/billing">Buy TK</NuxtLink> to keep going.
+          {{ t("ai.out") }} <NuxtLink to="/billing">{{ t("ai.buy") }}</NuxtLink>
         </p>
         <button class="btn primary" type="submit" :disabled="creating">
-          <span v-if="creating" class="spinner" /> Ask Satish
+          <span v-if="creating" class="spinner" /> {{ t("ai.go") }}
         </button>
         <span v-if="createError" class="small" style="color: var(--red); margin-left: 10px">{{ createError }}</span>
       </form>
@@ -41,8 +40,8 @@
 
     <section class="card">
       <div class="list-head">
-        <h2>Tasks <span class="dim">({{ tasks.length }})</span></h2>
-        <button v-if="finishedCount" class="btn ghost small" @click="clearFinished">Clear finished</button>
+        <h2>{{ t("ai.tasks") }} <span class="dim">({{ tasks.length }})</span></h2>
+        <button v-if="finishedCount" class="btn ghost small" @click="clearFinished">{{ t("ai.clear") }}</button>
       </div>
       <p v-if="loading" class="small dim" style="margin-top: 8px"><span class="spinner" /> Loading…</p>
       <p v-else-if="tasks.length === 0" class="small dim" style="margin-top: 8px">No tasks yet. Ask for something above, or try a free sample report on <NuxtLink to="/ai">What can it do?</NuxtLink></p>
@@ -55,9 +54,9 @@
         <div v-if="t.status === 'running' && t.queued" class="small working">
           <span class="spinner" /> Waiting to start…<template v-if="aiStatus && !aiStatus.online"> Satish AI is offline right now.</template>
         </div>
-        <div v-else-if="t.status === 'running'" class="small working"><span class="spinner" /> Working on it…</div>
+        <div v-else-if="t.status === 'running'" class="small working"><span class="spinner" /> {{ tt("ai.working") }}</div>
         <div v-if="t.error" class="small task-err">{{ t.error }}</div>
-        <div v-if="t.delivered" class="small delivered">✓ Sent to your Telegram chat with Satish, including any files.</div>
+        <div v-if="t.delivered" class="small delivered">{{ tt("ai.sentChat") }}</div>
         <div class="task-foot">
           <span class="small dim">{{ ["completed", "failed", "cancelled"].includes(t.status) ? `${t.actual_xp.toLocaleString()} TK used` : "" }}</span>
           <span class="task-acts">
@@ -82,6 +81,25 @@
         over what you have. If it needs your OK for something (like sending an
         email), it pauses here until you approve.
       </div>
+    </section>
+
+    <section class="card">
+      <div class="list-head">
+        <h2>What Satish remembers</h2>
+        <button v-if="memories.length" class="btn ghost small" @click="forget()">Forget all</button>
+      </div>
+      <p class="small dim">Facts that help it answer you better. Learned from your chats with the bot, or added here. Only you can see them.</p>
+      <ul class="mem">
+        <li v-for="m in memories" :key="m.id">
+          <span>{{ m.text }}</span>
+          <button class="linkbtn" :aria-label="`Forget: ${m.text}`" @click="forget(m.id)">✕</button>
+        </li>
+      </ul>
+      <form class="mem-add" @submit.prevent="remember">
+        <input v-model="newMemory" maxlength="300" placeholder="e.g. I sell phone accessories in Kano" />
+        <button class="btn small" :disabled="newMemory.trim().length < 3">Add</button>
+      </form>
+      <p class="small dim">Tip: message the Satish bot to chat with Satish AI right in Telegram.</p>
     </section>
 
     <section v-if="eventTask" class="card">
@@ -192,6 +210,8 @@
 import type { ApprovalOut, TaskEventOut, TaskOut, TaskResultOut } from "@xp/shared-types";
 
 const api = useXpApi();
+const { t, languageName } = useI18n();
+const tt = t;
 const tasks = ref<TaskOut[]>([]);
 const loading = ref(true);
 const creating = ref(false);
@@ -289,9 +309,9 @@ async function submit() {
   creating.value = true;
   createError.value = "";
   try {
-    const t = await api.createTask({ objective: objective.value });
+    const created = await api.createTask({ objective: objective.value, language: languageName.value });
     objective.value = "";
-    await api.runTask(t.id); // starts straight away; TK is taken only for what it uses
+    await api.runTask(created.id); // starts straight away; TK is taken only for what it uses
     await refresh();
     await loadCredits();
   } catch (e) {
@@ -366,6 +386,26 @@ async function sendToChat() {
   }
 }
 
+const memories = ref<{ id: string; text: string }[]>([]);
+const newMemory = ref("");
+async function loadMemory() {
+  try {
+    memories.value = await api.aiMemory();
+  } catch {
+    /* older server */
+  }
+}
+async function remember() {
+  memories.value = await api.aiRemember(newMemory.value.trim());
+  newMemory.value = "";
+}
+async function forget(id?: string) {
+  if (!id && !window.confirm("Forget everything Satish remembers about you?")) return;
+  await api.aiForget(id);
+  await loadMemory();
+}
+onMounted(loadMemory);
+
 const finishedCount = computed(() => tasks.value.filter((t) => ["completed", "failed", "cancelled"].includes(t.status)).length);
 
 async function remove(id: string) {
@@ -399,11 +439,25 @@ async function cancel(id: string) {
   }
 }
 
+const route = useRoute();
+watch(
+  () => route.query.ask,
+  (ask) => {
+    if (typeof ask === "string" && ask.trim()) objective.value = ask.slice(0, 4000);
+  },
+  { immediate: true },
+);
+
 onMounted(refresh);
 onBeforeUnmount(() => poller && clearTimeout(poller));
 </script>
 
 <style scoped>
+.mem { list-style: none; padding: 0; margin: 8px 0; }
+.mem li { display: flex; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+.linkbtn { background: none; border: 0; color: var(--text-dim); cursor: pointer; }
+.mem-add { display: flex; gap: 8px; margin: 8px 0; }
+.mem-add input { flex: 1; min-width: 0; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); }
 .list-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .delivered { color: var(--green, #22c55e); margin: 4px 0; }
 .answer { white-space: pre-wrap; line-height: 1.6; font-size: 15px; margin: 4px 0 10px; }

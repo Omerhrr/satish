@@ -98,6 +98,13 @@
           Recovery phrase
           <textarea v-model="restoreText" rows="4" autocapitalize="none" autocomplete="off" spellcheck="false" />
         </label>
+        <details class="shares-restore" :open="restoreFromShares">
+          <summary class="small" @click.prevent="restoreFromShares = !restoreFromShares">Restore from 2 backup shares instead</summary>
+          <p class="small dim">Paste two different shares from the people you gave them to.</p>
+          <textarea v-model="shareA" rows="2" placeholder="satish-share-v1-1-…" autocapitalize="none" spellcheck="false" aria-label="First share" />
+          <textarea v-model="shareB" rows="2" placeholder="satish-share-v1-2-…" autocapitalize="none" spellcheck="false" aria-label="Second share" />
+          <button class="btn small" type="button" :disabled="!shareA.trim() || !shareB.trim()" @click="useShares">Rebuild my phrase</button>
+        </details>
         <p v-if="error" class="err">{{ error }}</p>
         <div class="stack">
           <button class="btn primary" @click="checkRestore">Continue</button>
@@ -143,19 +150,19 @@
           </button>
         </div>
 
-        <LightningWallet v-if="tab === 'ln' && ln.available" compact :hide="w.state.hideBalance" :username="w.state.handle?.username ?? null" @pay-onchain="payOnchainTo" @pay-user-onchain="payUserOnchain" />
+        <LightningWallet v-if="tab === 'ln' && ln.available" ref="lnRef" compact :hide="w.state.hideBalance" :username="w.state.handle?.username ?? null" @pay-onchain="payOnchainTo" @pay-user-onchain="payUserOnchain" />
 
         <template v-if="tab === 'btc' || !ln.available">
         <section class="card hero">
           <div class="hero-top">
-            <span class="dim small">{{ w.net.name === "testnet" ? "Bitcoin savings (test)" : "Bitcoin savings" }}</span>
+            <span class="dim small">{{ w.net.name === "testnet" ? t("w.savingsTest") : t("w.savings") }}</span>
             <button class="eye" :aria-label="w.state.hideBalance ? 'Show balance' : 'Hide balance'" :aria-pressed="w.state.hideBalance" @click="w.setHideBalance(!w.state.hideBalance)">
-              {{ w.state.hideBalance ? "Show" : "Hide" }}
+              {{ w.state.hideBalance ? t("w.show") : t("w.hide") }}
             </button>
           </div>
           <template v-if="w.state.hideBalance">
             <div class="amount">••••••</div>
-            <div class="dim small">Balance hidden</div>
+            <div class="dim small">{{ t("w.hidden") }}</div>
           </template>
           <template v-else>
             <div class="amount">{{ total.toLocaleString() }}<span class="unit"> sats</span></div>
@@ -167,16 +174,16 @@
             </div>
           </template>
           <div class="actions-main">
-            <button class="btn primary" @click="go('receive'); watchReceive()">Receive</button>
-            <button class="btn primary" :disabled="!w.spendable.value" @click="openSend">Send</button>
+            <button class="btn primary" @click="go('receive'); watchReceive()">{{ t("w.receive") }}</button>
+            <button class="btn primary" :disabled="!w.spendable.value" @click="openSend">{{ t("w.send") }}</button>
           </div>
           <div class="actions-alt">
-            <button class="btn" @click="openBuy">Buy bitcoin</button>
-            <button class="btn" @click="openRequest">Request</button>
+            <button class="btn" @click="openBuy">{{ t("w.buy") }}</button>
+            <button class="btn" @click="openRequest">{{ t("w.request") }}</button>
           </div>
           <button class="sync" :disabled="w.state.loading" @click="w.refresh()">
             <span v-if="w.state.loading" class="spinner" />
-            {{ w.state.loading ? "Updating…" : w.state.lastSync ? `Updated ${ago(w.state.lastSync)} · tap to refresh` : "Tap to refresh" }}
+            {{ w.state.loading ? t("w.updating") : w.state.lastSync ? `${ago(w.state.lastSync)} · ${t("w.tapRefresh")}` : t("w.tapRefresh") }}
           </button>
           <p v-if="w.state.error" class="err">{{ w.state.error }}</p>
           <p v-if="notice" class="small ok">{{ notice }}</p>
@@ -184,13 +191,13 @@
 
         <section class="card">
           <div class="head">
-            <h2>Recent</h2>
-            <NuxtLink v-if="w.state.history.length > 3" class="small" :to="{ path: '/', query: { s: 'history' } }">See all</NuxtLink>
+            <h2>{{ t("w.recent") }}</h2>
+            <NuxtLink v-if="w.state.history.length > 3" class="small" :to="{ path: '/', query: { s: 'history' } }">{{ t("w.seeAll") }}</NuxtLink>
           </div>
-          <p v-if="!w.state.history.length && !w.state.loading" class="dim small">Nothing yet. Tap Receive to get your address, or share your username.</p>
+          <p v-if="!w.state.history.length && !w.state.loading" class="dim small">{{ t("w.nothingYet") }}</p>
           <button v-for="t in w.state.history.slice(0, 3)" :key="t.txid" class="tx" @click="openTx(t.txid)">
             <div>
-              <b>{{ t.amount >= 0 ? "Received" : "Sent" }}</b>
+              <b>{{ t.amount >= 0 ? tt("w.received") : tt("w.sent") }}</b>
               <span v-if="w.state.notes[t.txid]" class="small dim"> · {{ w.state.notes[t.txid] }}</span>
               <div class="small" :class="t.confirmed ? 'dim' : 'pending'">
                 {{ t.confirmed ? fmtTime(t.time) : t.amount < 0 && t.replaceable ? "Waiting to confirm · tap to speed up" : "Waiting to confirm" }}
@@ -220,6 +227,7 @@
         </section>
 
         </template>
+        <MoneyCards :total-sats="total + (lnBalance ?? 0)" />
         </template>
 
         <!-- ===== History ===== -->
@@ -402,7 +410,29 @@
         <template v-else-if="section === 'settings'">
         <p v-if="notice" class="small ok" style="margin-bottom: 10px">{{ notice }}</p>
 
+        <h3 class="group">{{ t("set.language") }}</h3>
+        <section class="card list">
+          <label class="item">
+            <div><b>{{ t("set.languageRow") }}</b><span>Satish AI answers in this language too.</span></div>
+            <select class="pick" :value="lang" aria-label="Language" @change="setLang(($event.target as HTMLSelectElement).value as any)">
+              <option v-for="l in LANGUAGES" :key="l.code" :value="l.code">{{ l.name }}</option>
+            </select>
+          </label>
+          <label class="item">
+            <div><b>{{ t("set.currencyRow") }}</b><span>You can also type amounts in it when sending or requesting.</span></div>
+            <select class="pick" :value="currency" aria-label="Currency" @change="setCurrency(($event.target as HTMLSelectElement).value)">
+              <option v-for="c in currencies" :key="c" :value="c">{{ c }}</option>
+            </select>
+          </label>
+        </section>
+
         <h3 class="group">Security</h3>
+        <section class="card list">
+          <div class="item limit">
+            <div><b>Daily spending limit</b><span>Above it, sending waits 30 seconds and asks you to double-check. Stops panic payments to scammers.</span></div>
+            <AmountInput :model-value="dailyLimit" placeholder="No limit" label="Daily spending limit" @update:model-value="saveLimit" />
+          </div>
+        </section>
         <section class="card list">
           <div class="item">
             <div><b>Ask for my password when I open Satish</b><span>And after 5 minutes away. One password opens both wallets.</span></div>
@@ -414,6 +444,7 @@
           </div>
           <button class="item" @click="go('changepw')"><div><b>Change password</b></div><em>›</em></button>
           <button class="item" @click="go('reveal')"><div><b>Show recovery phrase</b><span>Your 12 words. Keep them on paper.</span></div><em>›</em></button>
+          <button class="item" @click="openShares"><div><b>Back up with trusted people</b><span>3 pieces for 3 people you trust. Any 2 can help you get your wallet back. One alone is useless to a thief.</span></div><em>›</em></button>
         </section>
 
         <h3 class="group">Backup and alerts</h3>
@@ -506,11 +537,10 @@
         </template>
         <template v-else>
           <p class="sub">Get a link you can share on WhatsApp, Telegram or anywhere. Anyone can pay it from any bitcoin wallet.</p>
-          <label class="field">
-            Amount in sats (optional)
-            <input v-model="reqAmount" inputmode="numeric" placeholder="e.g. 5000" />
-            <span v-if="naira(Number(reqAmount) || 0)" class="small dim">{{ naira(Number(reqAmount)) }}</span>
-          </label>
+          <div class="field">
+            Amount (optional): sats or your money
+            <AmountInput v-model="reqAmount" placeholder="e.g. 5000" label="Amount to request" />
+          </div>
           <label class="field">What's it for? (optional)<input v-model="reqNote" maxlength="140" placeholder="e.g. rice, rent, school fees" /></label>
           <p v-if="error" class="err">{{ error }}</p>
           <div class="stack">
@@ -655,18 +685,17 @@
             {{ c.name }}
           </button>
         </div>
-        <label class="field">
-          Amount (sats)
+        <div class="field">
+          Amount: sats or your money (₦, $, …)
           <div class="inline">
-            <input v-model="sendAmount" inputmode="numeric" :disabled="sendMax" placeholder="e.g. 10000" />
+            <AmountInput v-model="sendAmount" :disabled="sendMax" label="Amount to send" />
             <button class="btn small" type="button" :class="{ primary: sendMax }" @click="sendMax = !sendMax">Max</button>
           </div>
           <span class="small dim">
             Available: {{ w.spendable.value.toLocaleString() }} sats
             <template v-if="naira(w.spendable.value)"> ({{ naira(w.spendable.value) }})</template>
-            <template v-if="!sendMax && naira(Number(sendAmount) || 0)"> · sending {{ naira(Number(sendAmount)) }}</template>
           </span>
-        </label>
+        </div>
         <div class="field">
           Network fee
           <div class="feepick" role="radiogroup" aria-label="Network fee">
@@ -723,7 +752,8 @@
         </template>
         <p v-if="error" class="err">{{ error }}</p>
         <div class="stack">
-          <button class="btn primary" :disabled="busy || (!password && !w.state.unlocked) || (warnings.length > 0 && !warningsOk)" @click="confirmSend">
+          <p v-if="pauseLeft > 0" class="small pending">⏳ Over your daily limit: you can send in {{ pauseLeft }}s.</p>
+          <button class="btn primary" :disabled="busy || pauseLeft > 0 || (!password && !w.state.unlocked) || (warnings.length > 0 && !warningsOk)" @click="confirmSend">
             <span v-if="busy" class="spinner" /> Send now
           </button>
           <button class="btn ghost" :disabled="busy" @click="go('send')">← Edit</button>
@@ -980,6 +1010,36 @@
         </template>
       </section>
 
+      <!-- social recovery -->
+      <section v-else-if="view === 'shares'" class="card">
+        <h2>Back up with trusted people</h2>
+        <template v-if="!shares.length">
+          <p class="sub">
+            We'll split your recovery phrase into 3 pieces. Give each to a different person you trust
+            (family, a close friend, your lawyer). Any 2 pieces rebuild your wallet; 1 piece alone reveals nothing.
+          </p>
+          <label class="field">Wallet password<input v-model="password" type="password" autocomplete="current-password" /></label>
+          <p v-if="error" class="err">{{ error }}</p>
+          <div class="stack">
+            <button class="btn primary" :disabled="busy || !password" @click="makeShares"><span v-if="busy" class="spinner" /> Make 3 pieces</button>
+            <button class="btn ghost" @click="go('home')">Cancel</button>
+          </div>
+        </template>
+        <template v-else>
+          <p class="sub">Send each piece to a <b>different</b> person. Don't keep two in the same place.</p>
+          <div v-for="(sh, i) in shares" :key="i" class="share">
+            <b>Piece {{ i + 1 }}</b>
+            <div class="addr mono small">{{ sh }}</div>
+            <div class="acts">
+              <button class="btn small" @click="copyShare(i)">{{ shareCopied === i ? "Copied ✓" : "Copy" }}</button>
+              <button class="btn small" @click="sendShare(i)">Send in Telegram</button>
+            </div>
+          </div>
+          <p class="small dim">Tell each person: "Keep this safe. If I ever lose my phone, I'll ask you for it." Making new pieces doesn't cancel old ones, so only hand them to people you trust.</p>
+          <button class="btn primary" @click="shares = []; go('home')">Done</button>
+        </template>
+      </section>
+
       <!-- change password -->
       <section v-else-if="view === 'changepw'" class="card">
         <h2>Change wallet password</h2>
@@ -1042,7 +1102,7 @@ import {
 
 const w = useWallet();
 const { naira } = usePrice();
-type View = "privkeys" | "sweep" | "tx" | "bump" | "alerts" | "export" | "forgot" | "welcome" | "show" | "verify" | "restore" | "password" | "home" | "receive" | "send" | "review" | "sent" | "reveal" | "changepw" | "remove" | "contacts" | "contact" | "buy" | "cloudrestore" | "cloudon" | "username" | "request" | "requestshow";
+type View = "shares" | "privkeys" | "sweep" | "tx" | "bump" | "alerts" | "export" | "forgot" | "welcome" | "show" | "verify" | "restore" | "password" | "home" | "receive" | "send" | "review" | "sent" | "reveal" | "changepw" | "remove" | "contacts" | "contact" | "buy" | "cloudrestore" | "cloudon" | "username" | "request" | "requestshow";
 const view = ref<View>(w.state.stored ? "home" : "welcome");
 const error = ref("");
 const busy = ref(false);
@@ -1257,6 +1317,9 @@ async function exportHistory() {
 }
 
 const ln = useLightning();
+const { t, lang, setLang, LANGUAGES } = useI18n();
+const tt = t; // for templates where a loop variable is called "t"
+const { currency, setCurrency, currencies } = usePrice();
 const route = useRoute();
 const router = useRouter();
 const section = computed(() => {
@@ -1414,6 +1477,87 @@ async function lockNow() {
   notice.value = "Locked. Your password is needed to send again.";
 }
 
+// "Pay with Satish" from the browser extension (lightning:/bitcoin: links,
+// or a selected invoice): open the right wallet's send screen, filled in.
+const lnRef = ref<{ startSend: (prefill?: string) => void } | null>(null);
+async function handlePayLink(raw: string) {
+  const text = raw.trim();
+  if (!text || !w.state.stored) return;
+  const btc = /^bitcoin:([a-z0-9]+)(?:\?(.*))?$/i.exec(text);
+  if (btc && !/lightning=/i.test(btc[2] || "")) {
+    setTab("btc");
+    await openSend();
+    sendTo.value = btc[1]!;
+    const amt = new URLSearchParams(btc[2] || "").get("amount");
+    if (amt) sendNote.value = `Requested amount: ${amt} BTC (${Math.round(Number(amt) * 1e8).toLocaleString()} sats)`;
+    return;
+  }
+  const ln = btc ? new URLSearchParams(btc[2] || "").get("lightning") || text : text.replace(/^lightning:/i, "");
+  setTab("ln");
+  await nextTick();
+  lnRef.value?.startSend(ln);
+}
+onMounted(() =>
+  watch(
+    () => [route.query.pay, !!w.state.stored] as const,
+    async ([pay, has]) => {
+      if (typeof pay === "string" && pay && has) {
+        await handlePayLink(pay);
+        void router.replace({ path: "/", query: {} });
+      }
+    },
+    { immediate: true },
+  ),
+);
+
+// Group chat cards: "/pay ₦2000 @musa" or "/split ..." open here with
+// start_param gp_<id>. Fill in the send screen; report back once sent.
+const groupPayId = ref("");
+async function openGroupPayment(id: string) {
+  try {
+    const g = await useXpApi().groupPayment(id);
+    if (g.already_paid) {
+      notice.value = "You've already paid this one. ✅";
+      return;
+    }
+    setTab("btc");
+    await openSend();
+    sendTo.value = "@" + g.to_username;
+    sendAmount.value = String(g.amount_sats);
+    sendNote.value = g.note || (g.kind === "split" ? "My share" : "");
+    groupPayId.value = g.id;
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : "Couldn't open that payment.";
+  }
+}
+onMounted(() => {
+  const sp = String((window as any).Telegram?.WebApp?.initDataUnsafe?.start_param || route.query.gp || "");
+  const id = sp.startsWith("gp_") ? sp.slice(3) : sp && route.query.gp ? sp : "";
+  if (!id) return;
+  const stop = watch(
+    () => !!w.state.stored && !locked.value,
+    (ready) => {
+      if (!ready) return;
+      void openGroupPayment(id);
+      queueMicrotask(() => stop());
+    },
+    { immediate: true },
+  );
+});
+onMounted(() =>
+  watch(sentTxid, async (txid) => {
+    if (txid && groupPayId.value) {
+      const id = groupPayId.value;
+      groupPayId.value = "";
+      try {
+        await useXpApi().groupPaid(id, txid);
+      } catch {
+        /* the payment went through; only the tick in the group is missing */
+      }
+    }
+  }),
+);
+
 async function payOnchainTo(address: string) {
   await openSend();
   sendTo.value = address;
@@ -1478,7 +1622,44 @@ const warnings = computed(() => {
   const bal = w.spendable.value;
   if (bal > 0 && p.amount + p.fee >= bal * 0.5 && p.amount >= 100_000) out.push(`This is a big payment: ${Math.round(((p.amount + p.fee) / bal) * 100)}% of your balance.`);
   if (p.fee > p.amount * 0.2) out.push(`The network fee is more than 20% of the amount you're sending.`);
+  const limit = Number(dailyLimit.value) || 0;
+  if (limit > 0 && sentToday.value + p.amount > limit)
+    out.push(`This goes over your daily limit of ${limit.toLocaleString()} sats (${sentToday.value.toLocaleString()} sent today). Scammers rush people: take a moment.`);
   return out;
+});
+
+// Spending limit (on this device): over it, Send waits 30 seconds.
+const limitKey = () => `xp_limit_v1_${(window as any).Telegram?.WebApp?.initDataUnsafe?.user?.id ?? "local"}`;
+const dailyLimit = ref("");
+const sentToday = computed(() => {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const since = start.getTime() / 1000;
+  return w.state.history.filter((t) => t.amount < 0 && (!t.confirmed || (t.time ?? 0) >= since)).reduce((s, t) => s - t.amount, 0);
+});
+const overLimit = computed(() => warnings.value.some((x) => x.includes("daily limit")));
+const pauseLeft = ref(0);
+let pauseTimer: ReturnType<typeof setInterval> | null = null;
+watch(overLimit, (over) => {
+  if (pauseTimer) clearInterval(pauseTimer);
+  pauseLeft.value = over ? 30 : 0;
+  if (over) pauseTimer = setInterval(() => (pauseLeft.value = Math.max(0, pauseLeft.value - 1)), 1000);
+});
+function saveLimit(v: string) {
+  dailyLimit.value = v;
+  try {
+    if (v) localStorage.setItem(limitKey(), v);
+    else localStorage.removeItem(limitKey());
+  } catch {
+    /* ignore */
+  }
+}
+onMounted(() => {
+  try {
+    dailyLimit.value = localStorage.getItem(limitKey()) ?? "";
+  } catch {
+    /* ignore */
+  }
 });
 
 // username
@@ -1954,6 +2135,55 @@ async function confirmSend() {
   }
 }
 
+// Social recovery (2-of-3 Shamir shares of the recovery phrase)
+const shares = ref<string[]>([]);
+const shareCopied = ref(-1);
+const restoreFromShares = ref(false);
+const shareA = ref("");
+const shareB = ref("");
+function openShares() {
+  shares.value = [];
+  password.value = "";
+  error.value = "";
+  go("shares");
+}
+async function makeShares() {
+  busy.value = true;
+  error.value = "";
+  try {
+    const { splitPhrase } = await import("~/lib/shamir");
+    shares.value = splitPhrase(await w.revealPhrase(password.value));
+    password.value = "";
+  } catch {
+    error.value = "Wrong password.";
+  } finally {
+    busy.value = false;
+  }
+}
+async function copyShare(i: number) {
+  await copy(shares.value[i]!);
+  shareCopied.value = i;
+  setTimeout(() => (shareCopied.value = -1), 2000);
+}
+function sendShare(i: number) {
+  const text = `This is piece ${i + 1} of my Satish wallet backup. Please keep it safe and private; I'll only ask for it if I lose my phone.\n\n${shares.value[i]}`;
+  const url = `https://t.me/share/url?url=${encodeURIComponent("https://satish.rogan.live")}&text=${encodeURIComponent(text)}`;
+  const tg = (window as any).Telegram?.WebApp;
+  if (tg?.openTelegramLink) tg.openTelegramLink(url);
+  else window.open(url, "_blank", "noopener");
+}
+async function useShares() {
+  error.value = "";
+  try {
+    const { combineShares } = await import("~/lib/shamir");
+    restoreText.value = combineShares([shareA.value, shareB.value]);
+    restoreFromShares.value = false;
+    shareA.value = shareB.value = "";
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : "Those shares didn't work.";
+  }
+}
+
 async function reveal() {
   busy.value = true;
   error.value = "";
@@ -2126,6 +2356,13 @@ onBeforeUnmount(() => {
 .field input:focus, .field textarea:focus { outline: none; border-color: var(--orange); }
 .inline { display: flex; gap: 8px; }
 .inline input { flex: 1; min-width: 0; }
+.inline .amount-input { flex: 1; min-width: 0; }
+.share { margin: 12px 0; }
+.share .acts { display: flex; gap: 8px; margin-top: 6px; }
+.shares-restore { margin: 10px 0; }
+.shares-restore textarea { width: 100%; margin: 6px 0; box-sizing: border-box; }
+.item.limit { flex-direction: column; align-items: stretch; gap: 8px; }
+.pick { flex: none; max-width: 46%; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg-elev); color: var(--text); font-size: 14px; }
 .check { display: flex; gap: 8px; align-items: center; margin-top: 12px; font-size: 14px; }
 .words { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 14px 0; }
 .words.hidden .word { filter: blur(6px); }

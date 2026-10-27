@@ -46,6 +46,8 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
+        # The Satish browser extension calls the API from its own origin.
+        allow_origin_regex=r"^(chrome|moz)-extension://[a-z0-9-]+$" if settings.cors_allow_extensions else None,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

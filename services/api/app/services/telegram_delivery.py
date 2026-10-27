@@ -79,7 +79,7 @@ async def deliver_task(
     try:
         async with httpx.AsyncClient(timeout=60, transport=transport) as client:
             for i, chunk in enumerate(split_message(no_dashes(_plain(answer or task.deliverable or "Done.")))):
-                text = f"{header}\n\n{chunk}" if i == 0 else chunk
+                text = f"{header}\n\n{chunk}" if i == 0 and not task.thread_id else chunk  # chats need no header
                 r = await client.post(f"{base}/sendMessage", json={"chat_id": chat_id, "text": text,
                                                                    "disable_web_page_preview": True})
                 if r.status_code != 200 or not r.json().get("ok"):

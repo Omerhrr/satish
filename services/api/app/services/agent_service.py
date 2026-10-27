@@ -50,6 +50,18 @@ def _registry_for(session, task, settings, storage):
 
 log = get_logger(__name__)
 
+
+async def build_context(session, task) -> str | None:
+    """What Satish AI should know: the user's saved memories and, in a chat
+    thread, the earlier questions and answers (newest last)."""
+    from app.services.ai_memory import context_for
+
+    try:
+        return await context_for(session, task)
+    except Exception as exc:  # memory is a nice-to-have, never a blocker
+        log.warning("ai_context_failed", error=type(exc).__name__)
+        return None
+
 # Server-side scope policy for user-initiated agent tasks (least privilege):
 # tools NOT covered here are structurally unreachable, whatever the model
 # plans. Phase-9 adds the email/automation product surfaces: email:send and
@@ -426,6 +438,8 @@ async def run_agent_task(
             persistence=hooks,
             max_steps=settings.agent_max_steps,
             should_cancel=cancelled_in_db,
+            language=task.language,
+            context=await build_context(session, task),
         )
 
         outcome_status = "failed"
@@ -467,6 +481,19 @@ async def run_agent_task(
                     )
                 )
                 await session.commit()
+                # Chat mode: keep this answer as the thread's latest turn (24 h)
+                # and learn lasting facts about the user, before delivery scrubs it.
+                answer_text = str((result.report or {}).get("answer") or "")
+                if task.thread_id and answer_text:
+                    try:
+                        from app.services.ai_memory import add_turn, learn_from_chat
+
+                        await add_turn(session, task.user_id, task.thread_id, "assistant", answer_text)
+                        await learn_from_chat(session, make_chat_client(settings), task.user_id, task.objective, answer_text)
+                        await session.commit()
+                    except Exception as exc:
+                        await session.rollback()
+                        log.warning("chat_memory_failed", error=type(exc).__name__)
                 # Send the result to the user's Telegram chat; on success our
                 # copy (files + text) is removed - history lives in Telegram.
                 try:

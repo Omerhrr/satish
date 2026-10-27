@@ -101,6 +101,15 @@ def render_notification_text(row: Notification, job_name: str | None) -> str:
         if payload.get("confirmed"):
             return f"📥 You received {amount:,} sats{test}. It's confirmed and in your Satish wallet."
         return f"📥 You're receiving {amount:,} sats{test}. It's waiting to confirm; we'll tell you when it does."
+    if row.kind == "price.alert":
+        cur = payload.get("currency", "")
+        word = "above" if payload.get("direction") == "above" else "below"
+        return (
+            f"🔔 Bitcoin is now {payload.get('price_text', '')} ({word} your alert at "
+            f"{payload.get('target_text', '')}). Open Satish to send, receive or save."
+        ) if cur else "🔔 Your bitcoin price alert was hit."
+    if row.kind == "savings.goal_reached":
+        return f"🎉 You reached your savings goal \"{payload.get('name', '')}\". Well done!"
     return f"Satish notification ({row.kind})."
 
 

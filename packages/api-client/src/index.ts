@@ -29,6 +29,7 @@ import type {
   RateOut,
   SessionInfo,
   SessionOut,
+  UserOut,
   TaskCreateIn,
   TaskEstimateOut,
   TaskEventPageOut,
@@ -36,6 +37,27 @@ import type {
   TaskResultOut,
   TaskStepOut,
 } from "@xp/shared-types";
+
+export interface PriceAlert {
+  id: string;
+  currency: string;
+  direction: "above" | "below";
+  target: number;
+  active: boolean;
+  triggered_at: string | null;
+  created_at: string;
+}
+
+export interface SavingsGoal {
+  id: string;
+  name: string;
+  target_amount: number;
+  currency: string; // "SAT" or a fiat code
+  deadline: string | null;
+  weekly_reminder: boolean;
+  reached_at: string | null;
+  created_at: string;
+}
 
 export interface XpClientConfig {
   apiPort?: string | number;
@@ -49,6 +71,22 @@ export interface XpClient {
   health: () => Promise<HealthOut>;
   capabilities: () => Promise<CapabilitiesOut>;
   authTelegram: (initData?: string) => Promise<SessionOut>;
+  me: () => Promise<UserOut>;
+  groupPayment: (id: string) => Promise<{ id: string; kind: string; to_username: string; amount_sats: number; display: string; note: string | null; already_paid: boolean }>;
+  groupPaid: (id: string, ref: string) => Promise<{ status: string }>;
+  priceAlerts: () => Promise<PriceAlert[]>;
+  addPriceAlert: (a: { currency: string; direction: "above" | "below"; target: number }) => Promise<PriceAlert>;
+  deletePriceAlert: (id: string) => Promise<void>;
+  goals: () => Promise<SavingsGoal[]>;
+  addGoal: (g: { name: string; target_amount: number; currency: string; deadline?: string | null }) => Promise<SavingsGoal>;
+  goalReached: (id: string) => Promise<SavingsGoal>;
+  deleteGoal: (id: string) => Promise<void>;
+  aiMemory: () => Promise<{ id: string; text: string; source: string; created_at: string }[]>;
+  aiRemember: (text: string) => Promise<{ id: string; text: string; source: string; created_at: string }[]>;
+  aiForget: (id?: string) => Promise<void>;
+  linkStart: () => Promise<{ code: string; poll_token: string; expires_in: number; bot_username: string | null }>;
+  /** null while waiting for /link in Telegram. */
+  linkPoll: (pollToken: string) => Promise<SessionOut | null>;
   balance: () => Promise<BalanceOut>;
   ledger: (limit?: number, offset?: number) => Promise<LedgerPageOut>;
   devGrant: (payload: DevGrantIn) => Promise<BalanceOut>;
@@ -118,6 +156,8 @@ export interface XpClient {
   getRequest: (id: string) => Promise<PaymentRequestOut>;
   cancelRequest: (id: string) => Promise<PaymentRequestOut>;
   btcPrice: () => Promise<{ btc_ngn: number; btc_usd: number | null; updated_at: number; source: string }>;
+  /** Price of 1 BTC in every currency (code -> price). */
+  btcRates: () => Promise<{ btc: Record<string, number>; updated_at: number; source: string }>;
   onrampStatus: () => Promise<{ enabled: boolean; default_fiat: string }>;
   onrampLink: (body: { address: string; fiat?: string; amount?: number }) => Promise<{ url: string; expires_at: string }>;
   handleLightningPublish: (body: { network: string; identity_pubkey: string; ln_network: string; spark_address: string; signature: string }) => Promise<HandleLightningOut>;
@@ -248,6 +288,7 @@ export function createXpClient(config: XpClientConfig = {}): XpClient {
       throw new Error(friendlyError(res.status, detail));
     }
     if (res.status === 204) return undefined as T;
+    if (res.status === 202) return { pending: true } as T;
     return (await res.json()) as T;
   }
 
@@ -263,6 +304,27 @@ export function createXpClient(config: XpClientConfig = {}): XpClient {
   return {
     health: () => request<HealthOut>("/api/v1/health"),
     capabilities: () => request<CapabilitiesOut>("/api/v1/capabilities"),
+    me: () => request<UserOut>("/api/v1/auth/me"),
+    groupPayment: (id) => request(`/api/v1/group/${id}`),
+    groupPaid: (id, ref) => request(`/api/v1/group/${id}/paid`, { method: "POST", body: JSON.stringify({ ref }) }),
+    priceAlerts: () => request("/api/v1/alerts/price"),
+    addPriceAlert: (a) => request("/api/v1/alerts/price", { method: "POST", body: JSON.stringify(a) }),
+    deletePriceAlert: (id) => request<void>(`/api/v1/alerts/price/${id}`, { method: "DELETE" }),
+    goals: () => request("/api/v1/goals"),
+    addGoal: (g) => request("/api/v1/goals", { method: "POST", body: JSON.stringify(g) }),
+    goalReached: (id) => request(`/api/v1/goals/${id}/reached`, { method: "POST" }),
+    deleteGoal: (id) => request<void>(`/api/v1/goals/${id}`, { method: "DELETE" }),
+    aiMemory: () => request("/api/v1/ai/memory"),
+    aiRemember: (text) => request("/api/v1/ai/memory", { method: "POST", body: JSON.stringify({ text }) }),
+    aiForget: (id) => request<void>(id ? `/api/v1/ai/memory/${id}` : "/api/v1/ai/memory", { method: "DELETE" }),
+    linkStart: () => request("/api/v1/auth/link/start", { method: "POST" }),
+    linkPoll: async (pollToken) => {
+      const r = await request<SessionOut | { pending: true }>("/api/v1/auth/link/poll", {
+        method: "POST",
+        body: JSON.stringify({ poll_token: pollToken }),
+      });
+      return r && "session_token" in r ? r : null;
+    },
     authTelegram: (initData = "") =>
       request<SessionOut>("/api/v1/auth/telegram", {
         method: "POST",
@@ -386,6 +448,7 @@ export function createXpClient(config: XpClientConfig = {}): XpClient {
     getRequest: (id) => request(`/api/v1/requests/${encodeURIComponent(id)}`),
     cancelRequest: (id) => request(`/api/v1/requests/${encodeURIComponent(id)}/cancel`, { method: "POST" }),
     btcPrice: () => request("/api/v1/price/btc"),
+    btcRates: () => request("/api/v1/price/rates"),
     onrampStatus: () => request("/api/v1/onramp/status"),
     onrampLink: (body) => request("/api/v1/onramp/link", { method: "POST", body: JSON.stringify(body) }),
     handleLightningPublish: (body) => request("/api/v1/handles/lightning", { method: "POST", body: JSON.stringify(body) }),
