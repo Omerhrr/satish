@@ -92,11 +92,24 @@ def card_text(g: GroupPayment) -> str:
         tail = "\n✅ Paid" if paid else "\nTap below to pay it from your Satish wallet."
         return head + tail
     lines = [f"🧾 Split{note}: {g.display} each ({sats}) to @{g.to_username}"]
+    paid_set = {k.lower() for k in paid}
+    no_set = {k.lower() for k in (g.declined or [])}
     for p in g.participants or []:
-        lines.append(f"{'✅' if p.lower() in {k.lower() for k in paid} else '⬜'} @{p}")
-    done = sum(1 for p in g.participants or [] if p.lower() in {k.lower() for k in paid})
+        mark = "✅" if p.lower() in paid_set else "❌" if p.lower() in no_set else "⬜"
+        lines.append(f"{mark} @{p}")
+    done = sum(1 for p in g.participants or [] if p.lower() in paid_set)
     lines.append(f"\n{done} of {len(g.participants or [])} paid. Tap below to pay your share.")
     return "\n".join(lines)
+
+
+def mini_app_link(param: str, bot_username: str | None = None) -> str:
+    """A t.me link that opens the Satish Mini App inside Telegram (not a web page)."""
+    s = get_settings()
+    bot = (bot_username or s.telegram_bot_username or "").lstrip("@")
+    if not bot:
+        return f"{s.mini_app_url.rstrip('/')}/?gp={param.removeprefix('gp_')}"
+    short = (s.telegram_miniapp_short_name or "").strip("/")
+    return f"https://t.me/{bot}/{short}?startapp={param}" if short else f"https://t.me/{bot}?startapp={param}"
 
 
 class CreateIn(BaseModel):
@@ -109,6 +122,7 @@ class CreateIn(BaseModel):
     participants: list[str] = Field(default_factory=list, max_length=30)  # split
     note: str | None = Field(default=None, max_length=140)
     chat_id: int | None = None
+    bot_username: str | None = Field(default=None, max_length=64)
 
 
 @router.post("/create")
@@ -162,10 +176,23 @@ async def create(payload: CreateIn, session: DbSession, x_bot_key: str = Header(
         participants=people or None,
         paid={},
         chat_id=payload.chat_id,
+        declined=[],
     )
+    g.pay_url = mini_app_link(f"gp_{g.id}", payload.bot_username)
     session.add(g)
     await session.commit()
-    return {"status": "ok", "id": g.id, "text": card_text(g), "start_param": f"gp_{g.id}"}
+    # People to invite privately (the bot can only message people who have used Satish).
+    invite, unknown = [], []
+    for p in people:
+        tg = await session.scalar(select(TelegramAccount).where(func.lower(TelegramAccount.username) == p.lower()))
+        (invite if tg else unknown).append(
+            {"username": p, "telegram_user_id": tg.telegram_user_id} if tg else p
+        )
+    return {
+        "status": "ok", "id": g.id, "text": card_text(g), "start_param": f"gp_{g.id}", "pay_url": g.pay_url,
+        "invite": invite, "not_on_satish": unknown,
+        "from_name": payload.first_name or payload.username or "Someone",
+    }
 
 
 class MessageIn(BaseModel):
@@ -182,6 +209,32 @@ async def set_message(gid: str, payload: MessageIn, session: DbSession, x_bot_ke
         g.message_id = payload.message_id
         await session.commit()
     return {"status": "ok"}
+
+
+class DeclineIn(BaseModel):
+    telegram_user_id: int
+
+
+@router.post("/{gid}/decline")
+async def decline(gid: str, payload: DeclineIn, session: DbSession, x_bot_key: str = Header(default="")) -> dict:
+    """A participant tapped Decline on their private invitation."""
+    s = get_settings()
+    if not s.telegram_bot_token or not hmac.compare_digest(x_bot_key, bot_key(s.telegram_bot_token)):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "bot only")
+    g = await session.get(GroupPayment, gid)
+    if g is None:
+        return {"status": "not_found"}
+    tg = await session.scalar(select(TelegramAccount).where(TelegramAccount.telegram_user_id == payload.telegram_user_id))
+    who = ((tg.username if tg else None) or "").lower()
+    if not who or who not in {p.lower() for p in g.participants or []}:
+        return {"status": "not_invited"}
+    if who in {k.lower() for k in (g.paid or {})}:
+        return {"status": "already_paid"}
+    g.declined = sorted({*(g.declined or []), who})
+    await session.commit()
+    await _edit_card(g)
+    creator_tg = await session.scalar(select(TelegramAccount.telegram_user_id).where(TelegramAccount.user_id == g.creator_user_id))
+    return {"status": "declined", "creator_telegram_id": creator_tg, "who": who, "note": g.note, "display": g.display}
 
 
 class GroupOut(BaseModel):
@@ -222,6 +275,8 @@ async def mark_paid(gid: str, payload: PaidIn, user: CurrentUser, session: DbSes
     paid = dict(g.paid or {})
     paid[me] = payload.ref
     g.paid = paid
+    if g.declined and me in g.declined:
+        g.declined = [d for d in g.declined if d != me]
     await session.commit()
     await _edit_card(g)
     return {"status": "ok"}
@@ -239,7 +294,7 @@ async def _edit_card(g: GroupPayment) -> None:
                     "chat_id": g.chat_id,
                     "message_id": g.message_id,
                     "text": card_text(g),
-                    "reply_markup": {"inline_keyboard": [[{"text": "💸 Pay in Satish", "url": f"{s.mini_app_url}?startapp=gp_{g.id}"}]]},
+                    "reply_markup": {"inline_keyboard": [[{"text": "💸 Pay in Satish", "url": g.pay_url or mini_app_link(f"gp_{g.id}")}]]},
                 },
             )
     except httpx.HTTPError as exc:

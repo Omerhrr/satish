@@ -64,6 +64,9 @@ class Settings(BaseSettings):
     telegram_init_data_max_age_seconds: int = 86400
     mini_app_url: str = "https://t.me/XPDevBot/app"
     telegram_bot_username: str | None = None  # without @, shown on the extension sign-in screen
+    # Short name of the Mini App in BotFather (t.me/<bot>/<short>). Empty: links use the bot's
+    # Main Mini App (t.me/<bot>?startapp=...), set in BotFather > Bot Settings > Configure Mini App.
+    telegram_miniapp_short_name: str = ""
     # Notification relay (phase 9, KL-06): "canned" records a deterministic
     # local receipt and states that nothing was transmitted; "bot_api" sends
     # for real and refuses to construct without a bot token.

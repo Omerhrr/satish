@@ -896,9 +896,10 @@ def build_product_registry(
             name="docs.generate_pdf",
             category="documents",
             description=(
-                "Make a PDF report. Put the full written report in sections (one string per "
-                "section, headings with #, bullets with -), using the facts you read, with "
-                "source names; the source list is added automatically."
+                "Make a PDF report. Put the full written report in sections (one Markdown string per "
+                "section: ## headings, lists, **bold**, tables with | col | col |), using the facts you "
+                "read, with source names. Add charts as fenced ```chart blocks holding an ECharts option "
+                "in JSON (bar, line, pie, colours allowed; no functions). Sources are added automatically."
             ),
             input_schema={
                 "type": "object",

@@ -43,6 +43,8 @@ export default defineNuxtConfig({
     }
   },
   app: {
+    // Chrome refuses extensions with files or folders starting with "_" (Nuxt's default is /_nuxt/).
+    ...(isExtension ? { buildAssetsDir: "/assets/" } : {}),
     head: {
       title: isExtension ? "Satish" : "Satish - your bitcoin wallet in Telegram",
       htmlAttrs: { lang: "en" },

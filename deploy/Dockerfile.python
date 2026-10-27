@@ -4,7 +4,7 @@ FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
 # WeasyPrint (PDF reports) needs Pango + a font.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends libpango-1.0-0 libpangoft2-1.0-0 fonts-dejavu-core \
+ && apt-get install -y --no-install-recommends libpango-1.0-0 libpangoft2-1.0-0 fonts-dejavu-core nodejs npm \
  && rm -rf /var/lib/apt/lists/* \
  && pip install uv
 
@@ -13,6 +13,8 @@ COPY packages/py-core packages/py-core
 COPY services services
 COPY apps/bot apps/bot
 COPY tests/data tests/data
+# Charts in reports and Telegram answers: ECharts rendered by Node (no browser).
+RUN cd services/chart-renderer && npm install --omit=dev --no-audit --no-fund
 RUN uv pip install --system \
       -e packages/py-core -e services/api -e services/worker \
       -e services/agent-adapter -e services/lightning-adapter \

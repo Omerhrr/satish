@@ -134,27 +134,10 @@ def render_report_html(spec: ReportSpec) -> str:
     limitations_html = "".join(f"<li>{esc(item)}</li>" for item in spec.limitations)
     modes_html = "".join(f"<li>{esc(m)}</li>" for m in spec.mode_notes)
 
-    def _block(text: str) -> str:
-        out, items = [], []
-        for raw in str(text).splitlines():
-            line = raw.strip()
-            if line.startswith(("- ", "* ", "• ")):
-                items.append(f"<li>{esc(line[2:].strip())}</li>")
-                continue
-            if items:
-                out.append("<ul>" + "".join(items) + "</ul>")
-                items = []
-            if not line:
-                continue
-            if line.startswith("#"):
-                out.append(f"<h3>{esc(line.lstrip('#').strip())}</h3>")
-            else:
-                out.append(f"<p>{esc(line.replace('**', ''))}</p>")
-        if items:
-            out.append("<ul>" + "".join(items) + "</ul>")
-        return "".join(out)
+    from xp_core.services.rich_text import rich_html
 
-    body_html = "".join(_block(b) for b in spec.body if str(b).strip())
+    # Markdown with tables and ECharts charts (drawn to SVG on the server).
+    body_html = rich_html("\n\n".join(str(b) for b in spec.body if str(b).strip()))
     report_html = f"<h2>Report</h2>{body_html}" if body_html else ""
 
     doc = f"""<!DOCTYPE html>
@@ -179,6 +162,17 @@ def render_report_html(spec: ReportSpec) -> str:
             border-left: 3px solid #f7931a; }}
   .limit ul {{ margin: 6px 0 0; }}
   h3 {{ font-size: 12.5px; margin: 14px 0 4px; }}
+  h4 {{ font-size: 11.5px; margin: 12px 0 4px; }}
+  table {{ border-collapse: collapse; width: 100%; margin: 10px 0 14px; font-size: 10.5px; }}
+  th {{ background: #14181f; color: #fff; text-align: left; padding: 6px 8px; }}
+  td {{ padding: 5px 8px; border-bottom: 1px solid #e5e7eb; }}
+  tr:nth-child(even) td {{ background: #f8fafc; }}
+  td[style*="right"], th[style*="right"] {{ text-align: right; }}
+  figure.chart {{ margin: 12px 0 16px; page-break-inside: avoid; }}
+  figure.chart svg {{ width: 100%; height: auto; }}
+  code {{ background: #f1f5f9; padding: 0 3px; border-radius: 3px; font-size: 10px; }}
+  pre {{ background: #f1f5f9; padding: 8px; border-radius: 4px; font-size: 9.5px; white-space: pre-wrap; }}
+  blockquote {{ border-left: 3px solid #f7931a; margin: 8px 0; padding: 2px 10px; color: #475569; }}
   p {{ margin: 0 0 7px; }}
 </style></head><body>
   <div class="brand">SATISH · RESEARCH REPORT</div>

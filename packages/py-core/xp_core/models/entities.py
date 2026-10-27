@@ -294,6 +294,8 @@ class GroupPayment(Base):
     note: Mapped[str | None] = mapped_column(String(140), nullable=True)
     participants: Mapped[list | None] = mapped_column(JSON, nullable=True)  # telegram usernames (split)
     paid: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # who -> txid/ref
+    declined: Mapped[list | None] = mapped_column(JSON, nullable=True)  # who said no (split)
+    pay_url: Mapped[str | None] = mapped_column(String(255), nullable=True)  # t.me link that opens the Mini App
     chat_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     message_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

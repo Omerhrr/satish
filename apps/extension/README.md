@@ -13,8 +13,8 @@ Output: `apps/extension/dist/` and `apps/extension/satish-extension.zip`.
 
 ## Try it
 
-1. Open `chrome://extensions`, turn on Developer mode.
-2. Load unpacked, pick `apps/extension/dist` (or drag the zip in).
+1. Unzip `satish-extension.zip` into a folder (Chrome can't load a .zip directly).
+2. Open `chrome://extensions`, turn on Developer mode, click **Load unpacked** and pick that folder.
 3. Click the Satish icon. It shows a code; send `/link CODE` to the bot.
 
 ## What it does

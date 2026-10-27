@@ -76,3 +76,42 @@ def test_card_text_counts_paid():
                      note="dinner", participants=["musa", "bola"], paid={"musa": "tx"})
     t = card_text(g)
     assert "✅ @musa" in t and "⬜ @bola" in t and "1 of 2 paid" in t
+
+
+async def test_split_invites_links_and_decline(client, session, monkeypatch):
+    s = get_settings()
+    monkeypatch.setattr(s, "telegram_bot_token", "7000:TEST")
+    monkeypatch.setattr(s, "telegram_miniapp_short_name", "")
+    await _handle(session, "ada", 601, "ada_tg")
+    await _handle(session, "musa", 602, "musa_tg")
+    r = (
+        await client.post(
+            "/api/v1/group/create",
+            headers={"X-Bot-Key": bot_key("7000:TEST")},
+            json={"kind": "split", "telegram_user_id": 601, "username": "ada_tg", "first_name": "Ada", "amount": "3000",
+                  "participants": ["@musa_tg", "@stranger"], "bot_username": "SatishBot"},
+        )
+    ).json()
+    # Opens inside Telegram as a Mini App, not as a web page
+    assert r["pay_url"] == f"https://t.me/SatishBot?startapp=gp_{r['id']}"
+    assert r["invite"] == [{"username": "musa_tg", "telegram_user_id": 602}]
+    assert r["not_on_satish"] == ["stranger"] and r["from_name"] == "Ada"
+
+    no = (await client.post(f"/api/v1/group/{r['id']}/decline", headers={"X-Bot-Key": bot_key("7000:TEST")},
+                            json={"telegram_user_id": 602})).json()
+    assert no["status"] == "declined" and no["creator_telegram_id"] == 601
+    from xp_core.models.entities import GroupPayment
+
+    g = await session.get(GroupPayment, r["id"])
+    await session.refresh(g)
+    assert "❌ @musa_tg" in card_text(g)
+    outsider = (await client.post(f"/api/v1/group/{r['id']}/decline", headers={"X-Bot-Key": bot_key("7000:TEST")},
+                                  json={"telegram_user_id": 601})).json()
+    assert outsider["status"] == "not_invited"
+
+
+def test_short_name_link(monkeypatch):
+    from app.api.v1.group_pay import mini_app_link
+
+    monkeypatch.setattr(get_settings(), "telegram_miniapp_short_name", "app")
+    assert mini_app_link("gp_x", "SatishBot") == "https://t.me/SatishBot/app?startapp=gp_x"

@@ -9,6 +9,8 @@ is deleted and the app keeps showing the result.
 
 from __future__ import annotations
 
+import html
+import re
 from typing import Any
 
 import httpx
@@ -78,12 +80,33 @@ async def deliver_task(
     header = f"✅ Satish AI · {task.objective[:120]}"
     try:
         async with httpx.AsyncClient(timeout=60, transport=transport) as client:
-            for i, chunk in enumerate(split_message(no_dashes(_plain(answer or task.deliverable or "Done.")))):
-                text = f"{header}\n\n{chunk}" if i == 0 and not task.thread_id else chunk  # chats need no header
-                r = await client.post(f"{base}/sendMessage", json={"chat_id": chat_id, "text": text,
+            # Markdown -> Telegram HTML; charts become photos after the text.
+            from xp_core.services.rich_text import markdown_to_telegram, render_charts, split_charts
+
+            body, chart_options = split_charts(no_dashes(answer or task.deliverable or "Done."))
+            body = re.sub(r"\[\[CHART:(\d+)\]\]", lambda m: f"📊 Chart {int(m.group(1)) + 1} below", body)
+            head = "" if task.thread_id else f"<b>{html.escape(header)}</b>\n\n"  # chats need no header
+            for i, chunk in enumerate(split_message(body)):
+                tg_html = (head if i == 0 else "") + markdown_to_telegram(chunk)
+                r = await client.post(f"{base}/sendMessage", json={"chat_id": chat_id, "text": tg_html, "parse_mode": "HTML",
                                                                    "disable_web_page_preview": True})
+                if r.status_code == 400:  # Telegram didn't like the formatting: send it plain
+                    plain = (f"{header}\n\n" if i == 0 and not task.thread_id else "") + _plain(chunk)
+                    r = await client.post(f"{base}/sendMessage", json={"chat_id": chat_id, "text": plain,
+                                                                       "disable_web_page_preview": True})
                 if r.status_code != 200 or not r.json().get("ok"):
                     return {"status": "failed", "reason": f"sendMessage HTTP {r.status_code}"}
+            for n, chart in enumerate(render_charts(chart_options, png=True)):
+                if not chart.png:
+                    continue
+                title = ((chart.option.get("title") or {}) if isinstance(chart.option.get("title"), dict) else {}).get("text") or f"Chart {n + 1}"
+                r = await client.post(
+                    f"{base}/sendPhoto",
+                    data={"chat_id": str(chat_id), "caption": f"📊 {str(title)[:200]}"},
+                    files={"photo": (f"chart-{n + 1}.png", chart.png, "image/png")},
+                )
+                if r.status_code != 200 or not r.json().get("ok"):
+                    log.info("chart_photo_failed", status=r.status_code)
             for a in artifacts:
                 path = storage.open_path(a.object_key)
                 if not path.is_file():

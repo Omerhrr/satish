@@ -130,9 +130,7 @@
 
     <section v-if="result" class="card">
       <h2>Result</h2>
-      <p class="small" style="margin: 6px 0">
-        <div class="answer">{{ result.answer || result.deliverable || "-" }}</div>
-      </p>
+      <RichAnswer class="answer" :text="result.answer || result.deliverable || '-'" />
 
       <button class="btn primary small" :disabled="sending" @click="sendToChat">
         <span v-if="sending" class="spinner" /> Send to my Telegram chat
@@ -460,7 +458,7 @@ onBeforeUnmount(() => poller && clearTimeout(poller));
 .mem-add input { flex: 1; min-width: 0; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); }
 .list-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .delivered { color: var(--green, #22c55e); margin: 4px 0; }
-.answer { white-space: pre-wrap; line-height: 1.6; font-size: 15px; margin: 4px 0 10px; }
+.answer { margin: 6px 0 10px; }
 .offline { background: var(--orange-soft); color: var(--orange); border-radius: 12px; padding: 10px 14px; margin-bottom: 12px; font-size: 14px; }
 .ask-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .credit-chip { flex: none; font-size: 13px; font-weight: 700; color: var(--orange); background: var(--orange-soft); border-radius: 999px; padding: 4px 12px; }

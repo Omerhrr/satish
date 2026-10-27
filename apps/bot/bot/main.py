@@ -55,6 +55,14 @@ async def _api_get(path: str) -> dict | None:
 
 
 async def _open_app(message: Message, text: str) -> None:
+    if message.chat.type != "private":
+        # Groups can't show Mini App buttons; a t.me link still opens Satish inside Telegram.
+        me = await message.bot.get_me()
+        short = (get_settings().telegram_miniapp_short_name or "").strip("/")
+        kb = InlineKeyboardBuilder()
+        kb.button(text="⚡ Open Satish", url=f"https://t.me/{me.username}/{short}" if short else f"https://t.me/{me.username}?startapp=home")
+        await message.answer(text, reply_markup=kb.as_markup())
+        return
     await message.answer(text, reply_markup=mini_app_keyboard(get_settings()))
 
 
@@ -278,9 +286,10 @@ async def _post_card(message: Message, kind: str, args: str) -> None:
     mentions = [p for p in rest if p.startswith("@")]
     note = " ".join(p for p in rest if not p.startswith("@")) or None
     u = message.from_user
+    me = await message.bot.get_me()
     body = {
         "kind": kind, "telegram_user_id": u.id, "username": u.username, "first_name": u.first_name,
-        "amount": amount, "note": note, "chat_id": message.chat.id,
+        "amount": amount, "note": note, "chat_id": message.chat.id, "bot_username": me.username,
     }
     if kind == "pay":
         body["to"] = mentions[0] if mentions else None
@@ -291,11 +300,63 @@ async def _post_card(message: Message, kind: str, args: str) -> None:
         st = (r or {}).get("status", "")
         await message.answer(GROUP_ERRORS.get(st, "Satish couldn't make that card right now.").format(who=(r or {}).get("who", "")))
         return
-    url = f"{get_settings().mini_app_url}?startapp={r['start_param']}"
+    # A t.me link opens Satish as a Mini App inside Telegram (a plain web link opens a browser).
     kb = InlineKeyboardBuilder()
-    kb.button(text="💸 Pay in Satish", url=url)
+    kb.button(text="💸 Pay in Satish", url=r["pay_url"])
     sent = await message.answer(r["text"], reply_markup=kb.as_markup())
     await _bot_post(f"/group/{r['id']}/message", {"message_id": sent.message_id})
+    if kind == "split":
+        await _invite(message, r)
+
+
+async def _invite(message: Message, r: dict) -> None:
+    """Privately ask each person in a split to accept (and pay) or decline."""
+    from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+
+    base = get_settings().mini_app_url.rstrip("/")
+    first_line = r["text"].splitlines()[0].replace("🧾 ", "")
+    missed = list(r.get("not_on_satish") or [])
+    for person in r.get("invite") or []:
+        kb = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="✅ Accept & pay", web_app=WebAppInfo(url=f"{base}/?gp={r['id']}")),
+            InlineKeyboardButton(text="❌ Decline", callback_data=f"gpd:{r['id']}"),
+        ]])
+        try:
+            await message.bot.send_message(
+                person["telegram_user_id"],
+                f"🧾 {r.get('from_name', 'Someone')} split a bill with you in {message.chat.title or 'a chat'}.\n"
+                f"{first_line}\n\nAccept to pay your share from your Satish wallet, or decline.",
+                reply_markup=kb,
+            )
+        except Exception:
+            missed.append(person["username"])
+    if missed:
+        await message.answer(
+            "I couldn't message " + ", ".join(f"@{m}" for m in missed)
+            + " privately. They need to open Satish once (tap the bot and press Start); they can still pay from the card above."
+        )
+
+
+@router.callback_query(F.data.startswith("gpd:"))
+async def split_declined(call) -> None:
+    gid = call.data.split(":", 1)[1]
+    r = await _bot_post(f"/group/{gid}/decline", {"telegram_user_id": call.from_user.id})
+    status_ = (r or {}).get("status")
+    if status_ == "declined":
+        await call.message.edit_text(call.message.text + "\n\n❌ You declined this split.")
+        if r.get("creator_telegram_id"):
+            try:
+                await call.bot.send_message(
+                    r["creator_telegram_id"],
+                    f"@{r['who']} declined your split" + (f" for {r['note']}" if r.get("note") else "") + f" ({r['display']}).",
+                )
+            except Exception:
+                pass
+        await call.answer("Declined")
+    elif status_ == "already_paid":
+        await call.answer("You've already paid this one ✅", show_alert=True)
+    else:
+        await call.answer("This split isn't available any more.", show_alert=True)
 
 
 @router.message(Command("pay"))

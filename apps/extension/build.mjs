@@ -5,7 +5,7 @@
 // Output: apps/extension/dist (load unpacked in chrome://extensions) and
 // apps/extension/satish-extension.zip (for the Chrome Web Store).
 import { execSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -46,6 +46,32 @@ const html = readFileSync(join(dist, "index.html"), "utf8").replace(
   },
 );
 writeFileSync(join(dist, "index.html"), html);
+
+// Chrome rejects files or folders whose name starts with "_" (e.g. the
+// "_id_" chunk from pages/pay/[id].vue): rename them and fix references.
+const underscored = walk(dist).filter((f) => relative(dist, f).split("/").pop().startsWith("_"));
+if (underscored.length) {
+  const renames = underscored.map((f) => {
+    const name = f.split("/").pop();
+    const to = join(dirname(f), "u" + name);
+    renameSync(f, to);
+    return [name, "u" + name];
+  });
+  for (const f of walk(dist)) {
+    if (!/\.(js|mjs|css|html|json)$/.test(f)) continue;
+    let text = readFileSync(f, "utf8");
+    let changed = false;
+    for (const [from, to] of renames) {
+      if (text.includes(from)) {
+        text = text.split(from).join(to);
+        changed = true;
+      }
+    }
+    if (changed) writeFileSync(f, text);
+  }
+}
+const reserved = walk(dist).map((f) => relative(dist, f)).filter((f) => f.split("/").some((part) => part.startsWith("_")));
+if (reserved.length) throw new Error(`names starting with "_" aren't allowed in extensions: ${reserved.slice(0, 5).join(", ")}`);
 
 const manifest = readFileSync(join(here, "manifest.template.json"), "utf8").replace("__API_ORIGIN__", new URL(api).origin);
 writeFileSync(join(dist, "manifest.json"), manifest);
