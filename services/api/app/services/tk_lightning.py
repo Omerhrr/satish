@@ -41,6 +41,7 @@ class TkLightningUnavailable(RuntimeError):
 class PayeeWallet(Protocol):
     async def create_invoice(self, amount_sats: int, description: str, expiry_secs: int) -> str: ...
     async def paid_invoices(self, since_unix: int) -> set[str]: ...
+    async def forward(self, destination: str, amount_sats: int, idempotency_key: str) -> str: ...
 
 
 class BreezPayeeWallet:
@@ -114,6 +115,21 @@ class BreezPayeeWallet:
 
 
 _wallet: PayeeWallet | None = None
+
+
+async def _breez_forward(self, destination: str, amount_sats: int, idempotency_key: str) -> str:
+    """Send sats on to a developer's Lightning (Spark) address. Returns the payment id."""
+    import breez_sdk_spark as b
+
+    sdk = await self._get()
+    prep = await sdk.prepare_send_payment(
+        b.PrepareSendPaymentRequest(payment_request=b.PaymentRequest.INPUT(input=destination), amount=amount_sats)
+    )
+    resp = await sdk.send_payment(b.SendPaymentRequest(prepare_response=prep, idempotency_key=idempotency_key))
+    return str(resp.payment.id)
+
+
+BreezPayeeWallet.forward = _breez_forward  # type: ignore[attr-defined]
 
 
 def get_wallet(settings: Settings) -> PayeeWallet:

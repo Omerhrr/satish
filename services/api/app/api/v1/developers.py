@@ -151,6 +151,9 @@ class PayReqIn(BaseModel):
     metadata: dict[str, Any] | None = None  # your order id etc., returned in webhooks
     redirect_url: str | None = Field(default=None, max_length=500)  # where the pay page sends people after paying
     network: Network | None = None  # defaults to the key's network
+    # Which ways the payer may pay. Lightning needs an amount, and is received
+    # by Satish then forwarded to your Lightning wallet within seconds.
+    methods: list[Literal["onchain", "lightning"]] = Field(default_factory=lambda: ["onchain", "lightning"])
 
     @field_validator("metadata")
     @classmethod
@@ -175,14 +178,22 @@ def _links(req: PaymentRequest) -> dict[str, str]:
     bot = (s.telegram_bot_username or "").lstrip("@")
     btc = req.amount_sats / 1e8 if req.amount_sats else None
     uri = f"bitcoin:{req.address}" + (f"?amount={btc:.8f}".rstrip("0").rstrip(".") if btc else "")
+    if req.ln_invoice:
+        uri += ("&" if "?" in uri else "?") + f"lightning={req.ln_invoice}"
     out = {"pay_url": f"{base}/pay/{req.id}", "bitcoin_uri": uri}
+    if req.ln_invoice:
+        out["lightning_invoice"] = req.ln_invoice
+        out["lightning_uri"] = f"lightning:{req.ln_invoice}"
     if bot:
         out["telegram_url"] = f"https://t.me/{bot}?start=pay_{req.id}"
     return out
 
 
 def _pay_out(req: PaymentRequest) -> dict:
-    return {**svc.request_public(req), "redirect_url": req.redirect_url, **_links(req)}
+    extra = {"paid_via": req.paid_via, "methods": ["onchain"] + (["lightning"] if req.ln_invoice else [])}
+    if req.paid_via == "lightning":
+        extra["forward_status"] = req.forward_status
+    return {**svc.request_public(req), "redirect_url": req.redirect_url, **extra, **_links(req)}
 
 
 @router.post("/payment-requests", status_code=status.HTTP_201_CREATED)
@@ -206,8 +217,29 @@ async def create_payment_request(payload: PayReqIn, caller: ApiCaller, session: 
     req.api_key_id = caller.key.id if caller.key else None
     req.meta = payload.metadata or None
     req.redirect_url = payload.redirect_url
+    warning = None
+    if "lightning" in payload.methods:
+        from app.services import dev_lightning
+
+        handle = await svc.my_handle(session, caller.user, network)
+        try:
+            await dev_lightning.attach_invoice(session, req, handle, get_settings())
+        except dev_lightning.NoLightning as exc:
+            if payload.methods == ["lightning"]:
+                await session.rollback()
+                raise HTTPException(422, str(exc)) from exc
+            warning = f"Bitcoin only: {exc}"
+        except Exception as exc:  # the Lightning service is down: Bitcoin still works
+            log.warning("dev_invoice_failed", error=type(exc).__name__)
+            if payload.methods == ["lightning"]:
+                await session.rollback()
+                raise HTTPException(503, "Couldn't make a Lightning invoice right now.") from exc
+            warning = "Bitcoin only: Lightning is unavailable right now."
     await session.commit()
-    return _pay_out(req)
+    out = _pay_out(req)
+    if warning:
+        out["warning"] = warning
+    return out
 
 
 @router.get("/payment-requests/{request_id}")
@@ -215,11 +247,21 @@ async def get_payment_request(request_id: str, caller: ApiCaller, session: DbSes
     req = await session.get(PaymentRequest, request_id)
     if req is None or req.user_id != caller.user.id:
         raise HTTPException(404, "No such payment request.")
+    await check_both(session, req)
+    return _pay_out(req)
+
+
+async def check_both(session, req: PaymentRequest, settings=None) -> None:
+    """Refresh a request from the chain and, if it has one, its Lightning invoice."""
+    from app.services import dev_lightning
+
+    settings = settings or get_settings()
     try:
-        await svc.refresh_request(session, req, get_settings())
+        if req.ln_invoice and req.status == "open":
+            await dev_lightning.settle(session, [req], settings)
+        await svc.refresh_request(session, req, settings)
     except Exception as exc:
         log.warning("request_check_failed", request_id=req.id, error=type(exc).__name__)
-    return _pay_out(req)
 
 
 @router.get("/payment-requests")

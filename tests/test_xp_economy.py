@@ -228,11 +228,18 @@ async def test_purchase_receipt_pdf_rendered(session, dev_user, client, tmp_path
     assert download.status_code == 200
     assert download.content[:4] == b"%PDF"
 
+    direct = await client.get(f"/api/v1/xp/purchases/{purchase['id']}/receipt")
+    assert direct.status_code == 200
+    assert direct.content[:4] == b"%PDF"
+    assert "attachment" in direct.headers["content-disposition"]
+
 
 async def test_receipt_pdf_refused_for_unsettled_purchase(client):
     created = await client.post("/api/v1/xp/purchases", json={"amount_sats": 300})
     resp = await client.post(f"/api/v1/xp/purchases/{created.json()['id']}/receipt.pdf")
     assert resp.status_code == 409
+    direct = await client.get(f"/api/v1/xp/purchases/{created.json()['id']}/receipt")
+    assert direct.status_code == 409
 
 
 # reconciliation

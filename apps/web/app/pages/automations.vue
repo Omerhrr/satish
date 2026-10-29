@@ -325,7 +325,7 @@ onMounted(load);
 .days button.on {
   background: var(--accent, #f7931a);
   border-color: transparent;
-  color: #111;
+  color: var(--on-accent);
   font-weight: 600;
 }
 .sched-row {

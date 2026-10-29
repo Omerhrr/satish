@@ -9,7 +9,11 @@
   --text-dim: #9aa3b2;
   --text-faint: #626c7d;
   --orange: #f7931a;
-  --orange-soft: rgba(247, 147, 26, 0.14);
+  --orange-soft: rgba(var(--orange-rgb), 0.14);
+  --orange-rgb: 247, 147, 26;
+  --on-accent: #14181f;
+  --hover: #202a3a;
+  --row-hover: rgba(255, 255, 255, 0.025);
   --green: #2fbf71;
   --green-soft: rgba(47, 191, 113, 0.14);
   --red: #ef4444;
@@ -26,6 +30,27 @@
   margin: 0;
   padding: 0;
 }
+
+/* Light mode: same layout, paper-coloured surfaces. The accent is set by useTheme. */
+:root[data-mode="light"] {
+  --bg: #f5f6f8;
+  --bg-elev: #ffffff;
+  --bg-elev2: #eef1f5;
+  --border: #dde2ea;
+  --text: #12161c;
+  --text-dim: #4f5968;
+  --text-faint: #8590a0;
+  --green: #15803d;
+  --green-soft: rgba(21, 128, 61, 0.1);
+  --red: #dc2626;
+  --red-soft: rgba(220, 38, 38, 0.09);
+  --hover: #e8ecf2;
+  --row-hover: rgba(0, 0, 0, 0.03);
+  --glass: rgba(245, 246, 248, 0.9);
+  --glass-elev: rgba(255, 255, 255, 0.96);
+}
+html[data-mode="light"] { color-scheme: light; }
+:root[data-mode="light"] .card { box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05); }
 
 html {
   color-scheme: dark;
@@ -62,7 +87,7 @@ a {
   gap: 10px;
   padding: 12px 16px;
   padding-top: max(12px, env(safe-area-inset-top));
-  background: rgba(11, 14, 17, 0.88);
+  background: var(--glass, rgba(11, 14, 17, 0.88));
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border);
 }
@@ -80,8 +105,8 @@ a {
   width: 30px;
   height: 30px;
   border-radius: 9px;
-  background: linear-gradient(135deg, #f7931a, #ffb84d);
-  color: #0b0e11;
+  background: var(--orange);
+  color: var(--on-accent);
   display: grid;
   place-items: center;
   font-weight: 900;
@@ -148,7 +173,7 @@ a {
 .tabbar a.on {
   color: var(--orange);
   background: var(--orange-soft);
-  border-color: rgba(247, 147, 26, 0.35);
+  border-color: rgba(var(--orange-rgb), 0.35);
 }
 
 main.page {
@@ -232,7 +257,7 @@ main.page {
   display: inline-block;
 }
 .dot.ok { background: var(--green); box-shadow: 0 0 8px rgba(47,191,113,.7); }
-.dot.not_configured { background: var(--orange); box-shadow: 0 0 8px rgba(247,147,26,.5); }
+.dot.not_configured { background: var(--orange); box-shadow: 0 0 8px rgba(var(--orange-rgb),.5); }
 .dot.error { background: var(--red); }
 
 /* buttons */
@@ -254,14 +279,14 @@ main.page {
   font-family: inherit;
 }
 
-.btn:hover { border-color: #35405233; background: #202a3a; }
+.btn:hover { border-color: #35405233; background: var(--hover); }
 .btn:active { transform: scale(0.98); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .btn.primary {
-  background: linear-gradient(135deg, #f7931a, #e8850d);
+  background: var(--orange);
   border-color: transparent;
-  color: #14181f;
+  color: var(--on-accent);
 }
 .btn.primary:hover { filter: brightness(1.06); }
 
@@ -312,7 +337,7 @@ label.field textarea {
 label.field input:focus,
 label.field textarea:focus {
   border-color: var(--orange);
-  box-shadow: 0 0 0 3px rgba(247, 147, 26, 0.15);
+  box-shadow: 0 0 0 3px rgba(var(--orange-rgb), 0.15);
 }
 
 /* table */
@@ -350,7 +375,7 @@ table.ledger td {
 }
 
 table.ledger tr:last-child td { border-bottom: none; }
-table.ledger tr:hover td { background: rgba(255, 255, 255, 0.025); }
+table.ledger tr:hover td { background: var(--row-hover); }
 
 .amount-pos { color: var(--green); font-family: var(--mono); font-weight: 700; }
 .amount-neg { color: var(--red); font-family: var(--mono); font-weight: 700; }
@@ -414,7 +439,7 @@ table.ledger tr:hover td { background: rgba(255, 255, 255, 0.025); }
   padding: 22px 18px;
   margin-bottom: 14px;
   background:
-    radial-gradient(120% 160% at 85% -20%, rgba(247, 147, 26, 0.18), transparent 55%),
+    radial-gradient(120% 160% at 85% -20%, rgba(var(--orange-rgb), 0.18), transparent 55%),
     var(--bg-elev);
 }
 
@@ -441,7 +466,7 @@ table.ledger tr:hover td { background: rgba(255, 255, 255, 0.025); }
   top: 0;
   z-index: 40;
   padding-top: max(8px, env(safe-area-inset-top));
-  background: rgba(11, 14, 17, 0.92);
+  background: var(--glass, rgba(11, 14, 17, 0.92));
   backdrop-filter: blur(12px);
 }
 main.page { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
@@ -454,7 +479,7 @@ main.page { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
   display: grid;
   grid-template-columns: 1fr 1fr;
   padding: 6px 12px max(8px, env(safe-area-inset-bottom));
-  background: rgba(19, 23, 32, 0.96);
+  background: var(--glass-elev, rgba(19, 23, 32, 0.96));
   backdrop-filter: blur(12px);
   border-top: 1px solid var(--border);
 }

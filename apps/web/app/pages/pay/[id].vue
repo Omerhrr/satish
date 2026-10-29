@@ -1,6 +1,6 @@
 <template>
   <div class="paypage">
-    <header class="brand"><span class="badge">S</span> Satish</header>
+    <header class="brand"><img class="badge" src="/logo.png" alt="" width="28" height="28" /> Satish</header>
 
     <section v-if="loading" class="card center"><span class="spinner" /> Loading…</section>
 
@@ -32,17 +32,32 @@
           <button v-if="inTelegram" class="btn primary" @click="payInApp">Pay with my Satish wallet</button>
           <a v-else-if="botLink" class="btn primary" :href="botLink">Pay with Satish on Telegram</a>
 
-          <div class="qr" v-html="qrSvg" />
-          <div class="addr mono">{{ req.address }}</div>
-          <div class="row">
-            <button class="btn" @click="copy(req.address)">{{ copied ? "Copied ✓" : "Copy address" }}</button>
-            <a class="btn" :href="bip21">Open in my wallet app</a>
+          <div v-if="lnInvoice" class="seg" role="tablist">
+            <button role="tab" :aria-selected="method === 'lightning'" :class="{ on: method === 'lightning' }" @click="method = 'lightning'">⚡ Lightning</button>
+            <button role="tab" :aria-selected="method === 'onchain'" :class="{ on: method === 'onchain' }" @click="method = 'onchain'">₿ Bitcoin</button>
           </div>
-          <p class="small dim">
-            Scan or copy into any bitcoin wallet.
-            <template v-if="req.amount_sats">Send exactly {{ req.amount_sats.toLocaleString() }} sats.</template>
-            <span class="ok">✓ Address verified for @{{ req.username }}</span>
-          </p>
+          <template v-if="method === 'lightning' && lnInvoice">
+            <div class="qr" v-html="lnQr" />
+            <div class="addr mono">{{ lnInvoice.slice(0, 32) }}…</div>
+            <div class="row">
+              <button class="btn" @click="copy(lnInvoice)">{{ copied ? "Copied ✓" : "Copy invoice" }}</button>
+              <a class="btn" :href="'lightning:' + lnInvoice">Open in my wallet app</a>
+            </div>
+            <p class="small dim">Scan with any Lightning wallet. Instant, tiny fees. Satish passes it straight on to @{{ req.username }}.</p>
+          </template>
+          <template v-else>
+            <div class="qr" v-html="qrSvg" />
+            <div class="addr mono">{{ req.address }}</div>
+            <div class="row">
+              <button class="btn" @click="copy(req.address)">{{ copied ? "Copied ✓" : "Copy address" }}</button>
+              <a class="btn" :href="bip21">Open in my wallet app</a>
+            </div>
+            <p class="small dim">
+              Scan or copy into any bitcoin wallet.
+              <template v-if="req.amount_sats">Send exactly {{ req.amount_sats.toLocaleString() }} sats.</template>
+              <span class="ok">✓ Address verified for @{{ req.username }}</span>
+            </p>
+          </template>
           <p class="small status">
             <span class="spinner" />
             <template v-if="req.paid_sats">Payment seen ({{ req.paid_sats.toLocaleString() }} sats). Waiting for confirmation…</template>
@@ -94,6 +109,11 @@ const bip21 = computed(() => {
   if (q.note) params.set("message", q.note);
   return `bitcoin:${q.address}?${params.toString()}`;
 });
+const lnInvoice = computed(() => ((req.value as any)?.lightning_invoice as string | null) || "");
+const method = ref<"lightning" | "onchain">("lightning");
+const lnQr = computed(() =>
+  lnInvoice.value ? renderSVG("LIGHTNING:" + lnInvoice.value.toUpperCase(), { border: 2, whiteColor: "#ffffff", blackColor: "#0b0e11" }) : "",
+);
 const qrSvg = computed(() => (bip21.value ? renderSVG(bip21.value, { border: 2, whiteColor: "#ffffff", blackColor: "#0b0e11" }) : ""));
 
 async function load() {
@@ -131,11 +151,14 @@ onBeforeUnmount(() => timer && clearInterval(timer));
 <style scoped>
 .paypage { max-width: 460px; margin: 0 auto; padding: 16px; min-height: 100vh; }
 .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; margin-bottom: 14px; }
-.badge { background: var(--orange); color: #0b0e11; border-radius: 8px; width: 28px; height: 28px; display: grid; place-items: center; }
+.badge { border-radius: 8px; width: 28px; height: 28px; }
 .center { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .who { font-size: 22px; font-weight: 700; color: var(--orange); }
 .amount { font-size: 30px; font-weight: 800; }
 .note { font-style: italic; color: var(--text-dim); }
+.seg { display: flex; gap: 6px; justify-content: center; margin: 12px 0 4px; }
+.seg button { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--border); background: transparent; color: inherit; }
+.seg button.on { background: var(--orange); color: var(--on-accent); border-color: transparent; font-weight: 600; }
 .paid { color: var(--green); font-weight: 700; font-size: 18px; margin-top: 8px; }
 .warn { color: var(--red); font-weight: 600; }
 .ok { color: var(--green); display: block; margin-top: 4px; }

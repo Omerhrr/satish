@@ -45,6 +45,7 @@
       </button>
       <p v-if="!methods.length && rate" class="small err">Payments aren't set up yet.</p>
       <p v-if="error" class="notice small">{{ error }}</p>
+      <p v-if="receiptNote" class="small" style="color: var(--green)">{{ receiptNote }}</p>
     </section>
 
     <section v-if="paying" ref="payCard" class="card pay">
@@ -393,21 +394,29 @@ async function settle(p: PurchaseOut) {
   }
 }
 
+const receiptNote = ref<string | null>(null);
 async function receipt(p: PurchaseOut) {
   receipting.value = p.id;
   error.value = null;
+  receiptNote.value = null;
   try {
-    const art = (await api.createReceiptArtifact(p.id)) as { artifact_id?: string };
-    await new Promise((r) => setTimeout(r, 1200));
+    if ((window as any).Telegram?.WebApp?.initData) {
+      // Telegram's in-app browser can't save files: the bot sends the PDF to the chat instead.
+      await api.sendReceiptToTelegram(p.id);
+      receiptNote.value = "🧾 Receipt sent to your Telegram chat with Satish.";
+      return;
+    }
     const token = sessionStorage.getItem("xp_session_token") ?? localStorage.getItem("xp_session_token");
-    const res = await fetch(api.artifactDownloadUrl({ id: art.artifact_id } as any), {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
-    if (!res.ok) throw new Error("The receipt isn't ready yet. Try again in a moment.");
+    const res = await fetch(api.receiptUrl(p.id), { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+    if (!res.ok) {
+      let msg = "Couldn't make the receipt. Try again in a moment.";
+      try { msg = (await res.json()).detail || msg; } catch { /* not json */ }
+      throw new Error(msg);
+    }
     const url = URL.createObjectURL(await res.blob());
     const link = document.createElement("a");
     link.href = url;
-    link.download = "xp-receipt.pdf";
+    link.download = `satish-receipt-${p.id.slice(0, 8)}.pdf`;
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 10_000);
   } catch (e) {
@@ -437,7 +446,7 @@ onMounted(refresh);
 .pay { border-color: var(--orange); }
 .quick, .seg { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
 .chipbtn, .seg button { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--border); background: transparent; color: inherit; font-size: 14px; }
-.chipbtn.on, .seg button.on { background: var(--orange); border-color: transparent; color: #111; font-weight: 600; }
+.chipbtn.on, .seg button.on { background: var(--orange); border-color: transparent; color: var(--on-accent); font-weight: 600; }
 .payee { display: flex; gap: 8px; align-items: center; }
 .linkbtn { background: none; border: 0; color: var(--orange); font-size: 13px; padding: 0; }
 .paid { color: var(--green); font-weight: 600; }

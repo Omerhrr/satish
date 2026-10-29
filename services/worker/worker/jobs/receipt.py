@@ -81,10 +81,31 @@ def _render_html(lines: dict[str, Any]) -> str:
     )
 
 
-def _render_and_store(artifact_id: str, lines: dict[str, Any]) -> dict[str, Any]:
+def receipt_lines(row: PaymentIntent, entry: XpLedgerEntry | None) -> dict[str, Any]:
+    from datetime import UTC, datetime
+
+    return {
+        "purchase_id": row.id,
+        "payment_hash": row.provider_reference,
+        "amount_sats": row.amount_sats,
+        "xp_amount": row.xp_amount,
+        "rate": get_settings().xp_per_sat,
+        "status": row.status,
+        "settled_at": row.settled_at,
+        "ledger_entry_id": entry.id if entry else None,
+        "balance_after": entry.balance_after if entry else None,
+        "rendered_at": datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC"),
+    }
+
+
+def render_pdf(lines: dict[str, Any]) -> bytes:
     from weasyprint import HTML  # heavy import, lazy
 
-    pdf_bytes = HTML(string=_render_html(lines)).write_pdf()
+    return HTML(string=_render_html(lines)).write_pdf()
+
+
+def _render_and_store(artifact_id: str, lines: dict[str, Any]) -> dict[str, Any]:
+    pdf_bytes = render_pdf(lines)
     storage = LocalStorage(get_settings().artifact_dir)
     key = f"receipts/{lines.get('purchase_id', artifact_id)}/receipt.pdf"
     stored = storage.save_bytes(key, pdf_bytes)
@@ -119,22 +140,9 @@ async def generate_receipt_pdf(
         ).scalar_one_or_none()
     if row is None:
         raise ValueError(f"purchase {purchase_id} not found")
-
-    from datetime import UTC, datetime
-
-    lines = {
-        "purchase_id": row.id,
-        "payment_hash": row.provider_reference,
-        "amount_sats": row.amount_sats,
-        "xp_amount": row.xp_amount,
-        "rate": get_settings().xp_per_sat,
-        "status": row.status,
-        "settled_at": row.settled_at,
-        "ledger_entry_id": entry.id if entry else None,
-        "balance_after": entry.balance_after if entry else None,
-        "rendered_at": datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC"),
-    }
+    lines = receipt_lines(row, entry)
     stored = await asyncio.to_thread(_render_and_store, artifact_id, lines)
+
 
     async with factory() as session:
         art = (

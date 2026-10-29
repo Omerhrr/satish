@@ -94,8 +94,11 @@ describe("lightning wallet", () => {
     await expect(w.parse("hello")).rejects.toThrow(/doesn't look like/);
     const { prep, quote } = await w.prepare("lnbc2u1xyz");
     expect(quote).toEqual({ amount: 2000, fee: 3 });
-    await w.send(prep, "idem-1");
-    expect(f.calls.send[0]).toMatchObject({ idempotencyKey: "idem-1", options: { type: "bolt11Invoice", preferSpark: true } });
+    const key = "0b9f6a52-3c1e-4d8a-9f1b-2a7c5e6d4b31"; // Spark only accepts UUID keys
+    await w.send(prep, key);
+    expect(f.calls.send[0]).toMatchObject({ idempotencyKey: key, options: { type: "bolt11Invoice", preferSpark: true } });
+    await w.send(prep, "not-a-uuid");
+    expect(f.calls.send[1].idempotencyKey).toBeUndefined();
   });
 
   test("failed payments throw; deposits explain high fees; lightning address only on mainnet", async () => {

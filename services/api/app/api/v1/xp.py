@@ -11,7 +11,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, Response, status
 from sqlalchemy import func, select
 from xp_core.config import get_settings
 from xp_core.jobs.reconciliation import reconcile_all
@@ -210,6 +210,55 @@ async def purchase_receipt_pdf(
         "status": "accepted",
         "download_url": f"/api/v1/artifacts/{artifact.id}/download",
     }
+
+
+async def _receipt_bytes(session, user, purchase_id: str) -> tuple[bytes, str]:
+    import asyncio
+
+    from worker.jobs.receipt import receipt_lines, render_pdf
+
+    row = await xp_service.get_owned_purchase(session, user, purchase_id)
+    if row.status != "settled":
+        raise HTTPException(status_code=409, detail="A receipt is ready once the payment has gone through.")
+    entry = await session.scalar(
+        select(XpLedgerEntry).where(
+            XpLedgerEntry.entry_type == "purchase",
+            XpLedgerEntry.reference_type == "payment_intent",
+            XpLedgerEntry.reference_id == row.id,
+        )
+    )
+    pdf = await asyncio.to_thread(render_pdf, receipt_lines(row, entry))
+    return pdf, f"satish-receipt-{row.id[:8]}.pdf"
+
+
+@router.get("/purchases/{purchase_id}/receipt")
+async def purchase_receipt_download(purchase_id: str, user: CurrentUser, session: DbSession) -> Response:
+    """The receipt PDF, rendered on the spot (no waiting on a worker)."""
+    pdf, name = await _receipt_bytes(session, user, purchase_id)
+    return Response(pdf, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+
+@router.post("/purchases/{purchase_id}/receipt/telegram")
+async def purchase_receipt_to_telegram(purchase_id: str, user: CurrentUser, session: DbSession) -> dict:
+    """Inside Telegram a Mini App can't save files, so the bot sends the PDF to the chat."""
+    import httpx
+
+    from app.services.telegram_delivery import API, _chat_id
+
+    settings = get_settings()
+    chat_id = await _chat_id(session, user.id)
+    if not settings.telegram_bot_token or chat_id is None:
+        raise HTTPException(status_code=409, detail="Open Satish from Telegram to get the receipt in your chat.")
+    pdf, name = await _receipt_bytes(session, user, purchase_id)
+    async with httpx.AsyncClient(timeout=30) as client:
+        r = await client.post(
+            f"{API}/bot{settings.telegram_bot_token}/sendDocument",
+            data={"chat_id": str(chat_id), "caption": "🧾 Your Satish TK receipt"},
+            files={"document": (name, pdf, "application/pdf")},
+        )
+    if r.status_code != 200:
+        raise HTTPException(status_code=502, detail="Telegram didn't accept the file. Try again in a moment.")
+    return {"status": "sent"}
 
 
 # reconciliation (system seam)

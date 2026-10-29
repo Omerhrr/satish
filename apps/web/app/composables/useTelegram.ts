@@ -29,7 +29,7 @@ export function useTelegram() {
     if (window.Telegram?.WebApp) {
       window.Telegram.WebApp.ready();
       window.Telegram.WebApp.expand();
-      window.Telegram.WebApp.setHeaderColor?.("#0b0e11");
+      applyTheme(); // header colour follows the chosen light or dark mode
     }
   });
 

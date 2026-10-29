@@ -99,6 +99,8 @@ class RequestOut(BaseModel):
     created_at: str
     paid_at: str | None
     redirect_url: str | None = None  # developer's "back to the shop" page
+    lightning_invoice: str | None = None  # developer requests: pay with Lightning
+    paid_via: str | None = None
 
 
 def _bad(exc: svc.HandleError) -> HTTPException:
@@ -126,6 +128,8 @@ def _request_out(r: PaymentRequest) -> RequestOut:
         created_at=r.created_at.isoformat(),
         paid_at=r.paid_at.isoformat() if r.paid_at else None,
         redirect_url=r.redirect_url,
+        lightning_invoice=r.ln_invoice if r.status == "open" else None,
+        paid_via=r.paid_via,
     )
 
 
@@ -279,10 +283,9 @@ async def get_request(request_id: str, session: DbSession) -> RequestOut:
     req = await session.get(PaymentRequest, request_id)
     if req is None:
         raise HTTPException(status_code=404, detail="This payment request doesn't exist.")
-    try:
-        await svc.refresh_request(session, req, get_settings())
-    except Exception as exc:
-        log.warning("request_check_failed", request_id=req.id, error=str(exc))
+    from app.api.v1.developers import check_both
+
+    await check_both(session, req, get_settings())
     return _request_out(req)
 
 

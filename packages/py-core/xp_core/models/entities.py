@@ -695,6 +695,15 @@ class PaymentRequest(Base):
     api_key_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     meta: Mapped[dict | None] = mapped_column("metadata", JSON, nullable=True)
     redirect_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # Lightning (developer API): an invoice from Satish's wallet; once paid the
+    # sats are forwarded to the owner's Lightning (Spark) address.
+    ln_invoice: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    ln_destination: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    paid_via: Mapped[str | None] = mapped_column(String(16), nullable=True)  # onchain | lightning
+    forward_status: Mapped[str | None] = mapped_column(String(16), nullable=True)  # pending | sent | failed
+    forward_ref: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    forward_attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    forward_error: Mapped[str | None] = mapped_column(String(300), nullable=True)
 
 
 class ApiKey(Base):

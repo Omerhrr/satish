@@ -142,6 +142,10 @@ def create_app() -> FastAPI:
                     try:
                         async with get_session_factory()() as s:
                             await tk_lightning.sweep(s, settings)
+                        from app.services import dev_lightning
+
+                        async with get_session_factory()() as s:
+                            await dev_lightning.sweep(s, settings)
                     except Exception as exc:  # keep watching; log and retry
                         log.warning("tk_lightning_sweep_failed", error=type(exc).__name__, detail=str(exc)[:200])
                     await asyncio.sleep(15)

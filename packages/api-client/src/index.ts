@@ -145,6 +145,8 @@ export interface XpClient {
   listArtifacts: () => Promise<ArtifactOut[]>;
   createDemoPdf: (payload: DemoPdfIn) => Promise<ArtifactOut>;
   artifactDownloadUrl: (artifact: ArtifactOut) => string;
+  receiptUrl: (purchaseId: string) => string;
+  sendReceiptToTelegram: (purchaseId: string) => Promise<{ status: string }>;
   logout: () => Promise<{ status: string; revoked: boolean }>;
   listSessions: () => Promise<SessionInfo[]>;
   revokeSession: (sessionId: string) => Promise<{ status: string; session_id: string }>;
@@ -442,6 +444,9 @@ export function createXpClient(config: XpClientConfig = {}): XpClient {
         body: JSON.stringify(payload),
       }),
     artifactDownloadUrl: (artifact) => buildUrl(`/api/v1/artifacts/${artifact.id}/download`),
+    receiptUrl: (purchaseId) => buildUrl(`/api/v1/xp/purchases/${purchaseId}/receipt`),
+    sendReceiptToTelegram: (purchaseId) =>
+      request<{ status: string }>(`/api/v1/xp/purchases/${purchaseId}/receipt/telegram`, { method: "POST" }),
     logout: () =>
       request<{ status: string; revoked: boolean }>("/api/v1/auth/logout", { method: "POST" }),
     listSessions: () => request<SessionInfo[]>("/api/v1/auth/sessions"),

@@ -26,7 +26,7 @@
     <!-- ============ no wallet yet ============ -->
     <template v-else-if="!w.state.stored">
       <section v-if="view === 'welcome'" class="card center">
-        <div class="big-icon">₿</div>
+        <img class="app-logo" src="/logo.png" alt="Satish" width="88" height="88" />
         <h2>Your own Bitcoin wallet</h2>
         <p class="sub">
           Only you hold the keys. Your recovery phrase is created on this phone and is
@@ -410,6 +410,33 @@
         <!-- ===== Settings ===== -->
         <template v-else-if="section === 'settings'">
         <p v-if="notice" class="small ok" style="margin-bottom: 10px">{{ notice }}</p>
+
+        <h3 class="group">Look</h3>
+        <section class="card list">
+          <div class="item">
+            <div><b>Mode</b><span>Auto follows Telegram or your phone.</span></div>
+            <div class="seg mode-seg" role="radiogroup" aria-label="Light or dark mode">
+              <button v-for="m in MODES" :key="m.id" role="radio" :aria-checked="theme.mode.value === m.id" :class="{ on: theme.mode.value === m.id }" @click="theme.setMode(m.id)">{{ m.label }}</button>
+            </div>
+          </div>
+          <div class="item accent-row">
+            <div><b>App colour</b><span>{{ (ACCENTS.find((x) => x.id === theme.accentId.value) || ACCENTS[0])!.name }}</span></div>
+            <div class="swatches" role="radiogroup" aria-label="App colour">
+              <button
+                v-for="c in ACCENTS"
+                :key="c.id"
+                role="radio"
+                :aria-checked="theme.accentId.value === c.id"
+                :aria-label="c.name"
+                :title="c.name"
+                class="swatch"
+                :class="{ on: theme.accentId.value === c.id }"
+                :style="{ background: c.dark }"
+                @click="theme.setAccent(c.id)"
+              />
+            </div>
+          </div>
+        </section>
 
         <h3 class="group">{{ t("set.language") }}</h3>
         <section class="card list">
@@ -1093,6 +1120,14 @@
 </template>
 
 <script setup lang="ts">
+const theme = useTheme();
+const ACCENTS = theme.ACCENTS;
+const MODES = [
+  { id: "dark", label: "🌙 Dark" },
+  { id: "light", label: "☀️ Light" },
+  { id: "auto", label: "Auto" },
+] as const;
+
 import { renderSVG } from "uqr";
 import { awayFor } from "~/composables/useWallet";
 import type { PaymentRequestOut } from "@xp/api-client";
@@ -2329,6 +2364,15 @@ async function openPayRequest(id: string) {
     if (q.network !== w.net.name) throw new Error("That request is for a different bitcoin network.");
     if (q.status !== "open") throw new Error(q.status === "paid" ? "That request is already paid." : "That request was cancelled.");
     if (!verifyPoolAddress(q.identity_pubkey, w.net, q.address, q.signature)) throw new Error("That request failed its security check.");
+    // Developer requests can be paid over Lightning: use it when the Lightning
+    // wallet has enough, else fall back to Bitcoin.
+    const inv = (q as any).lightning_invoice as string | undefined;
+    if (inv && ln.available && (ln.st.balance ?? ln.st.cachedBalance ?? 0) >= (q.amount_sats ?? 0)) {
+      setTab("ln");
+      await nextTick();
+      lnRef.value?.startSend(inv);
+      return;
+    }
     if (!w.state.live) await w.refresh(); // know the balance before offering to pay
     await openSend();
     sendTo.value = q.address;
@@ -2361,6 +2405,14 @@ onBeforeUnmount(() => {
 .testnet a { color: inherit; text-decoration: underline; }
 .center { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .big-icon { font-size: 44px; line-height: 1; }
+.mode-seg { display: flex; gap: 4px; flex: none; }
+.mode-seg button { padding: 6px 10px; border-radius: 999px; border: 1px solid var(--border); background: transparent; color: inherit; font-size: 13px; cursor: pointer; }
+.mode-seg button.on { background: var(--orange); color: var(--on-accent); border-color: transparent; font-weight: 600; }
+.accent-row { flex-wrap: wrap; }
+.swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+.swatch { width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15); }
+.swatch.on { border-color: var(--text); outline: 2px solid var(--bg-elev); outline-offset: -4px; }
+.app-logo { width: 88px; height: 88px; border-radius: 22px; display: block; margin: 0 auto 4px; }
 .stack { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; width: 100%; }
 .row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin: 6px 0; }
 .unit { font-size: 0.5em; color: var(--text-dim); }

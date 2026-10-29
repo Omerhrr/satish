@@ -44,7 +44,8 @@
       <p class="small dim">From your server, with your key. Amounts in sats, or any currency (converted at today's rate).</p>
       <pre class="code">{{ curlCreate }}</pre>
       <button class="btn small" @click="copy(curlCreate, 'curl')">{{ copied === "curl" ? "Copied ✓" : "Copy" }}</button>
-      <p class="small dim">The answer has <code>pay_url</code> (a page anyone can pay from any wallet), <code>telegram_url</code> (opens Satish in Telegram), <code>bitcoin_uri</code> (for a QR code) and <code>status</code>.</p>
+      <p class="small dim">The answer has <code>pay_url</code> (a page anyone can pay from any wallet, Lightning or Bitcoin), <code>telegram_url</code> (opens Satish in Telegram), <code>lightning_invoice</code>, <code>bitcoin_uri</code> (a QR code that works in both kinds of wallet) and <code>status</code>.</p>
+      <p class="small dim"><b>Lightning:</b> payers pay an invoice from Satish's Lightning wallet; Satish confirms it at once (your webhook fires) and forwards the sats to your Satish Lightning wallet within seconds. Open Lightning once in your wallet so it can be found. Send <code>"methods": ["onchain"]</code> for Bitcoin only.</p>
 
       <h3 class="small">Try it now</h3>
       <form class="row" @submit.prevent="tryCreate">
@@ -59,7 +60,8 @@
       </form>
       <p v-if="tryError" class="small err">{{ tryError }}</p>
       <div v-if="tried" class="secret">
-        <b>{{ tried.amount_sats?.toLocaleString() }} sats · {{ tried.status }}</b>
+        <b>{{ tried.amount_sats?.toLocaleString() }} sats · {{ tried.status }} · {{ (tried.methods || ["onchain"]).join(" + ") }}</b>
+        <span v-if="tried.warning" class="small err">{{ tried.warning }}</span>
         <a class="small" :href="tried.pay_url" target="_blank" rel="noopener">{{ tried.pay_url }}</a>
       </div>
     </section>
@@ -112,7 +114,7 @@
       <table class="ref">
         <tr><th>Call</th><th>What it does</th></tr>
         <tr><td class="mono">POST /api/v1/dev/payment-requests</td><td><code>amount_sats</code> or <code>amount</code> + <code>currency</code>, <code>note</code>, <code>metadata</code> (yours, returned in webhooks), <code>redirect_url</code> (a "Back to the shop" button after paying)</td></tr>
-        <tr><td class="mono">GET /api/v1/dev/payment-requests/{id}</td><td>Current status: <code>open</code>, <code>paid</code> or <code>cancelled</code>; <code>paid_sats</code> so far</td></tr>
+        <tr><td class="mono">GET /api/v1/dev/payment-requests/{id}</td><td>Current status: <code>open</code>, <code>paid</code> or <code>cancelled</code>; <code>paid_sats</code>; <code>paid_via</code> (<code>lightning</code> or <code>onchain</code>); for Lightning, <code>forward_status</code> (<code>pending</code>, <code>sent</code>)</td></tr>
         <tr><td class="mono">GET /api/v1/dev/payment-requests</td><td>Your latest requests (<code>?status=paid</code>)</td></tr>
         <tr><td class="mono">POST …/{id}/cancel</td><td>Stop accepting a request</td></tr>
       </table>

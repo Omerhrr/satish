@@ -1072,5 +1072,13 @@ chain sweep marks a request paid, a `request.paid` webhook is queued for
 each endpoint; the worker POSTs it (every 30 s) with
 `Satish-Signature: t=..,v1=HMAC-SHA256(secret, "t.body")`, retrying with
 backoff (30 s .. 6 h) until a 2xx. Webhook URLs must be https on public
-addresses (resolved and checked before every send). On-chain only: Lightning
-payments land on the user's phone, which the server can't see.
+addresses (resolved and checked before every send).
+
+Lightning (D43, 2026-10-29): the developer's Lightning wallet is on their
+phone, so the server can't see payments to it. For API requests Satish's own
+Lightning wallet (the operator wallet) issues the invoice, marks the request
+paid the moment it settles (webhook `paid_via: lightning`), then forwards the
+sats to the owner's published Spark address (idempotent per request, retried
+up to 6 times, then `forward_status: failed` for the operator). Satish holds
+the money only for those seconds: the owner chose this over a slower
+non-custodial design so webhooks work. `methods: ["onchain"]` opts out.

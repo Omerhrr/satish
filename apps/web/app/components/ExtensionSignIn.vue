@@ -1,6 +1,6 @@
 <template>
   <div class="signin">
-    <div class="logo">S</div>
+    <img class="logo" src="/logo.png" alt="Satish" width="56" height="56" />
     <h1>Satish in your browser</h1>
     <p class="sub">Sign in with your Telegram account. Same TK, same tasks, same @username.</p>
 
@@ -122,7 +122,7 @@ onBeforeUnmount(stop);
 
 <style scoped>
 .signin { max-width: 420px; margin: 0 auto; padding: 28px 16px; text-align: center; }
-.logo { width: 56px; height: 56px; margin: 0 auto 12px; border-radius: 50%; background: var(--orange, #f7931a); color: #0b0e11; font: 700 28px/56px system-ui, sans-serif; }
+.logo { width: 56px; height: 56px; margin: 0 auto 12px; border-radius: 14px; display: block; }
 h1 { font-size: 22px; margin: 0 0 6px; }
 .sub { color: var(--text-dim, #94a3b8); margin: 0 0 18px; }
 .card { text-align: left; }

@@ -61,15 +61,9 @@ export default defineNuxtConfig({
       // Extensions may not load remote scripts; Telegram's SDK is only for the Mini App.
       script: isExtension ? [] : [{ src: "https://telegram.org/js/telegram-web-app.js" }],
       link: [
-        {
-          rel: "icon",
-          type: "image/svg+xml",
-          href:
-            "data:image/svg+xml," +
-            encodeURIComponent(
-              '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#f7931a"/><text x="16" y="22" font-size="16" font-family="Arial" font-weight="bold" text-anchor="middle" fill="#0b0e11">S</text></svg>'
-            )
-        }
+        { rel: "icon", type: "image/png", sizes: "32x32", href: "/icon-32.png" },
+        { rel: "icon", type: "image/png", sizes: "192x192", href: "/icon-192.png" },
+        { rel: "apple-touch-icon", href: "/icon-180.png" }
       ]
     }
   }
