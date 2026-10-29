@@ -252,7 +252,7 @@ async function payLightning() {
   sending.value = true;
   payError.value = "";
   try {
-    await ln.send(lnPrep.value as never, `tk-${paying.value?.id}`);
+    await ln.send(lnPrep.value as never, crypto.randomUUID());
     setTimeout(poll, 1200);
   } catch (e) {
     payError.value = e instanceof Error ? e.message : "The payment failed. Nothing was sent.";

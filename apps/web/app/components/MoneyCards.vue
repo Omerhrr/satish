@@ -22,9 +22,11 @@
         <option value="above">Tell me above</option>
         <option value="below">Tell me below</option>
       </select>
-      <input v-model="alertTarget" inputmode="decimal" :placeholder="btcPrice ? String(Math.round(btcPrice * 1.05)) : 'price'" aria-label="Alert price" />
-      <button class="btn small" :disabled="!(Number(alertTarget) > 0)">Alert me</button>
+      <input v-model="alertTarget" inputmode="decimal" :placeholder="btcPrice ? Math.round(btcPrice * 1.05).toLocaleString() : 'price'" aria-label="Alert price" />
+      <button class="btn small" :disabled="busy">Alert me</button>
     </form>
+    <p v-if="alertError" class="small err">{{ alertError }}</p>
+    <p v-else-if="alertNote" class="small ok">{{ alertNote }}</p>
     <p class="dim small">We'll message you in Telegram once, as soon as it happens.</p>
   </section>
 
@@ -42,6 +44,7 @@
         {{ progressText(g) }}<template v-if="g.deadline"> · by {{ new Date(g.deadline).toLocaleDateString() }}</template>
         <template v-if="pct(g) >= 100"> · 🎉 reached</template>
       </div>
+      <div v-if="pct(g) < 100 && planText(g)" class="small plan">{{ planText(g) }}</div>
     </div>
     <form class="goal-form" @submit.prevent="addGoal">
       <input v-model="goalName" maxlength="80" placeholder="Goal, e.g. School fees" aria-label="Goal name" />
@@ -53,8 +56,9 @@
         </select>
       </div>
       <label class="dim small">By (optional) <input v-model="goalDate" type="date" /></label>
-      <button class="btn small" :disabled="!goalName.trim() || !(Number(goalAmount) > 0)">Add goal</button>
+      <button class="btn small" :disabled="goalBusy">Add goal</button>
     </form>
+    <p v-if="goalError" class="small err">{{ goalError }}</p>
   </section>
 </template>
 
@@ -62,7 +66,7 @@
 import type { PriceAlert, SavingsGoal } from "@xp/api-client";
 
 /** Total sats the user holds (Bitcoin + Lightning), from the wallet page. */
-const props = defineProps<{ totalSats: number }>();
+const props = defineProps<{ totalSats: number; hidden?: boolean }>();
 const api = useXpApi();
 const { rates, currency, setCurrency, currencies, format, toFiat } = usePrice();
 
@@ -84,24 +88,66 @@ async function load() {
   }
 }
 
+const busy = ref(false);
+const alertError = ref("");
+const alertNote = ref("");
+
+/** "170,000,000", "₦170m", "170 million", "95k" -> a number (or NaN). */
+function parseMoney(text: string): number {
+  const t = text.trim().toLowerCase().replace(/[₦$€£,\s]/g, "").replace(/million$/, "m").replace(/thousand$/, "k");
+  const m = /^(\d+(?:\.\d+)?)([kmb])?$/.exec(t);
+  if (!m) return NaN;
+  const mult = { k: 1e3, m: 1e6, b: 1e9 }[m[2] as "k" | "m" | "b"] ?? 1;
+  return Number(m[1]) * mult;
+}
+
 async function addAlert() {
-  await api.addPriceAlert({ currency: currency.value, direction: alertDir.value, target: Number(alertTarget.value) });
-  alertTarget.value = "";
-  await load();
+  alertError.value = alertNote.value = "";
+  // An empty box uses the suggested price shown in it.
+  const target = alertTarget.value.trim() ? parseMoney(alertTarget.value) : Math.round(btcPrice.value * (alertDir.value === "above" ? 1.05 : 0.95));
+  if (!(target > 0)) {
+    alertError.value = "Type a price like 170,000,000 or 170m.";
+    return;
+  }
+  busy.value = true;
+  try {
+    await api.addPriceAlert({ currency: currency.value, direction: alertDir.value, target });
+    alertTarget.value = "";
+    alertNote.value = `Done. We'll tell you when bitcoin goes ${alertDir.value} ${format(target, currency.value)}.`;
+    await load();
+  } catch (e) {
+    alertError.value = e instanceof Error ? e.message : "Couldn't save the alert. Try again.";
+  } finally {
+    busy.value = false;
+  }
 }
 async function removeAlert(id: string) {
   await api.deletePriceAlert(id);
   await load();
 }
+const goalBusy = ref(false);
+const goalError = ref("");
 async function addGoal() {
-  await api.addGoal({
-    name: goalName.value.trim(),
-    target_amount: Number(goalAmount.value),
-    currency: goalCur.value,
-    deadline: goalDate.value ? new Date(goalDate.value).toISOString() : null,
-  });
-  goalName.value = goalAmount.value = goalDate.value = "";
-  await load();
+  goalError.value = "";
+  const target = parseMoney(goalAmount.value);
+  if (!goalName.value.trim()) return void (goalError.value = "Give your goal a name, like School fees.");
+  if (!(target > 0)) return void (goalError.value = "Type an amount like 500,000 or 500k.");
+  if (goalDate.value && new Date(goalDate.value + "T23:59:59") < new Date()) return void (goalError.value = "Pick a date in the future.");
+  goalBusy.value = true;
+  try {
+    await api.addGoal({
+      name: goalName.value.trim(),
+      target_amount: target,
+      currency: goalCur.value,
+      deadline: goalDate.value ? new Date(goalDate.value + "T23:59:59").toISOString() : null,
+    });
+    goalName.value = goalAmount.value = goalDate.value = "";
+    await load();
+  } catch (e) {
+    goalError.value = e instanceof Error ? e.message : "Couldn't save the goal.";
+  } finally {
+    goalBusy.value = false;
+  }
 }
 async function removeGoal(id: string) {
   await api.deleteGoal(id);
@@ -112,10 +158,26 @@ function saved(g: SavingsGoal): number {
   if (g.currency === "SAT") return props.totalSats;
   return toFiat(props.totalSats, g.currency) ?? 0;
 }
+function amount(v: number, cur: string): string {
+  return cur === "SAT" ? `${Math.round(v).toLocaleString()} sats` : format(v, cur);
+}
+/** "Save about ₦25,000 a week to make it by 1 Dec." */
+function planText(g: SavingsGoal): string {
+  if (props.hidden) return "";
+  const left = g.target_amount - saved(g);
+  if (left <= 0) return "";
+  if (!g.deadline) return `${amount(left, g.currency)} to go.`;
+  const days = (new Date(g.deadline).getTime() - Date.now()) / 86_400_000;
+  if (days < 0) return `The date has passed; ${amount(left, g.currency)} to go.`;
+  const weeks = Math.max(1, Math.ceil(days / 7));
+  return `${amount(left, g.currency)} to go: about ${amount(left / weeks, g.currency)} a week for ${weeks} week${weeks === 1 ? "" : "s"}.`;
+}
 function pct(g: SavingsGoal): number {
   return Math.max(0, Math.min(100, Math.floor((saved(g) / g.target_amount) * 100)));
 }
 function progressText(g: SavingsGoal): string {
+  if (props.hidden) return `${pct(g)}% of ${amount(g.target_amount, g.currency)}`;
+  if (g.currency !== "SAT" && toFiat(props.totalSats, g.currency) === null) return `Price for ${g.currency} not available right now`;
   const have = saved(g);
   if (g.currency === "SAT") return `${Math.round(have).toLocaleString()} of ${g.target_amount.toLocaleString()} sats (${pct(g)}%)`;
   return `${format(have, g.currency)} of ${format(g.target_amount, g.currency)} (${pct(g)}%)`;
@@ -144,6 +206,8 @@ onMounted(load);
 <style scoped>
 .head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .cur, .row-form select { padding: 6px 8px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg-elev); color: var(--text); }
+.err { color: var(--red, #ef4444); }
+.ok { color: var(--green, #22c55e); }
 .price { font-size: 26px; font-weight: 700; margin: 6px 0 2px; }
 .rows { list-style: none; padding: 0; margin: 10px 0; }
 .rows li { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
@@ -155,6 +219,7 @@ onMounted(load);
 .goal-top { display: flex; justify-content: space-between; }
 .bar { height: 8px; border-radius: 99px; background: var(--bg); border: 1px solid var(--border); overflow: hidden; margin: 6px 0 4px; }
 .bar span { display: block; height: 100%; background: var(--orange, #f7931a); }
+.plan { color: var(--orange, #f7931a); margin-top: 2px; }
 .goal-form { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
 .goal-form label { display: flex; gap: 8px; align-items: center; }
 </style>

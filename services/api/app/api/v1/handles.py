@@ -98,6 +98,7 @@ class RequestOut(BaseModel):
     paid_sats: int
     created_at: str
     paid_at: str | None
+    redirect_url: str | None = None  # developer's "back to the shop" page
 
 
 def _bad(exc: svc.HandleError) -> HTTPException:
@@ -124,6 +125,7 @@ def _request_out(r: PaymentRequest) -> RequestOut:
         paid_sats=r.paid_sats,
         created_at=r.created_at.isoformat(),
         paid_at=r.paid_at.isoformat() if r.paid_at else None,
+        redirect_url=r.redirect_url,
     )
 
 
@@ -180,6 +182,31 @@ async def lookup(username: str, network: Network, user: CurrentUser, session: Db
     if row is None:
         raise HTTPException(status_code=404, detail=f"No Satish user called @{svc.normalize_username(username)}.")
     return HandleOut(username=row.username, identity_pubkey=row.identity_pubkey)
+
+
+class CurrentNamesIn(BaseModel):
+    network: Network
+    identity_pubkeys: list[str] = Field(default_factory=list, max_length=500)
+
+
+@router.post("/handles/current-names")
+async def current_names(payload: CurrentNamesIn, user: CurrentUser, session: DbSession) -> dict[str, str]:
+    """Today's @username for each wallet identity key, so address books follow
+    people who changed their username. Keys with no active username are left out."""
+    from sqlalchemy import select
+    from xp_core.models.entities import WalletHandle
+
+    keys = sorted({k.strip().lower() for k in payload.identity_pubkeys if k and len(k) <= 66})
+    if not keys:
+        return {}
+    rows = await session.execute(
+        select(WalletHandle.identity_pubkey, WalletHandle.username).where(
+            WalletHandle.network == payload.network,
+            WalletHandle.status == "active",
+            WalletHandle.identity_pubkey.in_(keys),
+        )
+    )
+    return {k: u for k, u in rows.all()}
 
 
 @router.post("/handles/lightning", response_model=LightningOut)

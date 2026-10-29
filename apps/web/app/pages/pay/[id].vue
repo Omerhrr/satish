@@ -21,6 +21,7 @@
 
       <template v-if="req.status === 'paid'">
         <div class="paid">✅ Paid. Thank you!</div>
+        <a v-if="(req as any).redirect_url" class="btn primary" :href="(req as any).redirect_url" rel="noopener">Back to the shop</a>
       </template>
       <template v-else-if="req.status === 'cancelled'">
         <div class="dim">This request was cancelled.</div>

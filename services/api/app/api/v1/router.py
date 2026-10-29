@@ -8,6 +8,7 @@ from app.api.v1 import (
     ai_chat,
     money,
     group_pay,
+    developers,
     device_link,
     account,
     artifacts,
@@ -35,6 +36,7 @@ api_router.include_router(device_link.router)
 api_router.include_router(ai_chat.router)
 api_router.include_router(money.router)
 api_router.include_router(group_pay.router)
+api_router.include_router(developers.router)
 api_router.include_router(account.router)
 api_router.include_router(xp.router)
 api_router.include_router(tasks.router)

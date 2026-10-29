@@ -38,6 +38,25 @@ import type {
   TaskStepOut,
 } from "@xp/shared-types";
 
+export interface DevKey {
+  id: string;
+  name: string;
+  prefix: string;
+  network: string;
+  created_at: string;
+  last_used_at: string | null;
+  secret: string | null; // only right after creating it
+}
+
+export interface DevHook {
+  id: string;
+  url: string;
+  events: string[];
+  secret: string;
+  active: boolean;
+  created_at: string;
+}
+
 export interface PriceAlert {
   id: string;
   currency: string;
@@ -72,6 +91,17 @@ export interface XpClient {
   capabilities: () => Promise<CapabilitiesOut>;
   authTelegram: (initData?: string) => Promise<SessionOut>;
   me: () => Promise<UserOut>;
+  devKeys: () => Promise<DevKey[]>;
+  devCreateKey: (name: string, network: string) => Promise<DevKey>;
+  devRevokeKey: (id: string) => Promise<void>;
+  devHooks: () => Promise<DevHook[]>;
+  devCreateHook: (url: string, events?: string[]) => Promise<DevHook>;
+  devDeleteHook: (id: string) => Promise<void>;
+  devTestHook: (id: string) => Promise<{ delivered: boolean; status_code: number | null; error: string | null }>;
+  devDeliveries: (id: string) => Promise<{ id: string; event: string; status: string; attempts: number; last_status_code: number | null; last_error: string | null; created_at: string }[]>;
+  devCreatePaymentRequest: (body: Record<string, unknown>) => Promise<Record<string, any>>;
+  devPaymentRequests: () => Promise<{ data: Record<string, any>[] }>;
+  currentNames: (network: string, identityPubkeys: string[]) => Promise<Record<string, string>>;
   groupPayment: (id: string) => Promise<{ id: string; kind: string; to_username: string; amount_sats: number; display: string; note: string | null; already_paid: boolean }>;
   groupPaid: (id: string, ref: string) => Promise<{ status: string }>;
   priceAlerts: () => Promise<PriceAlert[]>;
@@ -305,6 +335,18 @@ export function createXpClient(config: XpClientConfig = {}): XpClient {
     health: () => request<HealthOut>("/api/v1/health"),
     capabilities: () => request<CapabilitiesOut>("/api/v1/capabilities"),
     me: () => request<UserOut>("/api/v1/auth/me"),
+    devKeys: () => request("/api/v1/dev/keys"),
+    devCreateKey: (name, network) => request("/api/v1/dev/keys", { method: "POST", body: JSON.stringify({ name, network }) }),
+    devRevokeKey: (id) => request<void>(`/api/v1/dev/keys/${id}`, { method: "DELETE" }),
+    devHooks: () => request("/api/v1/dev/webhooks"),
+    devCreateHook: (url, events) => request("/api/v1/dev/webhooks", { method: "POST", body: JSON.stringify({ url, events: events ?? ["request.paid"] }) }),
+    devDeleteHook: (id) => request<void>(`/api/v1/dev/webhooks/${id}`, { method: "DELETE" }),
+    devTestHook: (id) => request(`/api/v1/dev/webhooks/${id}/test`, { method: "POST" }),
+    devDeliveries: (id) => request(`/api/v1/dev/webhooks/${id}/deliveries`),
+    devCreatePaymentRequest: (body) => request("/api/v1/dev/payment-requests", { method: "POST", body: JSON.stringify(body) }),
+    devPaymentRequests: () => request("/api/v1/dev/payment-requests"),
+    currentNames: (network, identityPubkeys) =>
+      request("/api/v1/handles/current-names", { method: "POST", body: JSON.stringify({ network, identity_pubkeys: identityPubkeys }) }),
     groupPayment: (id) => request(`/api/v1/group/${id}`),
     groupPaid: (id, ref) => request(`/api/v1/group/${id}/paid`, { method: "POST", body: JSON.stringify({ ref }) }),
     priceAlerts: () => request("/api/v1/alerts/price"),

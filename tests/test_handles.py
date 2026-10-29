@@ -236,3 +236,16 @@ async def test_lightning_status_in_me_and_address_normalised(session, dev_user):
         assert r.status_code == 200 and r.json()["spark_address"] == real
         me = (await c.get("/api/v1/handles/me", params={"network": NET})).json()
         assert me["lightning_address"] == real and me["lightning_network"] == "regtest"
+
+
+from tests.test_agent_runtime import client  # noqa: E402,F401
+
+
+async def test_current_names_follow_renames(client, session, dev_user):
+    from xp_core.models.entities import WalletHandle
+
+    session.add(WalletHandle(user_id=dev_user.id, network="testnet", username="ada_new", identity_pubkey="02" + "b" * 64))
+    session.add(WalletHandle(user_id=dev_user.id, network="testnet", username="ada_old", identity_pubkey="02" + "b" * 64, status="released"))
+    await session.commit()
+    r = await client.post("/api/v1/handles/current-names", json={"network": "testnet", "identity_pubkeys": ["02" + "B" * 64, "02" + "c" * 64]})
+    assert r.status_code == 200 and r.json() == {"02" + "b" * 64: "ada_new"}

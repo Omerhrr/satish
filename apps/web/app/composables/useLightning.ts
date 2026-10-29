@@ -173,6 +173,8 @@ export function useLightning() {
   return {
     st, network, available, canMove, open, unlockAll, refresh, close, forget, flash, publish,
     invoice: (amount: number | undefined, description: string) => need().invoice(amount, description),
+    /** Every payment (for the CSV), not just the recent ones shown. */
+    allPayments: () => need().payments(5000),
     sparkAddress: () => need().sparkAddress(),
     depositAddress: () => need().depositAddress(),
     parse: (text: string) => need().parse(text),

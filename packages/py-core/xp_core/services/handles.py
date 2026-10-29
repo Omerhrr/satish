@@ -371,6 +371,23 @@ async def create_request(
     return req
 
 
+def request_public(req: PaymentRequest) -> dict:
+    """The payment request as developers see it (API responses and webhooks)."""
+    return {
+        "id": req.id,
+        "status": req.status,
+        "network": req.network,
+        "username": req.username,
+        "amount_sats": req.amount_sats,
+        "paid_sats": req.paid_sats,
+        "note": req.note,
+        "address": req.address,
+        "metadata": req.meta or {},
+        "created_at": req.created_at.isoformat() + "Z" if req.created_at else None,
+        "paid_at": req.paid_at.isoformat() + "Z" if req.paid_at else None,
+    }
+
+
 def esplora_for(settings: Settings, network: str) -> str:
     if settings.onchain_esplora_url and network == settings.onchain_network:
         return settings.onchain_esplora_url.rstrip("/")
@@ -408,6 +425,9 @@ async def refresh_request(
             )
         )
         log.info("payment_request_paid", request_id=req.id, sats=check.counted_sats)
+        from xp_core.services.webhooks import queue_event
+
+        await queue_event(session, req.user_id, "request.paid", request_public(req))
     await session.commit()
     return req
 

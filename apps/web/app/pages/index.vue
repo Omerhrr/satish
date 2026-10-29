@@ -227,7 +227,7 @@
         </section>
 
         </template>
-        <MoneyCards :total-sats="total + (lnBalance ?? 0)" />
+        <MoneyCards :total-sats="total + (lnBalance ?? 0)" :hidden="w.state.hideBalance" />
         </template>
 
         <!-- ===== History ===== -->
@@ -286,6 +286,7 @@
                   {{ w.state.hideBalance ? "••••" : (p.direction === "receive" ? "+" : "-") + (p.amount + (p.direction === "send" ? p.fee : 0)).toLocaleString() + " sats" }}
                 </div>
               </div>
+              <button class="btn small" style="margin-top: 10px" :disabled="!ln.st.payments.length" @click="exportLnHistory">Download history (CSV)</button>
             </template>
           </section>
         </template>
@@ -480,6 +481,7 @@
 
         <h3 class="group">Account</h3>
         <section class="card list">
+          <NuxtLink class="item" to="/developers"><div><b>Developers</b><span>Accept bitcoin on your website or app: API keys, payment links, webhooks.</span></div><em>›</em></NuxtLink>
           <NuxtLink class="item" to="/settings"><div><b>Sign-ins and your data</b><span>Devices signed in, download or delete your Satish data.</span></div><em>›</em></NuxtLink>
           <button class="item danger" @click="go('remove')"><div><b>Remove wallet from this phone</b><span>Your bitcoin stays safe. You'll need your 12 words to get it back.</span></div></button>
         </section>
@@ -1293,8 +1295,21 @@ async function showDescriptors() {
 }
 
 async function exportHistory() {
-  const csv = w.exportCsv();
-  const name = `satish-history-${new Date().toISOString().slice(0, 10)}.csv`;
+  await downloadCsv(w.exportCsv(), `satish-history-${new Date().toISOString().slice(0, 10)}.csv`);
+}
+
+async function exportLnHistory() {
+  const { lightningCsv } = await import("~/lib/lightning");
+  let all = ln.st.payments;
+  try {
+    all = await ln.allPayments();
+  } catch {
+    /* fall back to what's on screen */
+  }
+  await downloadCsv(lightningCsv(all), `satish-lightning-${new Date().toISOString().slice(0, 10)}.csv`);
+}
+
+async function downloadCsv(csv: string, name: string) {
   try {
     const file = new File([csv], name, { type: "text/csv" });
     if ((navigator as any).canShare?.({ files: [file] })) {

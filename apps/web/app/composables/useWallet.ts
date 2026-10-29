@@ -603,6 +603,27 @@ export function useWallet() {
     } catch {
       /* not signed in / offline: usernames just stay hidden */
     }
+    void followRenames();
+  }
+
+  /** People in the address book who changed their @username: show the new one.
+   *  Matched by their wallet's identity key (pinned when we first paid them),
+   *  so a name now held by someone else is never mistaken for them. */
+  async function followRenames() {
+    const pinned = state.contacts.filter((c) => c.username && c.identityPubkey);
+    if (!pinned.length) return;
+    let now: Record<string, string>;
+    try {
+      now = await xpApi.currentNames(netName, [...new Set(pinned.map((c) => c.identityPubkey!.toLowerCase()))]);
+    } catch {
+      return;
+    }
+    for (const c of pinned) {
+      const name = now[c.identityPubkey!.toLowerCase()];
+      if (!name || name === c.username) continue;
+      const label = c.name === "@" + c.username || c.name === `@${c.username} (Satish)` ? "@" + name : c.name;
+      saveContact({ ...c, username: name, name: label, note: c.note || `Was @${c.username}` });
+    }
   }
 
   async function ensureIdentity(password?: string) {

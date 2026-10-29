@@ -134,3 +134,18 @@ describe("lightning wallet", () => {
     await expect(w.balance()).rejects.toThrow(/Open your Lightning wallet/);
   });
 });
+
+import { lightningCsv } from "../app/lib/lightning";
+
+describe("lightning csv", () => {
+  test("exports payments with net amounts and safe quoting", () => {
+    const csv = lightningCsv([
+      { id: "a", direction: "receive", status: "completed", amount: 1500, fee: 0, time: 1761700000, kind: "lightning", description: "lunch, rice" },
+      { id: "b", direction: "send", status: "completed", amount: 1000, fee: 3, time: 1761700100, kind: "spark", description: 'say "hi"' },
+    ]);
+    const lines = csv.trim().split("\r\n");
+    expect(lines[0]).toBe("date,direction,type,status,amount_sats,fee_sats,net_sats,description,payment_id");
+    expect(lines[1]).toContain(',1500,0,1500,"lunch, rice",a');
+    expect(lines[2]).toContain(',1000,3,-1003,"say ""hi""",b');
+  });
+});

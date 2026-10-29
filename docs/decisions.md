@@ -1059,3 +1059,18 @@ Verified by loading the built extension in Chromium.
   GF(256), with a checksum so wrong pieces are caught. Shares are sent to
   trusted people via Telegram's share sheet; restore accepts any 2.
 - Daily spending limit (per device): over it, Send waits 30 seconds.
+
+## D42 - Satish for developers: API keys, payment requests, webhooks (2026-10-29)
+
+Wallet > Settings > Developers. Keys (`sk_test_` / `sk_live_`, sha256 stored,
+shown once) can only create, read and cancel payment requests for their
+owner: no balances, no spending. `POST /dev/payment-requests` takes sats or
+an amount in any currency, `metadata` and `redirect_url`, and returns
+`pay_url`, `telegram_url` and a `bitcoin_uri`. Money goes to a fresh address
+from the owner's own @username pool, so Satish never holds it. When the
+chain sweep marks a request paid, a `request.paid` webhook is queued for
+each endpoint; the worker POSTs it (every 30 s) with
+`Satish-Signature: t=..,v1=HMAC-SHA256(secret, "t.body")`, retrying with
+backoff (30 s .. 6 h) until a 2xx. Webhook URLs must be https on public
+addresses (resolved and checked before every send). On-chain only: Lightning
+payments land on the user's phone, which the server can't see.

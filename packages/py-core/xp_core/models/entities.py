@@ -691,6 +691,59 @@ class PaymentRequest(Base):
     paid_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     checked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    # Developer API: who made it and the developer's own reference data.
+    api_key_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    meta: Mapped[dict | None] = mapped_column("metadata", JSON, nullable=True)
+    redirect_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
+
+class ApiKey(Base):
+    """A developer API key. Only a hash is stored; the key is shown once."""
+
+    __tablename__ = "api_keys"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    name: Mapped[str] = mapped_column(String(60))
+    prefix: Mapped[str] = mapped_column(String(20))  # shown in lists, e.g. sk_test_ab12
+    key_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    network: Mapped[str] = mapped_column(String(16))  # testnet | mainnet
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class WebhookEndpoint(Base):
+    """Where Satish posts events (request.paid) for a developer, signed with
+    HMAC-SHA256 using the endpoint's secret."""
+
+    __tablename__ = "webhook_endpoints"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    url: Mapped[str] = mapped_column(String(500))
+    secret: Mapped[str] = mapped_column(String(80))  # whsec_..., shown to its owner
+    events: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class WebhookDelivery(Base):
+    """One event to one endpoint, retried with backoff until it gets a 2xx."""
+
+    __tablename__ = "webhook_deliveries"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    endpoint_id: Mapped[str] = mapped_column(ForeignKey("webhook_endpoints.id"), index=True)
+    event: Mapped[str] = mapped_column(String(40))
+    payload: Mapped[dict] = mapped_column(JSON)
+    status: Mapped[str] = mapped_column(String(16), default="pending", index=True)  # pending | delivered | failed
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    next_attempt_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    last_status_code: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    last_error: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
 class WalletAlertSetting(Base):

@@ -39,6 +39,24 @@ export interface LnPayment {
   description: string;
 }
 
+/** Lightning history as CSV (a spreadsheet can open it). */
+export function lightningCsv(payments: LnPayment[]): string {
+  const esc = (v: string | number) => {
+    const t = String(v);
+    return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+  };
+  const rows = [["date", "direction", "type", "status", "amount_sats", "fee_sats", "net_sats", "description", "payment_id"]];
+  for (const p of payments) {
+    const net = p.direction === "receive" ? p.amount : -(p.amount + p.fee);
+    rows.push([
+      p.time ? new Date(p.time * 1000).toISOString() : "",
+      p.direction === "receive" ? "received" : "sent",
+      p.kind, p.status, String(p.amount), String(p.fee), String(net), p.description, p.id,
+    ]);
+  }
+  return rows.map((r) => r.map(esc).join(",")).join("\r\n") + "\r\n";
+}
+
 export function toLnPayment(p: Payment): LnPayment {
   const d = p.details;
   let description = "";
@@ -226,7 +244,20 @@ export class LightningWallet {
         : m.type === "bitcoinAddress"
           ? ({ type: "bitcoinAddress", confirmationSpeed: "medium" } as const)
           : undefined;
-    const r = await this.need().sendPayment({ prepareResponse: prep, options, idempotencyKey });
+    // Breez reuses the idempotency key as a Spark transfer id, which must be a
+    // plain UUID. On-chain withdrawals (Lightning -> a bitcoin address) failed
+    // with "Invalid TransferId format" when one was passed, so they go without;
+    // the review screen's single-tap button is what prevents a double send.
+    const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idempotencyKey);
+    const key = m.type === "bitcoinAddress" || !uuid ? undefined : idempotencyKey;
+    let r;
+    try {
+      r = await this.need().sendPayment({ prepareResponse: prep, options, ...(key ? { idempotencyKey: key } : {}) });
+    } catch (e) {
+      if (/TransferId/i.test(String((e as Error)?.message ?? e)))
+        throw new LightningError("Lightning couldn't start this payment. Check your Lightning history before trying again.");
+      throw e;
+    }
     const p = toLnPayment(r.payment);
     if (p.status === "failed") throw new LightningError("The payment failed. Nothing was sent.");
     return p;
