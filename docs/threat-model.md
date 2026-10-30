@@ -1,92 +1,63 @@
-# Threat Model (working notes - phase 0 deliverable)
+# Threat model
 
-Scope: phase 1 scaffold. This document tracks assets, adversaries, and
-mitigations that the implementation already honors, plus open items the
-release gates require before testnet/mainnet.
+What we protect, who might attack it, and how Satish stops them. Open gaps are in [known-limitations.md](known-limitations.md).
 
-## Assets
+## What we protect
 
-| Asset | Where it lives today |
+| | Where it lives |
 |---|---|
-| Seed phrases / private keys | NOWHERE - not in DB, logs, agent context, or chat (phase 3 keeps them in the user's signer) |
-| XP balances & ledger | Postgres/SQLite, append-only entries + CAS balance updates |
-| Payment state | `payment_intents` with idempotency keys; settlement verified before credit |
-| Session tokens | Only SHA-256 hashes stored; bearer expiry checked |
-| Generated artifacts | Private storage; authorized, ownership-checked delivery |
-| Audit trail | `audit_events` - redacted metadata, request-correlated |
+| Recovery phrases and private keys | only on the person's device, encrypted with their password |
+| People's bitcoin and Lightning funds | controlled only by those keys |
+| Who pays whom (@username payments, requests) | server database; balances and other activity are never sent |
+| TK balances | server ledger, append-only |
+| Developer API keys and webhook secrets | server; API keys stored only as hashes |
+| The operator's Lightning wallet | server; receives TK and developer Lightning payments |
+| Satish AI conversations and files | server until delivered to Telegram, then deleted |
+| Sessions | server stores only hashes |
 
-## Adversaries & mitigations
+## Threats and what stops them
 
-**Forged Mini App identity** - server-side HMAC validation of initData with
-freshness window (`verify_telegram_init_data`); unit-tested against tampered
-payloads, wrong tokens, stale auth dates. Open: replay window tuning and
-session binding in phase 2.
+**A hacked or dishonest Satish server tries to steal money.**
+The server has no keys, so it can't spend. It could try to give out its own address for an @username payment. It can't, because every address is signed by the recipient's wallet identity key, and the payer's phone checks the signature and remembers the key from the first payment. The same applies to Lightning addresses.
 
-**Prompt-injected agent** - all retrieved content wrapped as untrusted data;
-model output never grants authorization; tool registry enforces scopes,
-required arguments, budgets, timeouts; sensitive tools require digest-bound
-user approval. Open: per-tool output size caps and rate limiting before
-research tools ship.
+**A hacked server tries to steal from the operator wallet.**
+This is possible: the operator's Lightning phrase is on the server. That is why the operator should keep only a small amount there and move income out regularly. Developer Lightning payments sit there only for the seconds before they are forwarded.
 
-**Ledger manipulation** - append-only entries, unique idempotency keys,
-CHECK(balance >= 0), atomic CAS reservations; no client-supplied balance is
-ever authoritative (api_rules). Refunds/adjustments append new entries and
-write audit events.
+**Someone gets the person's phone.**
+The phrase is encrypted with their password (PBKDF2, 310,000 rounds, then AES-256-GCM). The optional app lock asks for the password on opening and after 5 minutes away. Showing the phrase or exporting keys always asks again.
 
-**Artifact leakage** - private-by-default storage, ownership checks on every
-access route; keys are path-normalized against traversal. Open: expiring
-signed URLs when S3-compatible storage lands.
+**The person is tricked into paying the wrong place.**
+A full review before every payment; an extra "I've checked" step for new addresses, large amounts and high fees; and a daily limit that makes big payments wait 30 seconds, which stops panic payments to scammers.
 
-**Secret leakage into logs** - structlog payloads carry IDs only; no seed,
-private key, or full payment credential fields exist in the models at all
-(structural prevention, not just convention).
+**Losing the phone or the password.**
+The 12 words restore everything. The encrypted Telegram backup and social recovery (any 2 of 3 trusted people) are optional extras. One piece of a social recovery split reveals nothing.
 
-**Dependency/supply chain** - pinned revisions in pyproject/bun.lock; CI runs
-lint+tests on every PR. Open: dependency review + license review (phase 0
-deliverables), DSH upstream revision pinning.
+**Fake sign-in.**
+Telegram's login data is checked with the bot token and must be recent. Extension sign-in uses a one-time code sent to the bot from the person's own Telegram.
 
-## Release gate reminders (plan: wallet_and_security.release_gates)
+**Satish AI is manipulated by a web page.**
+Pages the AI reads are marked as untrusted data, not instructions. The AI has no wallet tools at all, so the worst a manipulated AI could do is give a bad answer or draft a bad email, and emails are only sent after the person approves that exact text. Web fetching blocks private and local network addresses, odd ports and oversized responses.
 
-- Regtest pass of create/receive/send/restore before any testnet demo.
-- Signing UI shows destination, amount, fee, network before authorization.
-- Address aliases can never silently change a destination.
-- Failed/uncertain broadcasts represented accurately.
-- Lightning: channel-state backup + recovery documented before public beta;
-  never claim a seed phrase alone restores channels.
-- No mainnet until every gate above passes independent review.
+**Paying for TK twice, or being credited twice.**
+Each purchase has its own address or invoice. Settling is a compare-and-set, and the ledger entry has a unique key, so replays can't credit twice. Reconciliation compares balances with the ledger and raises alerts.
 
-## Phase-10 threat-model review (2026-10-16)
+**A developer's key leaks.**
+It can only create and read that developer's payment requests: it can't see balances or move money. Keys can be revoked in the app.
 
-A structured re-review of every trust boundary after phases 7-9 added
-research fetching, commerce scoring, external connections, email sending,
-and an automation scheduler. Each new surface was reviewed against the
-original STRIDE-per-boundary table; verdicts and deltas below. This review
-is INTERNAL - see docs/security-review.md for the honest status of
-independent review.
+**Fake webhooks, or webhooks used to attack internal systems.**
+Webhooks are signed with HMAC and include a timestamp. Endpoint addresses must be `https` on public IPs, checked again before every delivery.
 
-### New surfaces reviewed
+**A forged demo shop link.**
+The shop's pass is signed and expires after 4 hours.
 
-| Surface | Threats considered | Verdict / delta |
-| --- | --- | --- |
-| Research fetch (phase 7) | SSRF via redirects, private-IP probing, oversized responses, non-HTML smuggling | Existing FetchPolicy wall re-verified: scheme allowlist, port 80/443 only, per-hop + per-resolved-IP checks, size/content-type caps. No change. |
-| Commerce scoring (phase 8) | Manipulated verdicts via operator weights; untrusted listings presented as facts | Weights are operator-config and echoed in every verdict; defects fall back WITH disclosure; listing prices are typed estimates everywhere. No change. |
-| Credential vault (phase 9) | Vault key disclosure, decryption-path proliferation | Single decryption path re-verified; revocation hard-deletes; dev fallback key is disclosed on every response and refused outside dev. No change. |
-| Email send (phase 9) | Auto-retry fabricating delivery; resend of sent drafts; approval bypass | Outcome taxonomy (sent/refused/unknown) is final; sent drafts are terminal; send executes only post-approval with matching content digest. No change. |
-| Automation scheduler (phase 9) | Budget overrun, failure loops, crash-recovery double-run | Per-run cap enforced by the ledger itself; consecutive-failure ladder auto-pauses; stale-run recovery marks rather than repeats. No change. |
-| **API abuse (NEW, phase 10)** | Credential stuffing, scraping, cost-forcing via agent/money endpoints | **Mitigated**: token-bucket rate limiting per route class (auth 10/min, money 60/min, agent 30/min, reads 300/min) with 429 + Retry-After; subject = client IP + bearer fingerprint (no DB hit), upgraded to validation-joined per-user keys so token rotation cannot refresh buckets (D20). Monitoring surfaces deliberately unlimited. Backend is swappable: memory (per-process, default) or Redis (shared across workers via an atomic Lua token bucket; KL-09 closed). |
-| **Payment integrity ops (NEW)** | Silent drift between balance row and ledger; double-credited settlements discovered late | **Mitigated**: every reconciliation discrepancy now opens a persisted, deduplicated ReconciliationAlert (critical kinds never auto-resolve); operators ack/resolve via /ops with an audit trail. |
-| **Data retention (NEW)** | Indefinite PII/session/draft accumulation (privacy breach blast radius) | **Mitigated**: retention sweep deletes expired sessions, read/unread notifications past windows, finished automation runs, terminal email drafts. Ledger, task_events, audit_events, artifacts are structurally never swept (money + evidence trails). |
-| **Restore integrity (NEW)** | Backup that cannot actually restore; silent corruption | **Mitigated**: `make backup-drill` proves a full logical roundtrip with ledger re-reconciliation, 1:1 settlement check, and artifact digest verification on the restored copy. |
+**Too many requests.**
+Rate limits per kind of route (sign-in, money, AI, reading), with a Redis-backed option for several workers.
 
-### Residual risks accepted for phase 10 (tracked in docs/known-limitations.md)
+**Privacy leaks.**
+Chain data comes from mempool.space by default, which can see which addresses a wallet looks up. Running your own Esplora server fixes that (`NUXT_PUBLIC_ESPLORA_URL`). Logs carry IDs, never keys or message content.
 
-- Multi-worker rate limiting is solved in code (Redis backend, D20), but a
-  Redis outage fails OPEN: requests pass unthrottled while the degraded state
-  is counted on /ops/observability and logged - an operator watching the
-  observability surface sees it, nothing silently pretends to limit.
-- A bearer's very first request after process start (or identity-cache
-  eviction) is keyed on the presented-credential fingerprint; the per-user
-  join takes effect from the second request of that token onward (cold join
-  is a one-request seam, never a permanent bypass).
-- The backup drill exercises the logical roundtrip on SQLite; Postgres
-  pg_dump/pg_restore + SCB recovery need a live operator host (KL-04/KL-05).
+## Still open
+
+- No independent security review yet.
+- The operator wallet's phrase is on the server (see above).
+- Spark's operators are part of the Lightning trust model: they can't take funds, but they are not as trust-free as plain Bitcoin.

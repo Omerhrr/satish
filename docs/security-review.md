@@ -1,69 +1,39 @@
-# Security Review (phase 10)
+# Security review
 
-**Scope**: full internal review of the security-relevant surface as of
-phase-9 (`2e8a514`) plus the phase-10 additions (rate limiting,
-reconciliation alerts, retention sweep, drill/audit tooling).
+This is an **internal** review, done while building Satish. It is not a substitute for an independent audit, which hasn't happened yet ([known-limitations.md](known-limitations.md)).
 
-**Status - read this first**: this is a *structured internal* review by the
-implementing agent. It is thorough, evidence-linked, and reproducible - but
-it is **not** an independent review. Phase-10's own deliverable
-("Independent security review") therefore remains **open** as KL-15, and
-"No known critical findings remain unresolved before real-value production
-use" is evaluated against the register below with that caveat stated
-plainly.
+## How we check
 
-## Method
+1. Walk every trust boundary in the [threat model](threat-model.md).
+2. For each security claim, find the test that proves it. A claim without a test counts as a finding.
+3. Re-run the full test suites before each release: server (`make test`) and wallet (`cd apps/web && bun test tests`).
 
-1. Inventory every trust boundary (docs/threat-model.md) and walk each
-   phase's acceptance criteria against tests.
-2. For each security-relevant module: read the code path end-to-end, then
-   find the test that pins the behavior. Un-tested security claims are
-   findings by definition.
-3. Re-verify the invariant stack: ledger CAS + idempotency + 1:1
-   settlement, scope wall, approval digests, SSRF wall, credential vault
-   single-path decryption.
+## What has been checked, and the tests behind it
 
-## Verified strengths (evidence)
+| Area | What we check | Tests |
+|---|---|---|
+| Keys stay on the device | official BIP84 test vectors; the phrase is encrypted at rest; the signer refuses coins that aren't the wallet's and fees that differ from the review | `apps/web/tests/wallet-core.test.ts` |
+| Backup and recovery | the Telegram backup is unreadable without the password; Shamir pieces rebuild only with 2 of 3, and wrong pieces are caught | `cloud-backup.test.ts`, `shamir.test.ts` |
+| @username payments can't be redirected | address pools must be signed by the identity key; Lightning addresses too | `tests/test_handles.py`, `spark-sign.test.ts` |
+| TK credits exactly once | replaying a settlement doesn't credit again; the ledger matches balances | `tests/test_xp_economy.py`, `tests/test_tk_payments.py` |
+| Satish AI can't reach wallets | no wallet imports, tools or prompt text | `tests/test_ai_isolation.py` |
+| AI web fetching | private IPs, odd ports, redirects to local addresses and huge pages are refused | `tests/test_research.py` |
+| Developer API | keys are hashed and shown once; keys only reach their owner's requests; webhooks are signed; webhook URLs must be public `https`; Lightning forwarding happens once per request | `tests/test_developers.py` |
+| Demo shop | forged or expired passes are refused; prices come from the server | `tests/test_demo_shop.py` |
+| Sign-in | tampered, stale or wrong-bot Telegram data is refused; sessions expire and can be revoked | `tests/test_telegram_auth.py` |
+| Abuse | rate limits per kind of route, shared across workers with Redis | `tests/test_ratelimit_redis.py` |
+| Operator tools | `/ops` needs a configured credential; every attempt is logged | `tests/test_ops_identity.py` |
 
-- **Money integrity**: settle-time CAS + ledger idempotency key + the
-  reconciliation 1:1 check; 6x replay tests in tests/test_xp_economy.py;
-  phase-10 adds a persisted alert queue that cannot silently close critical
-  findings (tests/test_phase10_ops.py).
-- **Authorization**: USER_TASK_SCOPES scope wall evaluated before approval
-  gates; approval digests bind to exact content; untrusted-content wrappers
-  cannot reach tools directly.
-- **Identity**: initData HMAC with auth_date validation (forgery/stale/
-  wrong-token tests); 24h sessions; server-side revocation; per-session
-  last_used heartbeat.
-- **Network egress**: FetchPolicy SSRF wall (scheme/port/private-IP/
-  per-hop) - tests pin each bypass attempt.
-- **Secrets at rest**: wallet stores public descriptors only; connection
-  credentials Fernet-encrypted with a single decryption path; no seed or
-  private-key fields exist in any model (structural).
-- **Abuse controls (new)**: route-class token buckets with honest 429s,
-  kill switch, monitoring surfaces exempt; suite-verified.
+## Findings
 
-## Findings register
+| | Finding | Status |
+|---|---|---|
+| 1 | An early version kept the wallet on the server, which needed the phrase to sign | **Fixed**: the wallet moved onto the device; the server wallet was removed |
+| 2 | No rate limiting | **Fixed** |
+| 3 | Operator tools protected only by the dev-mode flag | **Fixed**: a credential is required, and access is logged |
+| 4 | Dev mode could be switched on in production | **Fixed**: it is refused when the environment is staging or production |
+| 5 | Lightning sends to a Bitcoin address failed with an idempotency key | **Fixed**: those sends don't use one, and the app checks history before allowing a retry |
+| 6 | The operator Lightning wallet's phrase is on the server | **Accepted, disclosed**: keep a small balance there |
+| 7 | Developer Lightning payments are held for seconds before forwarding | **Accepted, disclosed**: chosen so webhooks work instantly |
 
-| ID | Sev | Finding | Status |
-| --- | --- | --- | --- |
-| F-01 | high→fixed | Rate limiting absent entirely (pre-phase-10): auth/money/agent endpoints had no abuse ceiling | **Fixed** in phase 10 (middleware + tests); per-process scope residual **closed** with the Redis backend (D20, KL-09) |
-| F-02 | medium | Payment discrepancies were audit-log-only - an operator watching logs could miss drift | **Fixed**: persisted dedupe alert queue + ack/resolve lifecycle + observability counts |
-| F-03 | medium | `/ops/*` gated by DEV_MODE flag only; no operator identity model | **Fixed** (D21, KL-11): configured operator credential required everywhere, constant-time compared, grant/denial audited; unconfigured + non-dev refuses 503 (dark) instead of opening |
-| F-04 | medium | No automated dependency/vulnerability gate | **Mitigated**: `make audit` inventory + hard-spec gates committed; live CVE scanning (pip-audit/trivy) documented as operator CI step - scanner absence is disclosed, never faked |
-| F-05 | low→fixed | Bearer-fingerprint rate-limit subject allows bucket refresh via token rotation | **Fixed** (D20): validated bearers join per-user limiter keys via the identity cache; rotation of one user's tokens drains one bucket. Cold-join first request accepted (see threat-model residual) |
-| F-06 | low | Retention windows are settings, not code-constants - a misconfiguration could over-delete | Mitigated: PRESERVED_SURFACES is structural (money/audit never swept regardless of settings); window tests pin behavior |
-| F-07 | low | Backup drill covers SQLite logical roundtrip only | Accepted (KL-04/KL-05); drill prints its own scope notes so nobody mistakes it for a Postgres/SCB proof |
-
-No critical findings remain open in this build. The two high-severity
-items found during review (F-01) were fixed in this phase with tests.
-
-## Independent review - what it must cover (for the reviewer)
-
-1. Reproduce the money-integrity stack (ledger invariants, replay tests).
-2. Attempt scope-wall bypasses via untrusted content in tool inputs.
-3. Audit the FetchPolicy wall against a hostile redirect chain.
-4. Verify the credential vault's single decryption path and revocation.
-5. Assess rate-limit fitness for the target deployment topology.
-6. Own the "production readiness" call - this document deliberately does
-   not make it.
+No critical findings are open. Please report anything new through [SECURITY.md](../SECURITY.md).

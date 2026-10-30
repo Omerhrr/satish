@@ -1,7 +1,7 @@
 """Privacy and retention sweep (phase 10, deliverable: Privacy and retention policy
 enforcement).
 
-The policy itself lives in docs/privacy-retention.md; this job is the
+The policy itself lives in docs/privacy.md; this job is the
 enforcement arm. Windows are settings (XP_RETENTION_*), each sweep deletes
 ONLY within its window and never touches the money trail or audit surfaces:
 

@@ -198,7 +198,7 @@ async def _main() -> int:
     def log(msg: str) -> None:
         print(msg, flush=True)
 
-    print("XP end-to-end demo - fresh in-memory DB, zero external services")
+    print("Satish server demo - fresh in-memory DB, zero external services")
     report = await run_demo(log)
     for note in report["honesty_notes"]:
         print(f"  note: {note}")

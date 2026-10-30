@@ -19,7 +19,7 @@ Output: `apps/extension/dist/` and `apps/extension/satish-extension.zip`.
 
 ## What it does
 
-- Wallet (Bitcoin + Lightning) and Satish AI, same account and TK as Telegram.
+- The wallet (Bitcoin + Lightning), plus Satish AI, the first app built on Satish payments. Same account and TK as on Telegram.
   The wallet stays on each device: restore it with your 12 words.
 - Right-click a page: "Ask Satish AI about this page". Right-click selected
   text: "Ask Satish AI about ...".

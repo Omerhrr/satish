@@ -16,7 +16,7 @@ What this drill PROVES (on the dev/CI database engine, SQLite):
 Honest scope (also printed with the report):
 - Postgres production backups use pg_dump/pg_restore; the logical-export
   path here exercises the SAME verification gates the ops runbook applies
-  after any restore (docs/incident-response.md R5).
+  after any restore (docs/operations.md, Data loss).
 - Lightning SCB roundtrip is a separate drill (scripts/lnd_regtest_drill.py,
   stages 7-8) and is referenced, not duplicated here.
 - Run: make backup-drill   (or pytest -k backup_drill for the in-test run)
@@ -207,7 +207,7 @@ async def run_drill() -> dict[str, Any]:
         "ok": verification["ok"],
         "scope_notes": [
             "SQLite logical roundtrip; production Postgres uses pg_dump/pg_restore "
-            "with the same verification gates (docs/incident-response.md R5)",
+            "with the same verification gates (docs/operations.md, Data loss)",
             "Lightning SCB backup/restore roundtrip is drills 7-8 of "
             "scripts/lnd_regtest_drill.py (separate live drill)",
         ],

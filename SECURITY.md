@@ -1,44 +1,49 @@
-# Security Policy
+# Security policy
 
-## Reporting a vulnerability
+Satish is a wallet. People keep real money in it, so we take reports seriously and answer them quickly.
 
-Email the maintainers (see the repository owner's profile for the current
-contact) or open a GitHub security advisory. Do **not** open a public
-issue for anything you believe is exploitable.
+## Reporting a problem
 
-Include: affected surface (endpoint/module), reproduction steps or a
-proof-of-concept, and the commit you tested against. Regtest/canned-mode
-findings are welcome - the deterministic twin is designed to make
-settlement bugs reproducible without mainnet funds.
+**Please don't open a public issue for anything that could be used to steal money or data.**
 
-## Scope
+Report it privately instead, by either:
 
-In scope: everything in this repository - the FastAPI surface, the XP
-ledger and settlement path, wallet/Lightning adapters, the DSH agent wall
-(scopes, approvals, tool registry, untrusted-content handling), the
-credential vault, the Mini App, and the operational tooling
-(rate limiting, alerts, retention).
+- opening a [GitHub security advisory](https://github.com/Omerhrr/satish/security/advisories/new) on this repository, or
+- messaging the maintainer, @Omerhrr, on GitHub.
 
-Out of scope: Telegram platform issues, GitHub infrastructure, upstream
-vulnerabilities in lnd/BDK/DeepSeek (report upstream; we track advisories
-via `make audit` and dependency review).
+Please include:
 
-## Our commitments
+- what is affected (a screen, an API route, a file);
+- steps to reproduce it, or a proof of concept;
+- the commit or version you tested.
 
-- **90-day disclosure window** from report to public disclosure,
-  coordinated with the reporter; earlier if actively exploited.
-- No legal action against good-faith research that respects user data and
-  never touches funds that are not yours (regtest/canned only).
-- Findings land in `docs/security-review.md`'s findings register with
-  severity, fix, and test; systemic gaps also enter
-  `docs/known-limitations.md` until closed.
+Use the test network (testnet4 for Bitcoin, regtest for Lightning) when you test. You should never need real money to show a problem.
 
-## What we will honestly say today
+## What's in scope
 
-- This build has **not** had an independent external security review yet
-  (KL-15) - that is a release gate for real-value production use.
-- `/ops/*` endpoints are DEV_MODE-gated only (KL-11); do not deploy to
-  shared environments before an operator identity layer exists.
-- The rate limiter is per-process in-memory (KL-09); multi-worker
-  deployments need the Redis backend first.
-- No mainnet anywhere: providers refuse mainnet at construction by design.
+Everything in this repository, in particular:
+
+- **the wallet** on the device: keys, encryption, signing, backup, social recovery, private-key sweep (`apps/web/app/lib`);
+- **@usernames and payment requests**, including the signed address pools that stop a server from swapping in its own address;
+- **Lightning**: the in-app Breez wallet, and the server's operator wallet that receives TK and developer Lightning payments;
+- **the developer API**: API keys, payment requests, webhook signing, the demo shop;
+- **sign-in**: Telegram login, sessions, linking the browser extension;
+- **Satish AI** and TK credits, including the wall that keeps the AI away from wallets;
+- **the bot, the browser extension and the server**.
+
+Out of scope: problems in Telegram itself, GitHub, or third-party services we use (mempool.space, Breez and Spark, DeepSeek, Brave Search, Onramper). Please report those to them; if they affect Satish users, tell us too.
+
+## What we promise
+
+- We reply within **3 days** and keep you updated.
+- We aim to fix serious problems within **30 days**, and publish the details at most **90 days** after your report, agreed with you. Sooner if it's being actively exploited.
+- We won't take legal action against good-faith research that respects users' data and never touches money that isn't yours.
+- With your permission, we credit you in the fix.
+
+## Where things stand today
+
+Being honest about this matters more than looking finished:
+
+- Satish has **not had an independent security review yet**. Until it has, the app suggests keeping only spending money in it on mainnet.
+- Lightning payments made through a developer's payment request pass through Satish's operator wallet for a few seconds before being forwarded. TK payments by Lightning go to an operator wallet whose phrase is on the server. Both are explained in [docs/threat-model.md](docs/threat-model.md).
+- The full list of open gaps is in [docs/known-limitations.md](docs/known-limitations.md).

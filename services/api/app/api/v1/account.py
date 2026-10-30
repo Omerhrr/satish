@@ -6,7 +6,7 @@ is disclosed in the document itself. Closure refuses with precise reasons
 while anything is in flight, requires a clean reconciliation, then erases
 user content, anonymizes identity, and keeps the immutable money/evidence
 trail - the full contract is xp_core.services.closure and
-docs/privacy-retention.md.
+docs/privacy.md.
 """
 
 from __future__ import annotations

@@ -13,7 +13,7 @@ What it does, honestly:
 5. OPTIONAL LIVE SCANNERS - pip-audit / trivy / bun audit are run only if
    present on PATH; when absent the report says so explicitly instead of
    pretending a scan happened. Network-dependent scanners are therefore a
-   documented operator step (docs/incident-response.md), not a silent skip.
+   documented operator step (docs/operations.md), not a silent skip.
 
 Run: make audit    (or .venv/bin/python scripts/dependency_audit.py)
 """
@@ -131,7 +131,7 @@ def _optional_scanners() -> list[dict[str, str]]:
                     "tool": tool,
                     "status": "not_installed",
                     "note": f"{tool} is not bundled; run it in CI/on an operator host "
-                    "for live CVE scanning (documented in docs/incident-response.md)",
+                    "for live CVE scanning (documented in docs/operations.md)",
                 }
             )
             continue

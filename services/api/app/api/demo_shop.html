@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Kaduna Kicks · Shoes & bags</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23111827'/%3E%3Ctext x='16' y='22' font-size='15' text-anchor='middle' fill='%23fff' font-family='Arial' font-weight='bold'%3EKK%3C/text%3E%3C/svg%3E" />
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+<style>
+  :root {
+    --ink: #111827; --muted: #6b7280; --line: #e5e7eb; --bg: #fafaf9; --card: #fff;
+    --brand: #111827; --accent: #0f766e; --sat: #f7931a; --ok: #15803d; --bad: #b91c1c;
+    font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--ink); line-height: 1.5; }
+  button { font: inherit; cursor: pointer; }
+  a { color: inherit; }
+  .demo { background: #fef3c7; color: #78350f; font-size: 13px; padding: 8px 16px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: center; text-align: center; }
+  .demo button { background: none; border: 0; text-decoration: underline; color: inherit; font-weight: 600; }
+  header { position: sticky; top: 0; z-index: 5; background: rgba(255,255,255,.92); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+  .bar { max-width: 1080px; margin: 0 auto; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .logo { font-weight: 900; letter-spacing: 3px; font-size: 18px; cursor: pointer; }
+  .logo small { display: block; font-size: 10px; letter-spacing: 2px; color: var(--muted); font-weight: 600; }
+  nav { display: flex; gap: 18px; font-size: 14px; color: var(--muted); }
+  .cartbtn { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 8px 14px; font-weight: 600; }
+  .cartbtn b { background: var(--ink); color: #fff; border-radius: 999px; padding: 0 7px; margin-left: 6px; font-size: 12px; }
+  main { max-width: 1080px; margin: 0 auto; padding: 20px 16px 80px; }
+  .hero { border-radius: 20px; padding: 34px 26px; color: #fff; background: radial-gradient(120% 140% at 90% 0%, #14b8a6 0%, #0f766e 35%, #111827 100%); margin-bottom: 24px; }
+  .hero h1 { font-size: clamp(26px, 5vw, 40px); line-height: 1.1; max-width: 18ch; }
+  .hero p { opacity: .85; margin-top: 8px; max-width: 46ch; }
+  .hero .pill { display: inline-flex; gap: 6px; align-items: center; margin-top: 16px; background: rgba(255,255,255,.14); border-radius: 999px; padding: 6px 12px; font-size: 13px; }
+  h2 { font-size: 20px; margin: 4px 0 14px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; }
+  .p { background: var(--card); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; }
+  .art { aspect-ratio: 1; display: grid; place-items: center; font-size: 72px; }
+  .p .body { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 2px; flex: 1; }
+  .p .name { font-weight: 700; }
+  .p .tag { color: var(--muted); font-size: 13px; }
+  .price { font-weight: 800; margin-top: 6px; }
+  .price span { font-weight: 500; color: var(--muted); font-size: 12px; }
+  .btn { border: 0; border-radius: 10px; padding: 11px 14px; font-weight: 700; background: var(--ink); color: #fff; }
+  .btn.ghost { background: #fff; color: var(--ink); border: 1px solid var(--line); }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .p .btn { margin-top: 10px; }
+  .layout { display: grid; grid-template-columns: 1.3fr 1fr; gap: 20px; align-items: start; }
+  @media (max-width: 760px) { .layout { grid-template-columns: 1fr; } nav { display: none; } }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 18px; }
+  .line { display: flex; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .line .mini { width: 52px; height: 52px; border-radius: 10px; display: grid; place-items: center; font-size: 28px; flex: none; }
+  .line .grow { flex: 1; min-width: 0; }
+  .qty { display: flex; gap: 6px; align-items: center; }
+  .qty button { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--line); background: #fff; }
+  .sum { display: flex; justify-content: space-between; padding: 6px 0; font-size: 14px; color: var(--muted); }
+  .sum.total { color: var(--ink); font-size: 18px; font-weight: 800; border-top: 1px solid var(--line); margin-top: 6px; padding-top: 12px; }
+  label { display: block; font-size: 13px; font-weight: 600; margin: 10px 0 4px; }
+  input { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; font: inherit; }
+  .paywith { margin-top: 14px; width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; border: 0; border-radius: 12px; padding: 14px; background: var(--sat); color: #111; font-weight: 800; font-size: 16px; }
+  .paywith img { width: 24px; height: 24px; border-radius: 6px; }
+  .small { font-size: 13px; }
+  .muted { color: var(--muted); }
+  .err { color: var(--bad); }
+  .empty { text-align: center; padding: 40px 0; color: var(--muted); }
+
+  /* Satish payment box */
+  .satish { border: 2px solid var(--sat); border-radius: 18px; padding: 18px; background: #fff; text-align: center; }
+  .satish .head { display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 800; }
+  .satish .head img { width: 28px; height: 28px; border-radius: 7px; }
+  .satish .amt { font-size: 28px; font-weight: 900; margin-top: 6px; }
+  .tabs { display: inline-flex; background: #f3f4f6; border-radius: 999px; padding: 4px; margin: 12px 0 6px; }
+  .tabs button { border: 0; background: none; border-radius: 999px; padding: 7px 14px; font-weight: 600; color: var(--muted); }
+  .tabs button.on { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+  .qr { width: 240px; max-width: 100%; aspect-ratio: 1; margin: 6px auto; }
+  .qr svg { width: 100%; height: 100%; }
+  .mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; word-break: break-all; background: #f9fafb; border: 1px solid var(--line); border-radius: 8px; padding: 8px; margin: 8px 0; }
+  .row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  .row .btn { padding: 9px 12px; font-size: 14px; }
+  .wait { display: flex; gap: 8px; align-items: center; justify-content: center; color: #b45309; font-weight: 600; margin-top: 12px; font-size: 14px; }
+  .spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: s .8s linear infinite; display: inline-block; }
+  @keyframes s { to { transform: rotate(360deg); } }
+  .done { text-align: center; padding: 30px 18px; }
+  .done .big { font-size: 56px; }
+  .done h1 { margin: 6px 0; }
+
+  /* API log */
+  .log { position: fixed; right: 12px; bottom: 12px; width: min(440px, calc(100vw - 24px)); max-height: 58vh; overflow: auto; background: #0b1220; color: #d1d5db; border-radius: 14px; box-shadow: 0 12px 40px rgba(0,0,0,.35); font: 12px/1.45 ui-monospace, Menlo, Consolas, monospace; z-index: 9; }
+  .log .lh { position: sticky; top: 0; background: #111a2e; padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; color: #fff; font-family: system-ui, sans-serif; font-weight: 700; font-size: 13px; }
+  .log .lh button { background: none; border: 0; color: #9ca3af; font-size: 18px; }
+  .log .e { padding: 10px 12px; border-top: 1px solid #1f2937; }
+  .log .e b { color: #fbbf24; }
+  .log .e .who { color: #5eead4; }
+  .log pre { white-space: pre-wrap; word-break: break-all; margin-top: 4px; color: #e5e7eb; }
+  .log .hint { padding: 10px 12px; color: #9ca3af; font-family: system-ui, sans-serif; }
+  footer { text-align: center; color: var(--muted); font-size: 12px; padding: 30px 16px; }
+</style>
+</head>
+<body>
+<div class="demo">
+  <span>🧪 <b>Demo store</b> built on Satish for developers. <span id="who">Orders are paid to your own Satish wallet.</span></span>
+  <button id="logToggle" type="button">Show the API calls</button>
+</div>
+<header>
+  <div class="bar">
+    <div class="logo" onclick="go('shop')">KADUNA KICKS<small>SHOES · BAGS · CAPS</small></div>
+    <nav><span>New in</span><span>Shoes</span><span>Bags</span><span>Sale</span></nav>
+    <button class="cartbtn" type="button" onclick="go('cart')">Cart<b id="count">0</b></button>
+  </div>
+</header>
+<main id="view"></main>
+<footer>Kaduna Kicks is a pretend shop. No real goods are sold or shipped.</footer>
+
+<aside class="log" id="log" hidden>
+  <div class="lh"><span>Your server ⇄ Satish</span><button type="button" aria-label="Close" onclick="toggleLog(false)">×</button></div>
+  <div id="logBody"><div class="hint">Add something to the cart and check out. Every call the shop's server makes to Satish shows up here.</div></div>
+</aside>
+
+<script>
+"use strict";
+const ART = {
+  runners: ["👟", "linear-gradient(135deg,#fde68a,#f59e0b)", "Light sneakers for long days"],
+  heels: ["👠", "linear-gradient(135deg,#fbcfe8,#ec4899)", "For the owambe, all night"],
+  boots: ["🥾", "linear-gradient(135deg,#e7d7bf,#92400e)", "Leather, made to last"],
+  tote: ["👜", "linear-gradient(135deg,#bbf7d0,#16a34a)", "Hand-woven, fits a laptop"],
+  backpack: ["🎒", "linear-gradient(135deg,#bfdbfe,#2563eb)", "Water-proof, many pockets"],
+  cap: ["🧢", "linear-gradient(135deg,#ddd6fe,#7c3aed)", "Keeps the sun off"],
+};
+const S = { products: [], shipping: 0, cart: {}, view: "shop", order: null, method: "lightning", timer: null, pass: "" };
+const $ = (id) => document.getElementById(id);
+const esc = (t) => String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const fmt = (n) => Number(n || 0).toLocaleString();
+
+// The pass from Satish for developers arrives after "#", then lives in this tab only.
+(function readPass() {
+  const m = location.hash.match(/pass=([^&]+)/);
+  try {
+    if (m) sessionStorage.setItem("kk_pass", decodeURIComponent(m[1]));
+    S.pass = sessionStorage.getItem("kk_pass") || "";
+    S.cart = JSON.parse(sessionStorage.getItem("kk_cart") || "{}");
+  } catch { S.pass = m ? decodeURIComponent(m[1]) : ""; }
+  if (m) history.replaceState(null, "", location.pathname);
+})();
+function saveCart() { try { sessionStorage.setItem("kk_cart", JSON.stringify(S.cart)); } catch {} }
+
+async function call(method, path, body) {
+  const r = await fetch(path, {
+    method,
+    headers: { "Content-Type": "application/json", "X-Shop-Pass": S.pass },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Something went wrong. Try again.");
+  return data;
+}
+
+// ---------- API log ----------
+function toggleLog(show) {
+  const open = show ?? $("log").hidden;
+  $("log").hidden = !open;
+  $("logToggle").textContent = open ? "Hide the API calls" : "Show the API calls";
+}
+$("logToggle").onclick = () => toggleLog();
+function log(title, who, obj) {
+  const body = $("logBody");
+  if (body.querySelector(".hint")) body.innerHTML = "";
+  const e = document.createElement("div");
+  e.className = "e";
+  e.innerHTML = `<b>${esc(title)}</b> <span class="who">${esc(who)}</span><pre>${esc(typeof obj === "string" ? obj : JSON.stringify(obj, null, 2))}</pre>`;
+  body.prepend(e);
+}
+
+// ---------- cart ----------
+const count = () => Object.values(S.cart).reduce((a, b) => a + b, 0);
+const lines = () => S.products.filter((p) => S.cart[p.id]).map((p) => ({ p, n: S.cart[p.id] }));
+const subtotal = () => lines().reduce((s, l) => s + l.p.price * l.n, 0);
+function add(id, d) {
+  const n = (S.cart[id] || 0) + d;
+  if (n <= 0) delete S.cart[id]; else S.cart[id] = Math.min(n, 9);
+  saveCart();
+  render();
+}
+
+function go(v) { S.view = v; render(); window.scrollTo({ top: 0, behavior: "smooth" }); }
+
+// ---------- views ----------
+function shopView() {
+  return `
+  <section class="hero">
+    <h1>Fresh pairs for Harmattan season</h1>
+    <p>Shoes, bags and caps made in the North. Pay in seconds with bitcoin or Lightning.</p>
+    <span class="pill"><img src="/logo.png" alt="" width="18" height="18" style="border-radius:4px"> We accept Satish</span>
+  </section>
+  <h2>New in</h2>
+  <div class="grid">${S.products.map((p) => {
+    const [emoji, bg, tag] = ART[p.id] || ["🛍️", "#eee", ""];
+    return `<article class="p">
+      <div class="art" style="background:${bg}">${emoji}</div>
+      <div class="body">
+        <span class="name">${esc(p.name)}</span>
+        <span class="tag">${esc(tag)}</span>
+        <span class="price">${fmt(p.price)} sats</span>
+        <button class="btn" type="button" onclick="add('${p.id}',1)">${S.cart[p.id] ? `In cart (${S.cart[p.id]}) · Add one` : "Add to cart"}</button>
+      </div></article>`;
+  }).join("")}</div>`;
+}
+
+function cartView() {
+  if (!count()) return `<div class="card empty"><p>Your cart is empty.</p><br><button class="btn" type="button" onclick="go('shop')">Start shopping</button></div>`;
+  const total = subtotal() + S.shipping;
+  return `
+  <h2>Checkout</h2>
+  <div class="layout">
+    <div class="card">
+      ${lines().map(({ p, n }) => {
+        const [emoji, bg] = ART[p.id] || ["🛍️", "#eee"];
+        return `<div class="line"><div class="mini" style="background:${bg}">${emoji}</div>
+          <div class="grow"><b>${esc(p.name)}</b><div class="small muted">${fmt(p.price)} sats</div></div>
+          <div class="qty"><button type="button" aria-label="One less" onclick="add('${p.id}',-1)">−</button><span>${n}</span><button type="button" aria-label="One more" onclick="add('${p.id}',1)">+</button></div></div>`;
+      }).join("")}
+      <label for="nm">Name</label><input id="nm" autocomplete="name" placeholder="Aisha Bello" value="${esc(S.name || "")}" oninput="S.name=this.value">
+      <label for="ct">City</label><input id="ct" autocomplete="address-level2" placeholder="Kaduna" value="${esc(S.city || "")}" oninput="S.city=this.value">
+    </div>
+    <div class="card">
+      <div class="sum"><span>Subtotal</span><span>${fmt(subtotal())} sats</span></div>
+      <div class="sum"><span>Delivery</span><span>${fmt(S.shipping)} sats</span></div>
+      <div class="sum total"><span>Total</span><span>${fmt(total)} sats</span></div>
+      <button class="paywith" id="payBtn" type="button" onclick="checkout()" ${S.pass ? "" : "disabled"}>
+        <img src="/logo.png" alt=""> Pay with Satish
+      </button>
+      <p class="small muted" style="margin-top:8px;text-align:center">⚡ Lightning or ₿ Bitcoin, from any wallet.</p>
+      ${S.pass ? "" : `<p class="small err" style="margin-top:8px">Open this shop from Satish for developers to place an order.</p>`}
+      <p class="small err" id="err"></p>
+    </div>
+  </div>`;
+}
+
+function payView() {
+  const o = S.order, pay = o.payment;
+  const hasLn = !!pay.lightning_invoice;
+  if (!hasLn) S.method = "onchain";
+  const qrText = S.method === "lightning" ? "LIGHTNING:" + pay.lightning_invoice.toUpperCase() : pay.bitcoin_uri;
+  const copyText = S.method === "lightning" ? pay.lightning_invoice : pay.address;
+  const openUrl = S.method === "lightning" ? pay.lightning_uri : pay.bitcoin_uri;
+  return `
+  <h2>Pay for order ${esc(o.order_id)}</h2>
+  <div class="layout">
+    <div class="satish">
+      <div class="head"><img src="/logo.png" alt=""> Pay with Satish</div>
+      <div class="amt">${fmt(pay.amount_sats)} sats</div>
+      <div class="small muted">to @${esc(pay.username)} · ${esc(pay.network)}</div>
+      ${hasLn ? `<div class="tabs" role="tablist">
+        <button type="button" role="tab" class="${S.method === "lightning" ? "on" : ""}" onclick="S.method='lightning';render()">⚡ Lightning</button>
+        <button type="button" role="tab" class="${S.method === "onchain" ? "on" : ""}" onclick="S.method='onchain';render()">₿ Bitcoin</button>
+      </div>` : `<p class="small muted" style="margin:10px 0">${esc(pay.warning || "Bitcoin only")}</p>`}
+      <div class="qr" aria-label="Payment QR code">${qrSvg(qrText)}</div>
+      <div class="mono">${esc(S.method === "lightning" ? copyText.slice(0, 48) + "…" : copyText)}</div>
+      <div class="row">
+        <button class="btn ghost" type="button" onclick="copy('${esc(copyText)}', this)">${S.method === "lightning" ? "Copy invoice" : "Copy address"}</button>
+        <a class="btn ghost" href="${esc(openUrl)}">Open my wallet</a>
+        ${pay.telegram_url ? `<a class="btn" href="${esc(pay.telegram_url)}" target="_blank" rel="noopener">Pay in Satish</a>` : ""}
+      </div>
+      <p class="small muted" style="margin-top:8px">${S.method === "lightning"
+        ? "Scan with any Lightning wallet. Confirms in seconds."
+        : `Send exactly ${fmt(pay.amount_sats)} sats. This code works in Bitcoin and Lightning wallets. Shows once the network confirms it.`}</p>
+      <div class="wait"><span class="spin"></span> ${pay.paid_sats && pay.status === "open" ? `Payment seen (${fmt(pay.paid_sats)} sats), waiting for confirmation…` : "Waiting for your payment…"}</div>
+    </div>
+    <div class="card">
+      <b>Order summary</b>
+      ${o.lines.map((l) => `<div class="sum"><span>${esc(l)}</span></div>`).join("")}
+      <div class="sum"><span>Delivery</span><span>${fmt(o.shipping_sats)} sats</span></div>
+      <div class="sum total"><span>Total</span><span>${fmt(pay.amount_sats)} sats</span></div>
+      <p class="small muted" style="margin-top:10px">Payment goes through Satish. Lightning payments reach the shop's wallet within seconds.</p>
+      <button class="btn ghost" type="button" style="margin-top:10px" onclick="cancelOrder()">Cancel and go back</button>
+    </div>
+  </div>`;
+}
+
+function doneView() {
+  const o = S.order, pay = o.payment;
+  return `<div class="card done">
+    <div class="big">🎉</div>
+    <h1>Thank you${S.name ? ", " + esc(S.name.split(" ")[0]) : ""}!</h1>
+    <p>Order <b>${esc(o.order_id)}</b> is paid: ${fmt(pay.amount_sats)} sats by ${pay.paid_via === "lightning" ? "⚡ Lightning" : "₿ Bitcoin"}.</p>
+    <p class="small muted" style="margin:8px 0 16px">We'll pack it and send it to ${esc(S.city || "you")}. (Not really, it's a demo 😉)</p>
+    <button class="btn" type="button" onclick="newOrder()">Keep shopping</button>
+  </div>`;
+}
+
+function render() {
+  $("count").textContent = count();
+  const v = S.view;
+  $("view").innerHTML = v === "cart" ? cartView() : v === "pay" && S.order ? payView() : v === "done" && S.order ? doneView() : shopView();
+}
+
+function qrSvg(text) {
+  if (typeof qrcode !== "function") return `<p class="small err">Couldn't load the QR code. Copy the details below instead.</p>`;
+  const q = qrcode(0, "M");
+  q.addData(text, "Byte");
+  q.make();
+  return q.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
+}
+
+async function copy(text, el) {
+  try { await navigator.clipboard.writeText(text); el.textContent = "Copied ✓"; setTimeout(render, 1500); } catch {}
+}
+
+// ---------- server calls ----------
+async function checkout() {
+  const btn = $("payBtn"), err = $("err");
+  btn.disabled = true; err.textContent = "";
+  const body = { items: lines().map(({ p, n }) => ({ id: p.id, qty: n })), name: S.name || "", city: S.city || "" };
+  try {
+    const o = await call("POST", "checkout", body);
+    log("POST /api/v1/dev/payment-requests", "shop server → Satish", o.request_sent);
+    log("201 Created", "Satish → shop server", o.payment);
+    S.order = o; S.method = o.payment.lightning_invoice ? "lightning" : "onchain";
+    try { sessionStorage.setItem("kk_order", JSON.stringify(o)); } catch {}
+    go("pay");
+    poll();
+  } catch (e) {
+    err.textContent = e.message; btn.disabled = false;
+  }
+}
+
+function poll() {
+  clearInterval(S.timer);
+  let last = "";
+  S.timer = setInterval(async () => {
+    if (!S.order) return clearInterval(S.timer);
+    try {
+      const pay = await call("GET", "orders/" + S.order.payment.id);
+      const key = pay.status + "/" + pay.paid_sats;
+      if (key !== last) {
+        log("GET /api/v1/dev/payment-requests/" + pay.id, "shop server → Satish", { status: pay.status, paid_sats: pay.paid_sats, paid_via: pay.paid_via });
+        last = key;
+      }
+      S.order.payment = { ...S.order.payment, ...pay };
+      if (pay.status === "paid") {
+        clearInterval(S.timer);
+        log("POST https://your-shop.com/satish/webhook", "Satish → shop server", { type: "request.paid", data: { id: pay.id, amount_sats: pay.amount_sats, paid_via: pay.paid_via, metadata: pay.metadata } });
+        S.cart = {}; saveCart();
+        try { sessionStorage.removeItem("kk_order"); } catch {}
+        go("done");
+      } else if (S.view === "pay") {
+        const box = document.querySelector(".wait");
+        if (box && pay.paid_sats) box.innerHTML = `<span class="spin"></span> Payment seen (${fmt(pay.paid_sats)} sats), waiting for confirmation…`;
+      }
+    } catch { /* keep trying */ }
+  }, 3000);
+}
+
+function cancelOrder() {
+  clearInterval(S.timer); S.order = null;
+  try { sessionStorage.removeItem("kk_order"); } catch {}
+  go("cart");
+}
+function newOrder() { S.order = null; go("shop"); }
+
+(async function start() {
+  try {
+    const d = await call("GET", "products");
+    S.products = d.products; S.shipping = d.shipping_sats;
+  } catch (e) { $("view").innerHTML = `<p class="err">${esc(e.message)}</p>`; return; }
+  if (!S.pass) $("who").textContent = "Open it from Satish for developers to place test orders.";
+  try {
+    const o = JSON.parse(sessionStorage.getItem("kk_order") || "null");
+    if (o) { S.order = o; S.view = "pay"; poll(); }
+  } catch {}
+  render();
+})();
+</script>
+</body>
+</html>

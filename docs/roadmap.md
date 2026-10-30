@@ -1,33 +1,34 @@
-# Roadmap - implemented vs. planned (phase 11)
+# Roadmap
 
-Status per plan phase; "implemented" means code + tests + docs are
-committed and green (266 tests). Every planned item's absence is honest -
-see `docs/known-limitations.md` for the instrument that closes each gap.
+## Done
 
-| # | Phase | Status | Evidence |
-| --- | --- | --- | --- |
-| 0 | Product definition, DSH pinning spike | **Implemented** | D8, `dsh_revision.json` + drift gate, 21 spike tests. Live verify pending key (KL-01) |
-| 1 | Repository & developer foundation | **Implemented** | Monorepo, 23-table model, migrations, CI-config (parked: KL-14), docs |
-| 2 | Telegram identity & Mini App | **Implemented** | initData HMAC, 24h sessions, revocation, session UI; 14 bot commands; 8 Mini App screens. Replay-window tuning open (KL-13) |
-| 3 | On-chain self-custody wallet | **Implemented** | BDK provider, regtest proof suite, public-descriptor-only persistence, digest-bound signing flow, alias-redirect refusal |
-| 4 | Lightning wallet | **Implemented** | lnd v0.21.4-beta (ADR D11), canned/real twin state machines, preimage-bound settlement (6x replay test), fee caps, SCB roundtrip. Live drill needs host (KL-02/KL-03) |
-| 5 | XP ledger & payment conversion | **Implemented** | One canonical `xp_per_sat`, packs, purchase/receipt flow, reconciliation job, budget caps |
-| 6 | DeepSeek Harness integration | **Implemented** | Durable agent runtime: task_events, DB-checked approvals, scope wall, budget-aware dispatch, resume. Live model runs pending key (KL-01) |
-| 7 | Research & deliverable tools | **Implemented** | SSRF wall, provenance table, cross-source comparison, quality gates, PDF/CSV/XLSX artifacts, committed eval set (`make research-eval`) |
-| 8 | Commerce intelligence | **Implemented** | Structural-only scoring with echoed weights, typed facts (no fabricated costs), supplier/listing comparison, committed eval set (`make commerce-eval`). Live ad-library connector open (KL-08) |
-| 9 | Email & automation workflows | **Implemented** | Fernet credential vault, preview-before-send, digest+TTL approvals, budget-laddered scheduler, notification queue + Telegram relay (KL-06 closed: one-decision push, honest sent/refused/unknown/skipped taxonomy) |
-| 10 | Security, reliability, ops readiness | **Implemented** | Rate limiting (swappable memory/Redis backends + validation-joined per-user keys, KL-09 closed), reconciliation alerts (23rd table) behind a real operator credential (KL-11 closed), retention sweep + policy, self-serve export + ledger-aware account closure (KL-10 closed), backup/restore drill, dependency/container audit, IR runbooks, security review + limitations register. Postgres/SCB restore rehearsal open (KL-04/05) |
-| 11 | Open-source release & Btrust package | **Implemented** | This release package: demo (`make demo`), walkthrough, disclosure policy, contributing guide, roadmap, Btrust proposal, limitations register |
+**The wallet**
+- Self-custodial Bitcoin wallet on the device: create, restore, send, receive, speed up and cancel payments
+- Lightning on the device with the Breez SDK on Spark, from the same 12 words
+- Pay and get paid by @username, on Bitcoin and Lightning, with signed addresses
+- Payment requests and links, group pay and bill splitting in Telegram
+- Amounts in any currency, 12 languages, light and dark mode, app colours
+- Telegram backup, social recovery, daily limit, safety checks, app lock
+- Alerts, price alerts, savings goals, contacts, CSV history, export and leaving tools
+- Telegram Mini App and browser extension
 
-## Planned next (post-plan, tracked honestly)
+**Satish for developers**
+- API keys, payment requests (sats or any currency), signed webhooks
+- Lightning and Bitcoin payments, with Lightning forwarded to the developer's wallet
+- Kaduna Kicks demo shop
 
-- **KL-01**: run `make dsh-verify` with a real DeepSeek key; then flip the
-  agent from stub to live behind the same tool wall.
-- **KL-02/03/05**: run `make lightning-drill` + SCB restore rehearsal on a
-  healthy host; document evidence in the drill doc.
-- **KL-04**: rehearse pg_dump/pg_restore + verification gates against a real
-  Postgres instance.
-- **KL-14**: merge the parked CI workflows (`backup-with-ci` branch) once a
-  `workflow`-scoped token is available; add license review.
-- **KL-15**: independent external security review - the release gate for
-  real-value production use.
+**Satish AI, the first app on Satish payments**
+- Chat in Telegram and the app, web research with sources, reports with tables and charts, file reading
+- Automations, email drafts with approval
+- TK credits paid by Lightning or Bitcoin into the operator's Satish wallet
+
+## Next
+
+1. **Independent security review** of the wallet and payment code, before encouraging larger balances on mainnet.
+2. **Payments that never pass through Satish, even briefly.** Let developers receive Lightning payments straight to their own wallet while still getting instant webhooks.
+3. **Our own Esplora server** so wallet lookups don't depend on a third party, for privacy.
+4. **Native-speaker review** of the Hausa, Yoruba, Igbo and Pidgin text.
+5. **More for developers:** client libraries (JavaScript, Python, PHP), WooCommerce and Shopify plugins, refunds, and payment links without code.
+6. **Bring other wallets in:** import from other apps' recovery phrases (other address types and paths), and watch-only wallets.
+7. **Automated checks on GitHub** for every pull request.
+8. **Contributors** through the Btrust Builders community, with good first issues in the wallet, the developer API and translations.

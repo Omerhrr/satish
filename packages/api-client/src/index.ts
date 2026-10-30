@@ -101,6 +101,8 @@ export interface XpClient {
   devDeliveries: (id: string) => Promise<{ id: string; event: string; status: string; attempts: number; last_status_code: number | null; last_error: string | null; created_at: string }[]>;
   devCreatePaymentRequest: (body: Record<string, unknown>) => Promise<Record<string, any>>;
   devPaymentRequests: () => Promise<{ data: Record<string, any>[] }>;
+  devPaymentRequest: (id: string) => Promise<Record<string, any>>;
+  devDemoShop: () => Promise<{ url: string }>;
   currentNames: (network: string, identityPubkeys: string[]) => Promise<Record<string, string>>;
   groupPayment: (id: string) => Promise<{ id: string; kind: string; to_username: string; amount_sats: number; display: string; note: string | null; already_paid: boolean }>;
   groupPaid: (id: string, ref: string) => Promise<{ status: string }>;
@@ -347,6 +349,8 @@ export function createXpClient(config: XpClientConfig = {}): XpClient {
     devDeliveries: (id) => request(`/api/v1/dev/webhooks/${id}/deliveries`),
     devCreatePaymentRequest: (body) => request("/api/v1/dev/payment-requests", { method: "POST", body: JSON.stringify(body) }),
     devPaymentRequests: () => request("/api/v1/dev/payment-requests"),
+    devDemoShop: () => request("/api/v1/dev/demo-shop", { method: "POST" }),
+    devPaymentRequest: (id) => request(`/api/v1/dev/payment-requests/${encodeURIComponent(id)}`),
     currentNames: (network, identityPubkeys) =>
       request("/api/v1/handles/current-names", { method: "POST", body: JSON.stringify({ network, identity_pubkeys: identityPubkeys }) }),
     groupPayment: (id) => request(`/api/v1/group/${id}`),

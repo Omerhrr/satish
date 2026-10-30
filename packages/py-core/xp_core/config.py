@@ -269,7 +269,7 @@ class Settings(BaseSettings):
     # privacy / retention
     # Days after which the retention sweep deletes expired data classes.
     # Money-trail and audit surfaces are never swept (see
-    # xp_core/jobs/retention.py PRESERVED_SURFACES and docs/privacy-retention.md).
+    # xp_core/jobs/retention.py PRESERVED_SURFACES and docs/privacy.md).
     retention_sessions_days: int = 7
     retention_notifications_read_days: int = 30
     retention_notifications_unread_days: int = 90

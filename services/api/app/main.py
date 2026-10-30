@@ -119,6 +119,9 @@ def create_app() -> FastAPI:
         return {"status": "ok", "service": "xp-api", "version": VERSION, "env": settings.env}
 
     app.include_router(api_router, prefix="/api/v1")
+    from app.api.demo_shop import router as demo_shop_router
+
+    app.include_router(demo_shop_router)
 
     @app.on_event("startup")
     async def _startup() -> None:

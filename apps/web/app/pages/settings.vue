@@ -191,7 +191,7 @@ async function exportData() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `xp-account-export-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `satish-account-export-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
     exportNote.value = "Download started";

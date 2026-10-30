@@ -16,7 +16,7 @@ Layout produced:
 
 Re-run only on a deliberate re-pin; changing the pinned version requires
 updating LND_VERSION in lightning_adapter/lnd_provider.py and re-recording
-the version-specific API facts in docs/lightning-integration.md.
+the version-specific API facts in the lnd provider notes in git history (Satish now uses Breez Spark, docs/wallet.md).
 """
 
 from __future__ import annotations

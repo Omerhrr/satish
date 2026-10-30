@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from xp_core.config import Settings
 
 # Activities that may incur variable external costs, disclosed verbatim
-# (pricing_requirements #3). Keep in sync with docs/xp-economy.md.
+# (pricing_requirements #3). Keep in sync with docs/satish-ai.md (TK credits).
 VARIABLE_COST_ACTIVITIES = [
     "web.search - upstream search provider usage",
     "web.fetch_page - fetching large or slow pages",

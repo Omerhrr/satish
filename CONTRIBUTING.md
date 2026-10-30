@@ -1,82 +1,65 @@
-# Contributing to XP
+# Contributing to Satish
 
-Thanks for looking at XP. The project's core engineering principle is
-**honesty about what is real**: every claim of a working feature must be
-reproducible from this repository, and every gap must be visible in
-`docs/known-limitations.md`. A PR that overclaims is a defect, same as a
-broken test.
+Thanks for wanting to help. Satish is a self-custodial wallet, so the bar is simple: **never put people's money at risk, and never claim something works when it doesn't.**
 
-## Getting set up (10 minutes, zero external services)
+## Get set up
+
+You need Python 3.12+, [uv](https://docs.astral.sh/uv/) and [bun](https://bun.sh). No accounts or API keys are needed to run the tests.
 
 ```bash
-cd xp
-python3 -m venv .venv && .venv/bin/pip install -U pip
-uv pip install --python .venv/bin/python -e packages/py-core -e services/api \
-  -e services/worker -e services/agent-adapter \
-  -e services/lightning-adapter -e services/research-adapter \
-  -e services/commerce-adapter -e services/email-adapter \
-  -e services/telegram-adapter -e apps/bot
-bun install
-make migrate && make demo   # proves your env end-to-end
+git clone https://github.com/Omerhrr/satish.git && cd satish
+python3 -m venv .venv
+make install        # Python packages and web dependencies
+make migrate        # creates the local SQLite database
+make test           # server tests
+cd apps/web && bun test tests   # wallet tests
 ```
 
-## The quality bars (CI-parity, run locally)
+To run the app locally, see [docs/development.md](docs/development.md).
 
-| Gate | Command | Bar |
-| --- | --- | --- |
-| Tests | `make test` | full suite green, no skips added casually |
-| Lint | `make lint` | ruff clean |
-| Audit | `make audit` | no unpinnable dependency specs or `:latest` images |
-| Drill | `make backup-drill` | restore roundtrip + re-reconciliation holds |
-| Demo | `make demo` | golden path passes end-to-end |
-| Web | `cd apps/web && bun run build` | Nuxt build clean |
-| Migrations | alembic `upgrade head` + `downgrade base` + `upgrade head` | roundtrip clean |
+## Before you open a pull request
+
+| Check | Command |
+| --- | --- |
+| Server tests pass | `make test` |
+| Wallet tests pass | `cd apps/web && bun test tests` |
+| Code style | `make lint` |
+| The app builds | `cd apps/web && bun run build` |
+| The extension builds (if you touched the app) | `bun run build:extension` |
+| Database changes migrate up and down | `cd services/api && alembic upgrade head && alembic downgrade -1 && alembic upgrade head` |
 
 ## Ground rules
 
-1. **Money surfaces are sacred.** Anything touching the XP ledger, payment
-   intents, or settlement must keep: append-only entries, CAS balance
-   transitions, idempotency keys, and the 1:1 intent↔entry invariant.
-   Reconciliation alerts that are `critical` must never be auto-resolved.
-2. **Honesty at the API layer.** Canned/deterministic providers must label
-   themselves in their responses. No surface may fabricate delivery,
-   settlement, or capability that is not configured (this is what
-   "can_change"/"not_claimed" disclosures mean).
-3. **New dependencies** need a reason in the PR description and a pinned
-   spec; the audit gate will reject `*`, `git+`, and `:latest`.
-4. **Security-relevant changes** (auth, scopes, approvals, wallet,
-   Lightning, credentials) need a test that pins the mitigation they touch,
-   and a look at `docs/threat-model.md` - update it if the boundary moves.
-5. **Schema changes** go through Alembic with a roundtrip-verified
-   migration and a docstring explaining the phase/decision.
-6. **Docs move with code.** If your change alters behavior described in
-   `docs/*.md`, update the doc in the same PR. The known-limitations
-   register is part of the review surface.
+1. **Keys never leave the device.** Nothing may send a recovery phrase, private key or the wallet's public key (xpub) to the server. The server must stay unable to move anyone's money.
+2. **Satish AI stays away from wallets.** The AI may not import wallet code or get wallet tools (`tests/test_ai_isolation.py` checks this). Paying someone is always a wallet action the person does themselves.
+3. **Money code is careful code.** TK balances only change through the append-only ledger, each payment credits exactly once, and anything that could double-pay or double-credit needs a test that proves it can't.
+4. **Say what's real.** If something only works on the test network, or depends on a key that may not be set, the app and the docs must say so. Add open gaps to [docs/known-limitations.md](docs/known-limitations.md).
+5. **Security changes need a test.** That covers sign-in, keys, signing, webhooks, the developer API and anything that touches money. If the change moves a trust boundary, update [docs/threat-model.md](docs/threat-model.md).
+6. **New dependencies need a reason** in the pull request, and an exact version.
+7. **Database changes** go through an Alembic migration that can be undone.
+8. **Docs change with the code.** If your change alters something described in `docs/`, update it in the same pull request.
+9. **Plain words.** Text people see should be short and clear, and work in translation. No em dashes.
 
-## Code ownership
+## Where things live
 
-| Area | Path | Owner |
-| --- | --- | --- |
-| Ledger / economy | `packages/py-core/xp_core/{models,services,jobs}`, `services/api` xp/tasks/account | @Omerhrr |
-| Wallet (in-app, on device) / Lightning | `apps/web/app/lib/wallet-core.ts`, `services/lightning-adapter` | @Omerhrr |
-| Agent / DSH | `services/agent-adapter`, `services/worker` agent jobs | @Omerhrr |
-| API surface | `services/api/app` | @Omerhrr |
-| Email / Telegram adapters | `services/email-adapter`, `services/telegram-adapter` | @Omerhrr |
-| Mini App | `apps/web` | @Omerhrr |
-| Docs / threat model | `docs/` | @Omerhrr |
+| Area | Path |
+| --- | --- |
+| Wallet (keys, signing, Bitcoin, Lightning, backup) | `apps/web/app/lib`, `apps/web/app/composables` |
+| App screens | `apps/web/app/pages`, `apps/web/app/components` |
+| Browser extension build | `apps/extension` |
+| Telegram bot | `apps/bot` |
+| Server API | `services/api/app` |
+| Background jobs | `services/worker` |
+| Satish AI (agent, research, tools) | `services/agent-adapter`, `services/research-adapter`, `services/api/app/services` |
+| Shared models, ledger, settings | `packages/py-core` |
+| Deployment | `deploy` |
 
-(Project is young: single maintainer with explicit intent to broaden
-ownership per-module as contributors establish history. Btrust-funded
-work expands this map in the open.)
+The project has one maintainer today (@Omerhrr). As people contribute regularly, we'll share ownership of areas.
 
-## Commit style
+## Commits
 
-One logical change per commit, message states what and why; phase-scale
-changes get the full evidence trail in the message (tests count, migration
-id, gates run) matching the existing history.
+One change per commit. Say what changed and why.
 
-## Reporting issues
+## Reporting bugs
 
-Security: `SECURITY.md` (responsible disclosure, 90-day window).
-Everything else: GitHub issues with reproduction steps; if it touches a
-drill or the demo, attach the failing step's transcript.
+Open a GitHub issue with steps to reproduce. Security problems go through [SECURITY.md](SECURITY.md), not public issues.

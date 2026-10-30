@@ -10,7 +10,7 @@ Exit:  0 if a published message round-trips, 1 otherwise.
 
 Recorded result in this sandbox (2026-10-15): FAIL - even a pure Python
 PUB->SUB over loopback drops messages; documented in
-docs/lightning-integration.md ("The honest sandbox limitation").
+the lnd provider notes in git history (Satish now uses Breez Spark, docs/wallet.md) ("The honest sandbox limitation").
 """
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ def main() -> int:
                 return 0
         print("FAIL: 10 published messages over 127.0.0.1, none delivered")
         print("loopback zmq is broken in this environment - lnd's zmq chain")
-        print("notifications cannot work here (see docs/lightning-integration.md)")
+        print("notifications cannot work here (see the lnd provider notes in git history (Satish now uses Breez Spark, docs/wallet.md))")
         return 1
     finally:
         ctx.term()

@@ -1,6 +1,6 @@
 """Two-node lnd regtest drill (phase 4, decision D11 evidence instrument).
 
-Stages (mirrors docs/lightning-integration.md "Recovery and backups"):
+Stages (mirrors the lnd provider notes in git history (Satish now uses Breez Spark, docs/wallet.md) "Recovery and backups"):
   1. bitcoind regtest up (rpcpolling; zmq is broken in this sandbox)
   2. two lnd nodes: wallet init from captured seed, TLS + macaroon, ACTIVE
   3. fund node A + open channel A->B            [BLOCKED in this sandbox]
@@ -240,7 +240,7 @@ class LndNode:
 def main() -> int:
     if not BITCOIND.exists() or not LND_BIN.exists():
         print("drill binaries missing under .tools/ - download lnd "
-              f"{LND_VERSION} + bitcoind first (see docs/lightning-integration.md)")
+              f"{LND_VERSION} + bitcoind first (see the lnd provider notes in git history (Satish now uses Breez Spark, docs/wallet.md))")
         return 1
     work = TOOLS / "ln-regtest-data"
     shutil.rmtree(work, ignore_errors=True)

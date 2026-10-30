@@ -140,6 +140,20 @@ async def api_caller(
 ApiCaller = Annotated[Caller, Depends(api_caller)]
 
 
+# ------------------------------------------------------------------ demo shop
+
+
+@router.post("/demo-shop")
+async def open_demo_shop(user: CurrentUser) -> dict:
+    """A link to Kaduna Kicks, the demo shop, that takes orders paid to this user's wallet.
+
+    The pass sits after "#", so it never reaches server logs or other sites.
+    """
+    from app.api.demo_shop import make_pass
+
+    return {"url": f"/api/demo-shop/#pass={make_pass(user.id, get_settings().onchain_network)}"}
+
+
 # ------------------------------------------------------------------ payment requests
 
 

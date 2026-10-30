@@ -10,6 +10,16 @@
       Pick a Satish username first (Wallet &gt; Home &gt; Pick a username). Payments to your API are paid to it.
     </p>
 
+    <button type="button" class="card shop-promo" :disabled="shopBusy" @click="openShop">
+      <span class="promo-art" aria-hidden="true">👟👜🧢</span>
+      <span class="grow">
+        <b>See it on a real shop website</b>
+        <span class="small dim">Opens Kaduna Kicks, a demo store, in your browser. Add shoes or a bag to the cart, check out, and pay its Satish QR code with Lightning or Bitcoin. Orders are paid to your own wallet, and "Show the API calls" reveals every request the shop makes.</span>
+        <span v-if="shopError" class="small err">{{ shopError }}</span>
+      </span>
+      <span class="chev"><span v-if="shopBusy" class="spinner" /><template v-else>↗</template></span>
+    </button>
+
     <!-- 1. Keys -->
     <section class="card">
       <h2>1. API keys</h2>
@@ -146,6 +156,27 @@ const shown = reactive<Record<string, boolean>>({});
 const testResult = reactive<Record<string, { ok: boolean; text: string }>>({});
 const deliveries = reactive<Record<string, any[]>>({});
 const copied = ref("");
+const shopBusy = ref(false);
+const shopError = ref("");
+async function openShop() {
+  shopBusy.value = true;
+  shopError.value = "";
+  // Open the tab right away (browsers block pop-ups opened after a wait), then point it at the shop.
+  const tg = (window as any).Telegram?.WebApp;
+  const tab = tg?.initData ? null : window.open("about:blank", "_blank");
+  try {
+    const { url } = await api.devDemoShop();
+    const full = base.value + url;
+    if (tg?.initData && tg.openLink) tg.openLink(full);
+    else if (tab) tab.location.href = full;
+    else location.href = full;
+  } catch (e) {
+    tab?.close();
+    shopError.value = e instanceof Error ? e.message : "Couldn't open the shop.";
+  } finally {
+    shopBusy.value = false;
+  }
+}
 const tryAmount = ref("5000");
 const tryCur = ref("SAT");
 const tryNote = ref("Order 42");
@@ -255,6 +286,10 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.shop-promo { width: 100%; text-align: left; font: inherit; cursor: pointer; display: flex; align-items: center; gap: 12px; text-decoration: none; color: inherit; border-color: var(--orange); background: linear-gradient(135deg, var(--orange-soft), transparent 70%), var(--bg-elev); }
+.shop-promo .grow { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.promo-art { font-size: 26px; letter-spacing: -6px; flex: none; }
+.chev { font-size: 24px; color: var(--orange); }
 .rows { list-style: none; padding: 0; margin: 8px 0; }
 .rows li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); }
 .row { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0; }

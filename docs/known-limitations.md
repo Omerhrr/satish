@@ -1,37 +1,43 @@
-# Known Limitations Register (phase 10)
+# Known limitations
 
-The single consolidated register of everything this build honestly cannot
-do yet. Each item: what is missing, the impact, and where the re-open
-instrument lives. Phase docs keep their local context; this register is the
-release-facing rollup (plan phase-11: "Open issues and known limitations").
+What Satish can't do yet, or does with a catch. If you find something missing from this list, please add it.
 
-| ID | Limitation | Impact | Instrument / path to close |
-| --- | --- | --- | --- |
-| KL-01 | DSH live verification has never run: no DeepSeek API key is configured (the pinned model name `deepseek-flash` and base URL were re-checked against DeepSeek's docs on 2026-10-20) | The pinned-revision client is contract-tested offline (53 tests) but the live round trip (real completions, real usage numbers) is unproven | `make dsh-verify` the moment a key exists (docs/dsh-integration.md) |
-| KL-02 | Lightning live drill needs a healthy host (zmq, bitcoind regtest, two lnd nodes) | Invoice/payment/recovery state machines are lnd-identical by construction and unit-tested, but the 8-stage live drill has not executed here | `make lightning-drill` (docs/lightning-integration.md) |
-| KL-03 | btcwallet stall limitation in lnd recovery path | Documented upstream behavior affecting channel-force-close timing; disclosed, not worked around | docs/lightning-integration.md open items |
-| KL-04 | Production Postgres backup/restore (pg_dump/pg_restore) not exercised here | The drill proves the logical roundtrip + verification gates on SQLite; operator must run the same gates after a real pg_restore | docs/incident-response.md R5 |
-| KL-05 | Lightning SCB restore needs a live node host | SCB roundtrip is code-verified; the physical restore rehearsal awaits the drill host | `make lightning-drill` stages 7-8 |
-| KL-06 | **CLOSED** - Telegram notification relay is implemented (one push decision per notification: sent / refused / unknown / skipped, never auto-retried). Residual: live `bot_api` delivery awaits a real bot token + chat; canned mode proves the full path | none remaining in code; live-mode evidence pending | `docs/email-automation.md` relay section, `tests/test_relay.py` |
-| KL-07 | Live search needs a Brave Search API key | With `XP_RESEARCH_SEARCH_MODE=brave` + `XP_BRAVE_SEARCH_API_KEY` research searches the live web; without a key it falls back to the small offline sample set (disclosed) | XP_RESEARCH_FETCH_MODE=http with eval re-run (`make research-eval`) |
-| KL-08 | Commerce ad-library integration is canned fixtures | Scoring/comparison logic is real; the live ad-library connector does not exist | docs/commerce-intelligence.md |
-| KL-09 | **CLOSED** - Redis-backed rate limiter implemented behind the same interface (atomic Lua token bucket shared across workers; ``XP_RATE_LIMIT_BACKEND=redis`` requires ``XP_REDIS_URL`` and refuses to construct without it) plus validation-joined per-user keys (every validated bearer joins the limiter identity cache, so token rotation can no longer refresh buckets). Residual: degraded fail-open on Redis outage is disclosed via ops observability but is a fail-open, not a queue; live-Redis evidence awaits an operator host | multi-worker under-limiting and bearer-rotation refresh are fixed in code; live multi-worker evidence pending | `xp_core.services.ratelimit` (RedisRateLimiter, IdentityCache, build_rate_limiter), `tests/test_ratelimit_redis.py`, `docs/decisions.md` D20 |
-| KL-10 | **CLOSED** - self-serve data export + ledger-aware account closure implemented (typed confirmation, precondition refusals, clean-reconciliation gate, identity anonymization, money/evidence trail retained). Residual: operator-assisted paths for nonzero-balance closure are contact-based | residual only affects users who close with a balance | `docs/privacy-retention.md` closure section, `xp_core.services.closure`, `tests/test_account.py` |
-| KL-11 | **CLOSED** - operator identity model in front of `/ops/*`: a configured credential (``XP_OPS_OPERATOR_TOKEN``) is required for every ops request in every environment (constant-time compared, accepted via ``X-Operator-Token`` or Authorization bearer), every grant and denial is audited to audit_events with no credential material, and without a configured credential the surfaces refuse 503 outside DEV_MODE instead of opening. Residual: the credential is a shared static secret (no per-operator identities, no mTLS/VPN integration) - rotate it like any secret; per-operator audit attribution needs the next hardening step | no open code path serves ops unauthenticated | `app.deps.require_operator`, `tests/test_ops_identity.py`, `docs/decisions.md` D21 |
-| KL-12 | Expiring signed URLs for artifacts (S3 era) | Local storage uses owner-checked direct download; S3 backend needs signed-URL expiry | storage backend upgrade |
-| KL-13 | initData replay-window tuning + per-tool output size caps | Threat-model open items carried since phase 2/6; bounded by 24h session TTL and tool caps today | docs/threat-model.md |
-| KL-14 | CI workflows remain parked on the local `backup-with-ci` branch (recreated after the original branch proved unrecoverable from this clone and the remote) | The GitHub token used for pushes has `repo` scope only (verified via API); pushing workflow files is refused without `workflow` scope, so `.github/` stays off main and off the remote until a scoped token exists | create a token with `workflow` scope, then `git merge backup-with-ci` + push |
-| KL-15 | Independent external security review not performed | Phase-10 review is internal and structured but not independent; required before real-value production use | docs/security-review.md |
+## Security and trust
 
-| KL-16 | On-chain fees vs small XP packs | On mainnet an on-chain payment can cost a few hundred sats in fees, large next to the 1,000-sat pack; fine for testnet and larger packs | Lightning payments for small amounts (lnd path, KL-02) or larger packs |
-| KL-17 | Wallet privacy: the Esplora host sees queried addresses | mempool.space (default) can link a user's addresses together | `NUXT_PUBLIC_ESPLORA_URL` pointing at your own Esplora/mempool instance |
-| KL-18 | In-app buying not yet live | Onramper needs an account, API key and registered signing key; BTC-for-NGN availability across its Nigerian providers is unconfirmed | Onramper dashboard; exchange-withdrawal guide shown meanwhile |
-| KL-20 | Stuck incoming payments can't be sped up by the receiver (no CPFP yet) | Only the sender can speed up an incoming payment; Satish tells the user to ask them | child-pays-for-parent from the receive side |
-| KL-21 | Payment alerts check every minute through public Esplora | Messages can lag a minute or two; heavy use could hit mempool.space rate limits | own Esplora/mempool instance (KL-17) or a ZMQ/webhook feed |
-| KL-22 | Lightning (Breez SDK, Spark) has not made a live payment from the build environment | Its network can't reach Spark operators; the integration is unit-tested and browser-tested against a stand-in SDK built to the real type definitions | open Lightning on the deployed app (regtest, no key) and receive from the Lightspark faucet; then mainnet with a Breez API key and small amounts |
-| KL-23 | Lightning trust model: Spark operators | Transfers are co-signed by independent Spark operators; funds can't be moved by them alone and users can exit on-chain unilaterally, but this is a weaker guarantee than a plain on-chain wallet | disclosed in the app and D29; keep larger savings on-chain |
-| KL-24 | Lightning on regtest can't send to real Lightning invoices | Spark's regtest is a private test network; real Lightning routing only works on mainnet | test Lightning-to-Lightning on mainnet with small amounts |
-| KL-19 | TK payments over Lightning are still the canned demo provider | Real XP payments use on-chain mode (D23) | `make lightning-drill` host, then lightning mode |
+| | What it means | Plan |
+|---|---|---|
+| No independent security review yet | The code is tested and reviewed internally, but no outside auditor has checked it. On mainnet the app suggests keeping only spending money in Satish. | An external review before encouraging larger balances. |
+| The operator Lightning wallet's phrase is on the server | Whoever controls the server could spend what's in that wallet: TK income, and developer Lightning payments during the seconds before they are forwarded. | Keep a small balance there and move income out often. Longer term, a design where Satish never holds payments, even briefly. |
+| Forwarding developer Lightning payments may raise licensing questions | Satish briefly receives money on a developer's behalf. | Get legal advice before running this at scale on mainnet. |
+| Spark's trust model | Lightning transfers are co-signed by independent operators. They can't take funds, and people can always withdraw on-chain, but it is weaker than plain Bitcoin. | Explained in the app; keep savings on Bitcoin. |
 
-Anything claiming production readiness must first clear: KL-01 (agent
-claims), KL-02/KL-04/KL-05 (money claims), KL-15 (release gate).
+## Lightning
+
+| | What it means | Plan |
+|---|---|---|
+| Lightning on the test network can't pay real Lightning invoices | Spark's regtest is a private test network. | Test real Lightning on mainnet with small amounts. |
+| Moving money between Bitcoin and Lightning is mainnet only | The test networks for each are different chains. | None needed. |
+| Forwarding only works to Spark addresses | A developer's payments are forwarded to their Satish (Spark) Lightning wallet. | Allow other Lightning addresses. |
+| Lightning paths haven't run against the live network from our build machines | They are tested against a stand-in built to the real SDK's types, and run on the deployed app. | Keep testing on the live deployment. |
+
+## Bitcoin
+
+| | What it means | Plan |
+|---|---|---|
+| mempool.space sees which addresses a wallet looks up | Privacy. | Point `NUXT_PUBLIC_ESPLORA_URL` at your own server. |
+| Payment alerts can lag a minute or two | They check public servers every minute. | Own server or a push feed. |
+| The receiver can't speed up a stuck incoming payment | Only the sender can (replace-by-fee). | Child-pays-for-parent. |
+| On-chain fees are high for small TK purchases | On mainnet a fee can be a few hundred sats. | Use Lightning for small amounts. |
+
+## Other
+
+| | What it means | Plan |
+|---|---|---|
+| Buying bitcoin needs an Onramper account | Off until the keys are set; the app shows a "buy on an exchange and withdraw" guide instead. Naira availability depends on Onramper's partners. | Set up the account. |
+| Some translations need review | Hausa, Yoruba, Igbo and Pidgin text was written without native-speaker review; untranslated screens fall back to English. | Native review. |
+| The wallet isn't synced between devices | Each device restores from the 12 words or the Telegram backup. | By design: keys stay per device. |
+| Satish AI quality depends on outside services | DeepSeek for answers, Brave Search for better results. Without keys it gives placeholder answers. | Set the keys. |
+| The ad-library tool uses sample data | The commerce comparison logic is real, but there is no live ad-library connection. | A live connector. |
+| Operator tools use one shared credential | `/ops` needs `XP_OPS_OPERATOR_TOKEN`, but there are no per-person operator accounts. | Per-operator sign-in. |
+| Closing an account needs a zero TK balance | Since everyone starts with 300 free TK, people must spend it or ask the operator before closing. | Let people give up leftover TK when closing. |
+| No automated CI on GitHub yet | Tests are run before each release by hand. | Add GitHub Actions. |
